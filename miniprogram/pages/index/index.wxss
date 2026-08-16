@@ -52,14 +52,23 @@
 }
 
 /* 离线提示 */
-.offline-tip {
-  background: rgba(232, 85, 78, 0.08);
-  color: var(--color-danger);
+.offline-tip,
+.env-tip {
   padding: 16rpx 24rpx;
   border-radius: var(--radius-sm);
   font-size: var(--font-xs);
   margin-bottom: 16rpx;
   text-align: center;
+}
+
+.offline-tip {
+  background: rgba(232, 85, 78, 0.08);
+  color: var(--color-danger);
+}
+
+.env-tip {
+  background: rgba(212, 184, 150, 0.12);
+  color: var(--color-primary-dark);
 }
 
 /* ===== 预测胶囊 ===== */
@@ -137,7 +146,7 @@
   50% { transform: scale(1.1); opacity: 0.3; }
 }
 
-.feed-svg {
+.feed-icon {
   position: relative;
   z-index: 2;
   width: 140rpx;
@@ -257,7 +266,7 @@
   margin-bottom: 16rpx;
 }
 
-.dual-svg {
+.dual-icon {
   width: 88rpx;
   height: 88rpx;
 }

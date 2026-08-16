@@ -1,0 +1,24 @@
+<!-- custom-tab-bar/index.wxml -->
+<view class="tab-bar">
+  <view
+    wx:for="{{list}}"
+    wx:key="pagePath"
+    class="tab-bar-item {{selected === index ? 'active' : ''}}"
+    data-index="{{index}}"
+    bindtap="onTap"
+  >
+    <view class="tab-icon-wrap">
+      <image
+        class="tab-icon"
+        src="{{selected === index ? item.iconActive : item.icon}}"
+        mode="aspectFit"
+      ></image>
+      <!-- 选中态小圆点指示 -->
+      <view class="tab-dot" wx:if="{{selected === index}}"></view>
+    </view>
+    <view
+      class="tab-text"
+      style="color: {{selected === index ? selectedColor : color}};"
+    >{{item.text}}</view>
+  </view>
+</view>

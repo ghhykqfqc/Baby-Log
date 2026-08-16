@@ -20,6 +20,9 @@ Page({
   },
 
   onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().switchTab('pages/timeline/timeline')
+    }
     this.loadData()
   },
 

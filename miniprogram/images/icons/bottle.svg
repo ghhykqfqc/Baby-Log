@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- 奶嘴 -->
+  <path d="M44 20 Q60 8 76 20" fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.95"/>
+  <!-- 瓶颈 -->
+  <rect x="48" y="18" width="24" height="12" rx="3" fill="none" stroke="#FFFFFF" stroke-width="4" opacity="0.95"/>
+  <!-- 瓶身 -->
+  <rect x="42" y="30" width="36" height="76" rx="8" fill="none" stroke="#FFFFFF" stroke-width="4" opacity="0.95"/>
+  <!-- 液体（白色半透明） -->
+  <rect x="46" y="58" width="28" height="46" rx="5" fill="#FFFFFF" opacity="0.55"/>
+  <!-- 刻度线 -->
+  <line x1="46" y1="52" x2="52" y2="52" stroke="#FFFFFF" stroke-width="2.5" opacity="0.75"/>
+  <line x1="46" y1="68" x2="52" y2="68" stroke="#FFFFFF" stroke-width="2.5" opacity="0.75"/>
+  <line x1="46" y1="84" x2="52" y2="84" stroke="#FFFFFF" stroke-width="2.5" opacity="0.75"/>
+  <!-- 高光 -->
+  <path d="M48 36 L48 96" stroke="#FFFFFF" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+</svg>

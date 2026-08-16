@@ -15,7 +15,8 @@
     "enablePullDownRefresh": false
   },
   "tabBar": {
-    "color": "#999999",
+    "custom": true,
+    "color": "#B5A795",
     "selectedColor": "#D4B896",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "white",
@@ -23,20 +24,20 @@
       {
         "pagePath": "pages/index/index",
         "text": "记录",
-        "iconPath": "images/tab-record.png",
-        "selectedIconPath": "images/tab-record-active.png"
+        "iconPath": "images/tab-record-gray.svg",
+        "selectedIconPath": "images/tab-record-active.svg"
       },
       {
         "pagePath": "pages/timeline/timeline",
         "text": "时光轴",
-        "iconPath": "images/tab-timeline.png",
-        "selectedIconPath": "images/tab-timeline-active.png"
+        "iconPath": "images/tab-timeline-gray.svg",
+        "selectedIconPath": "images/tab-timeline-active.svg"
       },
       {
         "pagePath": "pages/growth/growth",
         "text": "成长",
-        "iconPath": "images/tab-growth.png",
-        "selectedIconPath": "images/tab-growth-active.png"
+        "iconPath": "images/tab-growth-gray.svg",
+        "selectedIconPath": "images/tab-growth-active.svg"
       }
     ]
   },

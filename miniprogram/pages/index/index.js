@@ -1,4 +1,4 @@
-// pages/index/index.js - 首页极简打卡（差异化布局重构）
+// pages/index/index.js - 首页极简打卡（差异化布局 + 云函数容错）
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
@@ -14,12 +14,11 @@ Page({
     predictions: { feed: '', diaper: '', sleep: '' },
     hasPrediction: false,
     isOffline: false,
+    cloudReady: true,  // 默认 true，避免闪烁
     todayText: '',
-    // 按压反馈
     feedPress: false,
     diaperPress: false,
     sleepPress: false,
-    // 成功反馈
     feedSuccess: false,
     diaperSuccess: false,
     sleepSuccess: false
@@ -33,8 +32,19 @@ Page({
   },
 
   onShow() {
+    // 同步云开发就绪状态
+    this.setData({ cloudReady: app.globalData.cloudReady })
+
+    // 同步自定义 tabBar 选中态
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().switchTab('pages/index/index')
+    }
+
     this.refreshFromCache()
-    this.fetchCloudData()
+    // 仅在云就绪时拉取云端数据
+    if (app.globalData.cloudReady) {
+      this.fetchCloudData()
+    }
     this._timer = setInterval(() => {
       this.updateElapsedTexts()
     }, 30000)
@@ -52,9 +62,6 @@ Page({
     app.eventBus.off('recordsUpdated', this.refreshFromCache)
   },
 
-  /**
-   * 更新顶部日期文案
-   */
   updateTodayText() {
     const d = new Date()
     const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
@@ -63,9 +70,6 @@ Page({
     })
   },
 
-  /**
-   * 从本地缓存刷新展示
-   */
   refreshFromCache() {
     const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || { name: '宝宝', age: '新生儿' }
     const lastRecords = storage.getLastRecords()
@@ -81,7 +85,6 @@ Page({
     }
 
     const hasPrediction = !!(predictions.feed || predictions.sleep)
-
     this.setData({ babyInfo, lastRecords, predictions, hasPrediction })
     this.updateElapsedTexts()
   },
@@ -97,11 +100,11 @@ Page({
     })
   },
 
+  /**
+   * 拉取云端数据（仅在云就绪时调用）
+   */
   async fetchCloudData() {
-    if (!app.globalData.isOnline) {
-      this.setData({ isOffline: true })
-      return
-    }
+    if (!app.globalData.cloudReady) return
 
     try {
       const data = await call('getRecords', {
@@ -144,13 +147,14 @@ Page({
       }
     } catch (err) {
       console.warn('拉取云端数据失败，使用本地缓存:', err)
-      this.setData({ isOffline: true })
+      // 云环境失效时同步状态
+      if (String(err.errCode || '').includes('-501000')) {
+        app.globalData.cloudReady = false
+        this.setData({ cloudReady: false })
+      }
     }
   },
 
-  /**
-   * 统一时间戳为数字毫秒（兼容 ISO 字符串、Date 对象、数字）
-   */
   normalizeTimestamp(ts) {
     if (!ts) return 0
     if (typeof ts === 'number') return ts
@@ -158,27 +162,22 @@ Page({
     return isNaN(d.getTime()) ? 0 : d.getTime()
   },
 
-  /**
-   * ===== 三个记录按钮的差异化处理 =====
-   */
+  // ===== 三个记录按钮处理 =====
 
-  // 喂奶
-  async handleFeed(e) {
+  async handleFeed() {
     await this.recordAction(RECORD_TYPES.FEED, 'feedPress', 'feedSuccess')
   },
 
-  // 换尿布
   async handleDiaper() {
     await this.recordAction(RECORD_TYPES.DIAPER, 'diaperPress', 'diaperSuccess')
   },
 
-  // 睡觉
   async handleSleep() {
     await this.recordAction(RECORD_TYPES.SLEEP, 'sleepPress', 'sleepSuccess')
   },
 
   /**
-   * 统一的记录动作处理
+   * 统一的记录动作处理（支持云未就绪时的离线模式）
    */
   async recordAction(type, pressKey, successKey) {
     // 触感反馈
@@ -194,8 +193,8 @@ Page({
       babyId,
       recordType: type,
       timestamp,
-      userId: app.globalData.openid,
-      duration: type === RECORD_TYPES.SLEEP ? 0 : 0,
+      userId: app.globalData.openid || '',
+      duration: 0,
       createdAt: new Date().toISOString()
     }
 
@@ -211,15 +210,15 @@ Page({
     this.setData({ [successKey]: true })
     setTimeout(() => this.setData({ [successKey]: false }), 1000)
 
-    // 4. 推送到云端
-    if (app.globalData.isOnline) {
+    // 4. 推送到云端（仅当云就绪时）
+    if (app.globalData.cloudReady && app.globalData.isOnline) {
       try {
         await call('addRecord', record)
       } catch (err) {
         app.enqueuePendingSync(record)
-        wx.showToast({ title: '已离线保存', icon: 'none', duration: 1200 })
       }
     } else {
+      // 云不可用，入队等待同步
       app.enqueuePendingSync(record)
     }
   },

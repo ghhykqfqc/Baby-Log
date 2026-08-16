@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- 月牙主体 -->
+  <path d="M64 22 Q42 28 42 50 Q42 72 64 78 Q50 76 44 58 Q42 44 64 22 Z"
+        fill="#FFFFFF" opacity="0.95"/>
+  <!-- 月亮上的小点（月坑） -->
+  <circle cx="54" cy="44" r="2" fill="#C7B8D9" opacity="0.5"/>
+  <circle cx="58" cy="58" r="1.5" fill="#C7B8D9" opacity="0.4"/>
+  <!-- 左上星星 -->
+  <circle cx="22" cy="28" r="2.5" fill="#FFFFFF" opacity="0.85"/>
+  <line x1="18" y1="28" x2="26" y2="28" stroke="#FFFFFF" stroke-width="1" opacity="0.6"/>
+  <line x1="22" y1="24" x2="22" y2="32" stroke="#FFFFFF" stroke-width="1" opacity="0.6"/>
+  <!-- 右下星星 -->
+  <circle cx="78" cy="72" r="2" fill="#FFFFFF" opacity="0.75"/>
+  <!-- Zzz 文字 -->
+  <text x="68" y="34" font-family="-apple-system,sans-serif" font-size="14" fill="#FFFFFF" opacity="0.85" font-weight="bold">Z</text>
+  <text x="78" y="26" font-family="-apple-system,sans-serif" font-size="10" fill="#FFFFFF" opacity="0.65" font-weight="bold">z</text>
+</svg>

@@ -1,4 +1,4 @@
-<!-- pages/index/index.wxml - 首页极简打卡（差异化布局重构） -->
+<!-- pages/index/index.wxml - 首页极简打卡（差异化布局 + 图标修复） -->
 <view class="page-index safe-bottom">
   <!-- 顶部宝宝信息 -->
   <view class="header">
@@ -15,21 +15,24 @@
     <text>📴 当前离线，记录已保存本地，联网后自动同步</text>
   </view>
 
-  <!-- 智能预测提示区（折叠式） -->
+  <!-- 云开发未就绪提示（仅开发期） -->
+  <view class="env-tip" wx:if="{{!cloudReady}}">
+    <text>🔧 云开发未开通，当前为离线模式。记录会保存到本地，开通云环境后自动同步。</text>
+  </view>
+
+  <!-- 智能预测提示区 -->
   <view class="prediction-area" wx:if="{{hasPrediction}}">
     <view class="predict-pill" wx:if="{{predictions.feed}}">
-      <text class="pill-icon">🍼</text>
-      <text class="pill-text">{{predictions.feed}}</text>
+      <text class="pill-text">🍼 {{predictions.feed}}</text>
     </view>
     <view class="predict-pill" wx:if="{{predictions.sleep}}">
-      <text class="pill-icon">🌙</text>
-      <text class="pill-text">{{predictions.sleep}}</text>
+      <text class="pill-text">🌙 {{predictions.sleep}}</text>
     </view>
   </view>
 
   <!-- ============ 主操作区：差异化布局 ============ -->
 
-  <!-- 喂奶：占据视觉中心的大卡片（最高频操作） -->
+  <!-- 喂奶：占据视觉中心的大卡片 -->
   <view
     class="feed-card {{feedPress ? 'pressing' : ''}}"
     bindtap="handleFeed"
@@ -41,23 +44,10 @@
       <view class="success-label">已记录喂奶</view>
     </view>
 
-    <!-- 奶瓶 SVG 图标 -->
+    <!-- 奶瓶图标（image 引用 SVG，小程序不支持内联 svg 标签） -->
     <view class="feed-icon-wrap">
       <view class="feed-glow"></view>
-      <svg class="feed-svg" viewBox="0 0 80 80" aria-hidden="true">
-        <!-- 奶瓶瓶身 -->
-        <rect x="28" y="18" width="24" height="52" rx="6" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.95"/>
-        <!-- 瓶颈 -->
-        <rect x="32" y="10" width="16" height="8" rx="2" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.95"/>
-        <!-- 奶嘴 -->
-        <path d="M34 10 Q40 2 46 10" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/>
-        <!-- 液体 -->
-        <rect x="30" y="36" width="20" height="32" rx="4" fill="#FFFFFF" opacity="0.5"/>
-        <!-- 刻度线 -->
-        <line x1="30" y1="32" x2="34" y2="32" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
-        <line x1="30" y1="44" x2="34" y2="44" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
-        <line x1="30" y1="56" x2="34" y2="56" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
-      </svg>
+      <image class="feed-icon" src="/images/icons/bottle.svg" mode="aspectFit"></image>
     </view>
 
     <view class="feed-label">喂奶</view>
@@ -67,7 +57,7 @@
     <view class="feed-hint" wx:else>点击记录</view>
   </view>
 
-  <!-- 下方两个不对称卡片：换尿布 + 睡觉 -->
+  <!-- 下方两个不对称卡片 -->
   <view class="dual-area">
     <!-- 换尿布 -->
     <view
@@ -79,16 +69,7 @@
         <text>✓</text>
       </view>
       <view class="dual-icon-wrap">
-        <svg class="dual-svg" viewBox="0 0 60 60" aria-hidden="true">
-          <!-- 尿布形：底部弧形 -->
-          <path d="M12 18 Q12 22 14 26 L20 42 Q24 50 30 50 Q36 50 40 42 L46 26 Q48 22 48 18 Z"
-                fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round" opacity="0.95"/>
-          <!-- 固定扣 -->
-          <circle cx="16" cy="20" r="2.5" fill="#FFFFFF" opacity="0.9"/>
-          <circle cx="44" cy="20" r="2.5" fill="#FFFFFF" opacity="0.9"/>
-          <!-- 中线 -->
-          <line x1="30" y1="22" x2="30" y2="46" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.6"/>
-        </svg>
+        <image class="dual-icon" src="/images/icons/diaper.svg" mode="aspectFit"></image>
       </view>
       <view class="dual-label">换尿布</view>
       <view class="dual-elapsed" wx:if="{{elapsedTexts.diaper !== '--'}}">{{elapsedTexts.diaper}}</view>
@@ -105,17 +86,7 @@
         <text>✓</text>
       </view>
       <view class="dual-icon-wrap">
-        <svg class="dual-svg" viewBox="0 0 60 60" aria-hidden="true">
-          <!-- 月牙 -->
-          <path d="M38 14 Q26 18 26 32 Q26 46 38 50 Q28 48 24 36 Q24 24 38 14 Z"
-                fill="#FFFFFF" opacity="0.95"/>
-          <!-- 星星点缀 -->
-          <circle cx="14" cy="20" r="1.8" fill="#FFFFFF" opacity="0.8"/>
-          <circle cx="46" cy="42" r="1.5" fill="#FFFFFF" opacity="0.7"/>
-          <!-- Zzz -->
-          <text x="40" y="22" font-size="8" fill="#FFFFFF" opacity="0.8" font-weight="bold">z</text>
-          <text x="46" y="18" font-size="6" fill="#FFFFFF" opacity="0.6" font-weight="bold">z</text>
-        </svg>
+        <image class="dual-icon" src="/images/icons/moon.svg" mode="aspectFit"></image>
       </view>
       <view class="dual-label">睡觉</view>
       <view class="dual-elapsed" wx:if="{{elapsedTexts.sleep !== '--'}}">{{elapsedTexts.sleep}}</view>

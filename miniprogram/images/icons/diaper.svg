@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- 尿布主体 -->
+  <path d="M18 28 Q18 34 22 40 L30 62 Q36 72 50 72 Q64 72 70 62 L78 40 Q82 34 82 28 Z"
+        fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linejoin="round" opacity="0.95"/>
+  <!-- 左侧固定扣 -->
+  <circle cx="24" cy="30" r="3.5" fill="#FFFFFF" opacity="0.9"/>
+  <!-- 右侧固定扣 -->
+  <circle cx="76" cy="30" r="3.5" fill="#FFFFFF" opacity="0.9"/>
+  <!-- 中间虚线（折叠线） -->
+  <line x1="50" y1="34" x2="50" y2="68" stroke="#FFFFFF" stroke-width="2" stroke-dasharray="4,3" opacity="0.65"/>
+  <!-- 顶部腰带 -->
+  <path d="M22 28 Q50 24 78 28" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.7"/>
+  <!-- 小心形装饰 -->
+  <path d="M50 52 Q46 48 44 52 Q44 56 50 60 Q56 56 56 52 Q54 48 50 52 Z"
+        fill="#FFFFFF" opacity="0.55"/>
+</svg>

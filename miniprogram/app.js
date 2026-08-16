@@ -1,32 +1,39 @@
 // app.js - 秒记宝宝 全局逻辑
+// 云环境 ID 配置（按需修改为你自己的环境 ID）
+const CLOUD_ENV = 'baby-log-prod'
+
 App({
-  /**
-   * 全局数据
-   */
   globalData: {
     userInfo: null,
     openid: '',
-    babyId: '',           // 当前选中的宝宝档案ID
-    babyInfo: null,       // 宝宝基础信息
-    familyRole: 'parent', // parent | grandparent
-    isOnline: true,       // 网络状态
-    pendingSync: []       // 待同步到云端的本地记录队列
+    babyId: '',
+    babyInfo: null,
+    familyRole: 'parent',
+    isOnline: true,
+    pendingSync: [],
+    // 云开发是否可用（环境未创建时为 false）
+    cloudReady: false,
+    // 开发模式：跳过云函数调用（云环境未开通时不报错）
+    devMode: false
   },
 
-  /**
-   * 小程序初始化
-   */
   onLaunch() {
-    // 初始化云开发
+    // 初始化云开发（容错：环境不存在时不崩溃）
     if (!wx.cloud) {
-      console.error('请使用 2.2.3 或以上的基础库以使用云能力')
-      return
+      console.warn('当前基础库版本过低，不支持云能力')
+      this.globalData.devMode = true
+    } else {
+      try {
+        wx.cloud.init({
+          env: CLOUD_ENV,
+          traceUser: true
+        })
+        this.globalData.cloudReady = true
+      } catch (err) {
+        console.warn('云开发初始化失败，进入离线模式:', err.message || err)
+        this.globalData.cloudReady = false
+      }
     }
-
-    wx.cloud.init({
-      env: 'baby-log-prod',  // 替换为实际云环境ID
-      traceUser: true
-    })
 
     // 恢复本地缓存
     this.restoreFromStorage()
@@ -34,82 +41,92 @@ App({
     // 监听网络状态
     wx.onNetworkStatusChange((res) => {
       this.globalData.isOnline = res.isConnected
-      if (res.isConnected && this.globalData.pendingSync.length > 0) {
+      if (res.isConnected && this.globalData.pendingSync.length > 0 && this.globalData.cloudReady) {
         this.syncPendingRecords()
       }
     })
 
-    // 获取用户openid
-    this.getOpenId()
+    // 仅在云开发就绪时获取 openid
+    if (this.globalData.cloudReady) {
+      this.getOpenId()
+    }
   },
 
-  /**
-   * 从本地缓存恢复数据（性能优化：首屏秒开）
-   */
   restoreFromStorage() {
-    const babyId = wx.getStorageSync('babyId')
-    const babyInfo = wx.getStorageSync('babyInfo')
-    const familyRole = wx.getStorageSync('familyRole')
-
-    if (babyId) this.globalData.babyId = babyId
-    if (babyInfo) this.globalData.babyInfo = babyInfo
-    if (familyRole) this.globalData.familyRole = familyRole
-  },
-
-  /**
-   * 获取用户唯一标识
-   */
-  async getOpenId() {
     try {
-      const res = await wx.cloud.callFunction({
-        name: 'getOpenId'
-      })
-      this.globalData.openid = res.result.openid
-      wx.setStorageSync('openid', res.result.openid)
-      return res.result.openid
-    } catch (err) {
-      console.error('获取openid失败:', err)
-      return ''
+      const babyId = wx.getStorageSync('babyId')
+      const babyInfo = wx.getStorageSync('babyInfo')
+      const familyRole = wx.getStorageSync('familyRole')
+      if (babyId) this.globalData.babyId = babyId
+      if (babyInfo) this.globalData.babyInfo = babyInfo
+      if (familyRole) this.globalData.familyRole = familyRole
+    } catch (e) {
+      console.warn('恢复本地缓存失败:', e)
     }
   },
 
   /**
-   * 离线记录入队，网络恢复后自动同步
-   * @param {Object} record - 记录数据
+   * 安全的云函数调用封装（云不可用时返回空结果，不报错）
    */
-  enqueuePendingSync(record) {
-    this.globalData.pendingSync.push(record)
-    wx.setStorageSync('pendingSync', this.globalData.pendingSync)
+  async safeCall(name, data = {}) {
+    if (!this.globalData.cloudReady) {
+      return null
+    }
+    try {
+      const res = await wx.cloud.callFunction({ name, data })
+      return res.result
+    } catch (err) {
+      // 静默处理 Env Not Exists 等错误
+      if (String(err.errCode || '').includes('-501000') || String(err.errMsg || '').includes('Env Not Exists')) {
+        this.globalData.cloudReady = false
+        console.warn('云环境不可用，已切换到离线模式')
+      }
+      return null
+    }
   },
 
-  /**
-   * 同步所有待处理记录到云端
-   */
+  async getOpenId() {
+    if (!this.globalData.cloudReady) return ''
+    try {
+      const res = await wx.cloud.callFunction({ name: 'getOpenId' })
+      if (res.result && res.result.openid) {
+        this.globalData.openid = res.result.openid
+        wx.setStorageSync('openid', res.result.openid)
+        return res.result.openid
+      }
+    } catch (err) {
+      console.warn('获取 openid 失败（云环境未就绪）:', err.errMsg || err.message || '')
+      this.globalData.cloudReady = false
+    }
+    return ''
+  },
+
+  enqueuePendingSync(record) {
+    this.globalData.pendingSync.push(record)
+    try {
+      wx.setStorageSync('pendingSync', this.globalData.pendingSync)
+    } catch (e) {}
+  },
+
   async syncPendingRecords() {
+    if (!this.globalData.cloudReady) return
     const queue = [...this.globalData.pendingSync]
     this.globalData.pendingSync = []
-    wx.setStorageSync('pendingSync', this.globalData.pendingSync)
+    try { wx.setStorageSync('pendingSync', this.globalData.pendingSync) } catch (e) {}
 
     for (const record of queue) {
       try {
-        await wx.cloud.callFunction({
-          name: 'addRecord',
-          data: record
-        })
+        await wx.cloud.callFunction({ name: 'addRecord', data: record })
       } catch (err) {
-        // 同步失败，重新入队
         this.globalData.pendingSync.push(record)
       }
     }
 
     if (this.globalData.pendingSync.length > 0) {
-      wx.setStorageSync('pendingSync', this.globalData.pendingSync)
+      try { wx.setStorageSync('pendingSync', this.globalData.pendingSync) } catch (e) {}
     }
   },
 
-  /**
-   * 全局事件总线（轻量级发布订阅）
-   */
   eventBus: {
     events: {},
     on(event, callback) {
