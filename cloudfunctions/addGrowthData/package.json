@@ -1,0 +1,9 @@
+{
+  "name": "addGrowthData",
+  "version": "1.0.0",
+  "description": "新增成长测量数据",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

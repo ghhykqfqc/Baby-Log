@@ -1,0 +1,112 @@
+<!-- pages/growth/growth.wxml -->
+<view class="page-growth safe-bottom">
+
+  <!-- 宝宝信息卡 -->
+  <view class="info-card card">
+    <view class="info-row">
+      <view class="info-label">姓名</view>
+      <view class="info-value">{{babyInfo.name || '宝宝'}}</view>
+    </view>
+    <view class="info-row">
+      <view class="info-label">出生日期</view>
+      <view class="info-value">{{babyInfo.birthDate || '未设置'}}</view>
+    </view>
+    <view class="info-row" wx:if="{{babyInfo.gender}}">
+      <view class="info-label">性别</view>
+      <view class="info-value">{{babyInfo.gender === 'M' ? '男' : '女'}}</view>
+    </view>
+  </view>
+
+  <!-- 生长曲线区 -->
+  <view class="chart-section card">
+    <view class="chart-header">
+      <view class="chart-title">生长曲线</view>
+      <view class="chart-tabs">
+        <view
+          class="tab {{chartType === 'weight' ? 'active' : ''}}"
+          data-type="weight"
+          bindtap="switchChart"
+        >体重</view>
+        <view
+          class="tab {{chartType === 'height' ? 'active' : ''}}"
+          data-type="height"
+          bindtap="switchChart"
+        >身高</view>
+      </view>
+    </view>
+
+    <!-- Canvas 图表 -->
+    <canvas
+      type="2d"
+      id="growthChart"
+      class="growth-chart"
+    ></canvas>
+
+    <view class="chart-tip">
+      <text>虚线为 WHO 50 百分位参考标准</text>
+    </view>
+  </view>
+
+  <!-- 历史记录列表 -->
+  <view class="history-section card" wx:if="{{records.length > 0}}">
+    <view class="section-title">历史测量</view>
+    <view class="history-item" wx:for="{{records}}" wx:key="_id">
+      <view class="hist-date">{{item.measureDate}}</view>
+      <view class="hist-data">
+        <text wx:if="{{item.height}}">身高 {{item.height}}cm</text>
+        <text wx:if="{{item.weight}}">体重 {{item.weight}}kg</text>
+      </view>
+    </view>
+  </view>
+
+  <empty-state
+    wx:if="{{!loading && records.length === 0}}"
+    icon="📏"
+    title="还没有测量数据"
+    subtitle="点击下方按钮开始记录宝宝的成长吧"
+  />
+
+  <!-- 录入按钮 -->
+  <view class="fab-btn" bindtap="showAddForm">
+    <text>+</text>
+  </view>
+
+  <!-- 录入表单弹窗 -->
+  <view class="form-mask" wx:if="{{showForm}}" bindtap="hideForm">
+    <view class="form-sheet" catchtap="">
+      <view class="form-title">记录成长数据</view>
+
+      <view class="form-item">
+        <text class="form-label">测量日期</text>
+        <picker mode="date" value="{{formData.measureDate}}" bindchange="onDateChange">
+          <view class="picker-value">{{formData.measureDate}}</view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">身高(cm)</text>
+        <input
+          type="digit"
+          placeholder="如 70.5"
+          value="{{formData.height}}"
+          bindinput="onHeightInput"
+        />
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">体重(kg)</text>
+        <input
+          type="digit"
+          placeholder="如 8.2"
+          value="{{formData.weight}}"
+          bindinput="onWeightInput"
+        />
+      </view>
+
+      <view class="form-actions">
+        <view class="btn-cancel" bindtap="hideForm">取消</view>
+        <view class="btn-confirm" bindtap="submitGrowth">保存</view>
+      </view>
+    </view>
+  </view>
+</view>

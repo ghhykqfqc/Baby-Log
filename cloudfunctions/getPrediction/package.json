@@ -1,0 +1,9 @@
+{
+  "name": "getPrediction",
+  "version": "1.0.0",
+  "description": "基于历史数据计算作息预测",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

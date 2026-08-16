@@ -1,0 +1,49 @@
+<!-- pages/timeline/timeline.wxml -->
+<view class="page-timeline">
+  <!-- 日期标题 -->
+  <view class="date-header">
+    <view class="date-title">{{todayLabel}}</view>
+    <view class="summary-bar">
+      <view class="summary-item">
+        <text class="num">{{summary.feedCount}}</text>
+        <text class="label">喂奶</text>
+      </view>
+      <view class="divider"></view>
+      <view class="summary-item">
+        <text class="num">{{summary.diaperCount}}</text>
+        <text class="label">换尿布</text>
+      </view>
+      <view class="divider"></view>
+      <view class="summary-item">
+        <text class="num">{{summary.sleepDuration}}</text>
+        <text class="label">睡眠(分钟)</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <empty-state
+    wx:if="{{!loading && records.length === 0}}"
+    icon="🌱"
+    title="还没有记录哦"
+    subtitle="去首页点击按钮记录宝宝的第一条作息吧"
+  />
+
+  <!-- 时光轴列表 -->
+  <view class="timeline-list" wx:if="{{records.length > 0}}">
+    <timeline-card
+      wx:for="{{records}}"
+      wx:key="_id"
+      record="{{item}}"
+      index="{{index}}"
+      binddelete="handleDelete"
+    />
+  </view>
+
+  <!-- 底部分享按钮 -->
+  <view class="bottom-bar safe-bottom" wx:if="{{records.length > 0}}">
+    <view class="share-btn" bindtap="goShareCard">
+      <text>📸 生成分享卡片</text>
+    </view>
+  </view>
+</view>

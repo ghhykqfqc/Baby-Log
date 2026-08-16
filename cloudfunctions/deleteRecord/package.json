@@ -1,0 +1,9 @@
+{
+  "name": "deleteRecord",
+  "version": "1.0.0",
+  "description": "删除一条作息记录",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -1,0 +1,36 @@
+<!-- components/timeline-card/timeline-card.wxml -->
+<view class="timeline-item" style="animation-delay: {{index * 50}}ms;">
+  <!-- 左侧时间轴线条 -->
+  <view class="axis">
+    <view class="axis-dot" style="background: {{record.color}};"></view>
+    <view class="axis-line" wx:if="{{index > 0}}"></view>
+  </view>
+
+  <!-- 可滑动卡片 -->
+  <view
+    class="card-wrapper"
+    style="transform: translateX({{offsetX}}rpx); transition: {{isSwiping ? 'none' : 'all 0.25s ease'}};"
+    bindtouchstart="handleTouchStart"
+    bindtouchmove="handleTouchMove"
+    bindtouchend="handleTouchEnd"
+    bindtap="handleCardTap"
+  >
+    <view class="card-content">
+      <view class="card-left">
+        <view class="card-icon">{{record.icon}}</view>
+      </view>
+      <view class="card-body">
+        <view class="card-title">{{record.label}}</view>
+        <view class="card-time">{{record.timeText}}</view>
+      </view>
+      <view class="card-extra" wx:if="{{record.extra}}">
+        <text class="extra-text">{{record.extra}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 删除按钮 -->
+  <view class="delete-btn" wx:if="{{showDelete}}" bindtap="handleDelete">
+    <text>删除</text>
+  </view>
+</view>

@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "timeline-card": "../../components/timeline-card/timeline-card",
+    "empty-state": "../../components/empty-state/empty-state"
+  },
+  "navigationBarTitleText": "今日时光轴",
+  "enablePullDownRefresh": true
+}

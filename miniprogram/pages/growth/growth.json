@@ -1,0 +1,6 @@
+{
+  "usingComponents": {
+    "empty-state": "../../components/empty-state/empty-state"
+  },
+  "navigationBarTitleText": "成长档案"
+}

@@ -1,0 +1,55 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/timeline/timeline",
+    "pages/growth/growth",
+    "pages/share/share"
+  ],
+  "window": {
+    "backgroundColor": "#FAF6F0",
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#FAF6F0",
+    "navigationBarTitleText": "秒记宝宝",
+    "navigationBarTextStyle": "black",
+    "navigationStyle": "default",
+    "enablePullDownRefresh": false
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#D4B896",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "记录",
+        "iconPath": "images/tab-record.png",
+        "selectedIconPath": "images/tab-record-active.png"
+      },
+      {
+        "pagePath": "pages/timeline/timeline",
+        "text": "时光轴",
+        "iconPath": "images/tab-timeline.png",
+        "selectedIconPath": "images/tab-timeline-active.png"
+      },
+      {
+        "pagePath": "pages/growth/growth",
+        "text": "成长",
+        "iconPath": "images/tab-growth.png",
+        "selectedIconPath": "images/tab-growth-active.png"
+      }
+    ]
+  },
+  "cloud": true,
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "requiredPrivateInfos": [
+    "getLocation"
+  ],
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于记录宝宝的作息数据"
+    }
+  }
+}

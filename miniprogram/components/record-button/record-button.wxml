@@ -1,0 +1,23 @@
+<!-- components/record-button/record-button.wxml -->
+<view
+  class="record-btn {{pressing ? 'pressing' : ''}} {{disabled ? 'disabled' : ''}}"
+  style="--btn-color: {{color}};"
+  bindtap="handleTap"
+>
+  <!-- 成功反馈层 -->
+  <view class="success-layer" wx:if="{{showSuccess}}">
+    <view class="success-icon">✓</view>
+    <view class="success-text">已记录</view>
+  </view>
+
+  <!-- 按钮主体 -->
+  <view class="btn-inner">
+    <view class="btn-icon">{{icon}}</view>
+    <view class="btn-label">{{label}}</view>
+  </view>
+
+  <!-- 距上次时间 -->
+  <view class="elapsed-text" wx:if="{{elapsedTime}}">
+    距上次 {{elapsedText}}
+  </view>
+</view>

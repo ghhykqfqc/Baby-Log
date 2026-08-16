@@ -1,0 +1,132 @@
+/* app.wxss - 全局样式 / 秒记宝宝 */
+
+/* ===== 设计令牌（奶咖色系） ===== */
+page {
+  --color-bg: #FAF6F0;
+  --color-bg-card: #FFFFFF;
+  --color-primary: #D4B896;
+  --color-primary-dark: #C0A07A;
+  --color-primary-light: #E8D5B8;
+  --color-primary-bg: #F5EBDD;
+  --color-text-primary: #3D3027;
+  --color-text-secondary: #8B7D6E;
+  --color-text-hint: #B5A795;
+  --color-divider: #F0E8DE;
+  --color-danger: #E8554E;
+  --color-success: #7FB069;
+  --color-info: #6CA3C5;
+
+  /* 圆角 */
+  --radius-sm: 12rpx;
+  --radius-md: 24rpx;
+  --radius-lg: 40rpx;
+  --radius-xl: 60rpx;
+
+  /* 间距 */
+  --spacing-xs: 8rpx;
+  --spacing-sm: 16rpx;
+  --spacing-md: 24rpx;
+  --spacing-lg: 32rpx;
+  --spacing-xl: 48rpx;
+
+  /* 字体 */
+  --font-xs: 22rpx;
+  --font-sm: 26rpx;
+  --font-md: 30rpx;
+  --font-lg: 36rpx;
+  --font-xl: 44rpx;
+  --font-xxl: 56rpx;
+
+  /* 阴影 */
+  --shadow-card: 0 4rpx 24rpx rgba(180, 150, 110, 0.12);
+  --shadow-button: 0 8rpx 32rpx rgba(212, 184, 150, 0.35);
+  --shadow-button-active: 0 4rpx 16rpx rgba(212, 184, 150, 0.25);
+
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  font-size: var(--font-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== 基础工具类 ===== */
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-hint {
+  color: var(--color-text-hint);
+}
+
+.text-danger {
+  color: var(--color-danger);
+}
+
+.font-bold {
+  font-weight: 600;
+}
+
+/* 安全区域 */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-bottom-lg {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 120rpx);
+}
+
+/* 卡片 */
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--spacing-lg);
+}
+
+/* 渐隐动画 */
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 弹跳动画（按钮按下反馈） */
+.bounce {
+  animation: bounce 0.4s ease;
+}
+
+@keyframes bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.92); }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}

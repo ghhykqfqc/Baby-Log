@@ -1,0 +1,72 @@
+# ===== 微信小程序 / 云开发 =====
+# 微信开发者工具自动生成的上传信息
+miniprogram_npm/
+# 云函数本地 node_modules（云端会重新安装）
+cloudfunctions/**/node_modules/
+# 云函数本地安装锁文件可选保留，默认忽略
+cloudfunctions/**/package-lock.json
+# 微信开发者工具的临时目录
+.wechat/
+# 项目私有配置（含本地 appid / 个人偏好，不应提交）
+project.private.config.json
+
+# ===== 依赖 =====
+node_modules/
+miniprogram/package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ===== 构建产物 =====
+dist/
+build/
+out/
+*.zip
+
+# ===== 日志 =====
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# ===== 环境变量 / 敏感信息 =====
+.env
+.env.local
+.env.*.local
+*.secret
+*.key
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== WorkBuddy / AI 工具 =====
+.workbuddy/
+
+# ===== Python（脚本工具）=====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+.pytest_cache/
+
+# ===== 临时文件 =====
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+
+# ===== 设计稿 / 其他 =====
+*.psd
+*.ai
+*.sketch

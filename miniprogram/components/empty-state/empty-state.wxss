@@ -1,0 +1,25 @@
+/* components/empty-state/empty-state.wxss */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  opacity: 0.6;
+}
+
+.empty-title {
+  font-size: var(--font-md);
+  color: var(--color-text-secondary);
+  margin-top: 24rpx;
+}
+
+.empty-subtitle {
+  font-size: var(--font-sm);
+  color: var(--color-text-hint);
+  margin-top: 8rpx;
+}

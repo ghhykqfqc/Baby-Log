@@ -1,0 +1,25 @@
+<!-- pages/share/share.wxml -->
+<view class="page-share safe-bottom">
+  <!-- 分享卡片预览 -->
+  <view class="canvas-container">
+    <canvas
+      type="2d"
+      id="shareCanvas"
+      class="share-canvas"
+    ></canvas>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="actions">
+    <view class="action-btn primary" bindtap="saveImage">
+      <text>💾 保存图片到相册</text>
+    </view>
+    <button class="action-btn secondary" open-type="share">
+      <text>💬 分享给好友</text>
+    </button>
+  </view>
+
+  <view class="tip">
+    <text>保存图片后可在朋友圈分享宝宝每日作息</text>
+  </view>
+</view>
