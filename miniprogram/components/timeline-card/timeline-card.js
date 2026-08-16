@@ -19,62 +19,51 @@ Component({
   },
 
   methods: {
-    // 触摸开始
     handleTouchStart(e) {
       if (e.touches.length !== 1) return
-      this.setData({
-        startX: e.touches[0].clientX,
-        isSwiping: true
-      })
+      this.setData({ startX: e.touches[0].clientX, isSwiping: true })
     },
 
-    // 触摸移动
     handleTouchMove(e) {
       if (!this.data.isSwiping || e.touches.length !== 1) return
       const moveX = e.touches[0].clientX
       const diff = moveX - this.data.startX
-      // 仅允许左滑
-      if (diff < 0 && diff > -160) {
+      // 仅允许左滑，且最大 160rpx（折算 px）
+      if (diff < 0 && diff > -100) {
         this.setData({ offsetX: diff })
       }
     },
 
-    // 触摸结束
     handleTouchEnd() {
       if (!this.data.isSwiping) return
       const offset = this.data.offsetX
-      // 滑动超过一半则显示删除
-      if (offset < -80) {
-        this.setData({ offsetX: -140, showDelete: true })
+      if (offset < -40) {
+        this.setData({ showDelete: true, offsetX: 0 })
       } else {
-        this.setData({ offsetX: 0, showDelete: false })
+        this.setData({ showDelete: false, offsetX: 0 })
       }
       this.setData({ isSwiping: false })
     },
 
-    // 点击删除按钮
     handleDelete() {
-      // 二次确认
       wx.showModal({
         title: '确认删除',
-        content: `确定要删除这条${this.data.record.label}记录吗？`,
+        content: `确定删除这条${this.data.record.label}记录？`,
         confirmText: '删除',
         confirmColor: '#E8554E',
         success: (res) => {
           if (res.confirm) {
             this.triggerEvent('delete', { id: this.data.record._id })
           } else {
-            // 取消则收回
-            this.setData({ offsetX: 0, showDelete: false })
+            this.setData({ showDelete: false })
           }
         }
       })
     },
 
-    // 恢复滑动
     handleCardTap() {
       if (this.data.showDelete) {
-        this.setData({ offsetX: 0, showDelete: false })
+        this.setData({ showDelete: false })
       }
     }
   }

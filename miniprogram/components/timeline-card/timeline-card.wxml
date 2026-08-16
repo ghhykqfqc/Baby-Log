@@ -1,36 +1,38 @@
 <!-- components/timeline-card/timeline-card.wxml -->
-<view class="timeline-item" style="animation-delay: {{index * 50}}ms;">
-  <!-- 左侧时间轴线条 -->
-  <view class="axis">
-    <view class="axis-dot" style="background: {{record.color}};"></view>
-    <view class="axis-line" wx:if="{{index > 0}}"></view>
-  </view>
-
+<view class="timeline-item" style="animation-delay: {{index * 40}}ms;">
   <!-- 可滑动卡片 -->
   <view
-    class="card-wrapper"
-    style="transform: translateX({{offsetX}}rpx); transition: {{isSwiping ? 'none' : 'all 0.25s ease'}};"
+    class="card-wrapper {{showDelete ? 'shifted' : ''}}"
     bindtouchstart="handleTouchStart"
     bindtouchmove="handleTouchMove"
     bindtouchend="handleTouchEnd"
     bindtap="handleCardTap"
   >
-    <view class="card-content">
-      <view class="card-left">
-        <view class="card-icon">{{record.icon}}</view>
+    <!-- 左侧色彩竖条（替代原来的时间轴点） -->
+    <view class="color-bar" style="background: {{record.color}};"></view>
+
+    <view class="card-inner">
+      <!-- 图标 -->
+      <view class="card-icon" style="background: {{record.color}}22;">
+        {{record.icon}}
       </view>
+
+      <!-- 内容主体 -->
       <view class="card-body">
-        <view class="card-title">{{record.label}}</view>
-        <view class="card-time">{{record.timeText}}</view>
-      </view>
-      <view class="card-extra" wx:if="{{record.extra}}">
-        <text class="extra-text">{{record.extra}}</text>
+        <view class="card-title-row">
+          <text class="card-title">{{record.label}}</text>
+          <text class="card-time">{{record.timeText}}</text>
+        </view>
+        <view class="card-extra-row" wx:if="{{record.extra}}">
+          <text class="extra-text">{{record.extra}}</text>
+        </view>
       </view>
     </view>
   </view>
 
   <!-- 删除按钮 -->
-  <view class="delete-btn" wx:if="{{showDelete}}" bindtap="handleDelete">
-    <text>删除</text>
+  <view class="delete-btn" bindtap="handleDelete">
+    <view class="del-icon">✕</view>
+    <text class="del-text">删除</text>
   </view>
 </view>

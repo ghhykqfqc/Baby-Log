@@ -1,10 +1,10 @@
-// pages/index/index.js - 首页极简打卡
+// pages/index/index.js - 首页极简打卡（差异化布局重构）
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
 const { formatElapsed } = require('../../utils/time')
 const { predictAll } = require('../../utils/predict')
-const { RECORD_TYPES, RECORD_CONFIG } = require('../../utils/constants')
+const { RECORD_TYPES } = require('../../utils/constants')
 
 Page({
   data: {
@@ -12,29 +12,29 @@ Page({
     lastRecords: { feed: 0, diaper: 0, sleep: 0 },
     elapsedTexts: { feed: '--', diaper: '--', sleep: '--' },
     predictions: { feed: '', diaper: '', sleep: '' },
-    recordTypes: [
-      { type: RECORD_TYPES.FEED, ...RECORD_CONFIG.feed },
-      { type: RECORD_TYPES.DIAPER, ...RECORD_CONFIG.diaper },
-      { type: RECORD_TYPES.SLEEP, ...RECORD_CONFIG.sleep }
-    ],
+    hasPrediction: false,
     isOffline: false,
-    syncingTip: ''
+    todayText: '',
+    // 按压反馈
+    feedPress: false,
+    diaperPress: false,
+    sleepPress: false,
+    // 成功反馈
+    feedSuccess: false,
+    diaperSuccess: false,
+    sleepSuccess: false
   },
 
-  // 定时器，用于刷新"距上次"文案
   _timer: null,
 
   onLoad() {
-    // 注册全局事件
     app.eventBus.on('recordsUpdated', this.refreshFromCache.bind(this))
+    this.updateTodayText()
   },
 
   onShow() {
-    // 先从本地缓存秒开展示
     this.refreshFromCache()
-    // 再异步拉取云端最新数据
     this.fetchCloudData()
-    // 启动定时刷新
     this._timer = setInterval(() => {
       this.updateElapsedTexts()
     }, 30000)
@@ -53,25 +53,39 @@ Page({
   },
 
   /**
+   * 更新顶部日期文案
+   */
+  updateTodayText() {
+    const d = new Date()
+    const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+    this.setData({
+      todayText: `${d.getMonth() + 1}/${d.getDate()} 周${week}`
+    })
+  },
+
+  /**
    * 从本地缓存刷新展示
    */
   refreshFromCache() {
     const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || { name: '宝宝', age: '新生儿' }
     const lastRecords = storage.getLastRecords()
     const predictionData = storage.get(storage.CACHE_KEYS.PREDICTION)
-    const predictions = predictionData ? {
-      feed: predictionData.feed?.text || '',
-      diaper: predictionData.diaper?.text || '',
-      sleep: predictionData.sleep?.text || ''
-    } : { feed: '', diaper: '', sleep: '' }
 
-    this.setData({ babyInfo, lastRecords, predictions })
+    let predictions = { feed: '', diaper: '', sleep: '' }
+    if (predictionData) {
+      predictions = {
+        feed: predictionData.feed?.text || '',
+        diaper: predictionData.diaper?.text || '',
+        sleep: predictionData.sleep?.text || ''
+      }
+    }
+
+    const hasPrediction = !!(predictions.feed || predictions.sleep)
+
+    this.setData({ babyInfo, lastRecords, predictions, hasPrediction })
     this.updateElapsedTexts()
   },
 
-  /**
-   * 更新"距上次"文案
-   */
   updateElapsedTexts() {
     const { lastRecords } = this.data
     this.setData({
@@ -83,9 +97,6 @@ Page({
     })
   },
 
-  /**
-   * 从云端拉取最近记录和预测
-   */
   async fetchCloudData() {
     if (!app.globalData.isOnline) {
       this.setData({ isOffline: true })
@@ -99,30 +110,34 @@ Page({
       })
 
       if (data && data.records) {
-        // 计算各类最新时间
         const lastRecords = { feed: 0, diaper: 0, sleep: 0 }
         data.records.forEach(r => {
+          const ts = this.normalizeTimestamp(r.timestamp)
           if (lastRecords[r.recordType] !== undefined) {
-            if (!lastRecords[r.recordType] || r.timestamp > lastRecords[r.recordType]) {
-              lastRecords[r.recordType] = r.timestamp
+            if (!lastRecords[r.recordType] || ts > lastRecords[r.recordType]) {
+              lastRecords[r.recordType] = ts
             }
           }
         })
 
-        // 本地缓存
         storage.set(storage.CACHE_KEYS.LAST_RECORDS, lastRecords)
 
-        // 计算预测
-        const predictionResult = predictAll(data.records)
+        const predictionResult = predictAll(data.records.map(r => ({
+          ...r,
+          timestamp: this.normalizeTimestamp(r.timestamp)
+        })))
         storage.set(storage.CACHE_KEYS.PREDICTION, predictionResult)
+
+        const predictions = {
+          feed: predictionResult.feed.text,
+          diaper: predictionResult.diaper.text,
+          sleep: predictionResult.sleep.text
+        }
 
         this.setData({
           lastRecords,
-          predictions: {
-            feed: predictionResult.feed.text,
-            diaper: predictionResult.diaper.text,
-            sleep: predictionResult.sleep.text
-          }
+          predictions,
+          hasPrediction: !!(predictions.feed || predictions.sleep)
         })
 
         this.updateElapsedTexts()
@@ -134,21 +149,57 @@ Page({
   },
 
   /**
-   * 点击记录按钮
+   * 统一时间戳为数字毫秒（兼容 ISO 字符串、Date 对象、数字）
    */
-  async handleRecord(e) {
-    const { type, timestamp } = e.detail
+  normalizeTimestamp(ts) {
+    if (!ts) return 0
+    if (typeof ts === 'number') return ts
+    const d = new Date(ts)
+    return isNaN(d.getTime()) ? 0 : d.getTime()
+  },
+
+  /**
+   * ===== 三个记录按钮的差异化处理 =====
+   */
+
+  // 喂奶
+  async handleFeed(e) {
+    await this.recordAction(RECORD_TYPES.FEED, 'feedPress', 'feedSuccess')
+  },
+
+  // 换尿布
+  async handleDiaper() {
+    await this.recordAction(RECORD_TYPES.DIAPER, 'diaperPress', 'diaperSuccess')
+  },
+
+  // 睡觉
+  async handleSleep() {
+    await this.recordAction(RECORD_TYPES.SLEEP, 'sleepPress', 'sleepSuccess')
+  },
+
+  /**
+   * 统一的记录动作处理
+   */
+  async recordAction(type, pressKey, successKey) {
+    // 触感反馈
+    wx.vibrateShort({ type: 'light' })
+
+    // 按下动画
+    this.setData({ [pressKey]: true })
+    setTimeout(() => this.setData({ [pressKey]: false }), 300)
+
+    const timestamp = Date.now()
     const babyId = app.globalData.babyId || 'default'
     const record = {
       babyId,
       recordType: type,
       timestamp,
       userId: app.globalData.openid,
-      duration: type === RECORD_TYPES.SLEEP ? 0 : undefined,
+      duration: type === RECORD_TYPES.SLEEP ? 0 : 0,
       createdAt: new Date().toISOString()
     }
 
-    // 1. 立即更新本地缓存（首屏秒开的核心）
+    // 1. 本地缓存立即更新
     storage.updateLastRecord(type, timestamp)
     storage.appendTodayRecord({ ...record, _id: `local_${timestamp}` })
     app.eventBus.emit('recordsUpdated')
@@ -156,33 +207,27 @@ Page({
     // 2. 更新视图
     this.updateElapsedTexts()
 
-    // 3. 推送到云端
+    // 3. 成功反馈
+    this.setData({ [successKey]: true })
+    setTimeout(() => this.setData({ [successKey]: false }), 1000)
+
+    // 4. 推送到云端
     if (app.globalData.isOnline) {
       try {
-        const result = await call('addRecord', record)
-        if (result && result._id) {
-          // 同步成功后可更新本地缓存的_id
-          wx.showToast({ title: '已记录', icon: 'success', duration: 800 })
-        }
+        await call('addRecord', record)
       } catch (err) {
-        // 网络失败，入队待同步
         app.enqueuePendingSync(record)
         wx.showToast({ title: '已离线保存', icon: 'none', duration: 1200 })
       }
     } else {
       app.enqueuePendingSync(record)
-      wx.showToast({ title: '已离线保存，恢复网络后自动同步', icon: 'none', duration: 1500 })
     }
   },
 
-  /**
-   * 分享
-   */
   onShareAppMessage() {
     return {
       title: '秒记宝宝 - 极简育儿记录',
-      path: '/pages/index/index',
-      imageUrl: ''
+      path: '/pages/index/index'
     }
   },
 

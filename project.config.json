@@ -44,7 +44,7 @@
   },
   "compileType": "miniprogram",
   "libVersion": "3.5.0",
-  "appid": "wx4c315ae8a483aa35",
+  "appid": "wxd2d92a5f6e466fac",
   "projectname": "baby-log",
   "condition": {},
   "editorSetting": {
@@ -55,5 +55,6 @@
   "packOptions": {
     "ignore": [],
     "include": []
-  }
+  },
+  "isGameTourist": false
 }

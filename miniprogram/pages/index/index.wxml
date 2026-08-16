@@ -1,4 +1,4 @@
-<!-- pages/index/index.wxml - 首页极简打卡 -->
+<!-- pages/index/index.wxml - 首页极简打卡（差异化布局重构） -->
 <view class="page-index safe-bottom">
   <!-- 顶部宝宝信息 -->
   <view class="header">
@@ -12,38 +12,119 @@
 
   <!-- 网络状态提示 -->
   <view class="offline-tip" wx:if="{{isOffline}}">
-    <text>📴 当前离线，记录已保存到本地，恢复网络后自动同步</text>
+    <text>📴 当前离线，记录已保存本地，联网后自动同步</text>
   </view>
 
-  <!-- 智能预测提示区 -->
-  <view class="prediction-area" wx:if="{{predictions.feed || predictions.diaper || predictions.sleep}}">
-    <view class="predict-card" wx:if="{{predictions.feed}}">
-      <text class="predict-label">🍼 {{predictions.feed}}</text>
+  <!-- 智能预测提示区（折叠式） -->
+  <view class="prediction-area" wx:if="{{hasPrediction}}">
+    <view class="predict-pill" wx:if="{{predictions.feed}}">
+      <text class="pill-icon">🍼</text>
+      <text class="pill-text">{{predictions.feed}}</text>
     </view>
-    <view class="predict-card" wx:if="{{predictions.diaper}}">
-      <text class="predict-label">🧷 {{predictions.diaper}}</text>
-    </view>
-    <view class="predict-card" wx:if="{{predictions.sleep}}">
-      <text class="predict-label">🌙 {{predictions.sleep}}</text>
+    <view class="predict-pill" wx:if="{{predictions.sleep}}">
+      <text class="pill-icon">🌙</text>
+      <text class="pill-text">{{predictions.sleep}}</text>
     </view>
   </view>
 
-  <!-- 三大记录按钮区 -->
-  <view class="buttons-area">
-    <record-button
-      wx:for="{{recordTypes}}"
-      wx:key="type"
-      type="{{item.type}}"
-      label="{{item.label}}"
-      icon="{{item.icon}}"
-      color="{{item.color}}"
-      elapsedTime="{{elapsedTexts[item.type]}}"
-      bindtap="handleRecord"
-    />
+  <!-- ============ 主操作区：差异化布局 ============ -->
+
+  <!-- 喂奶：占据视觉中心的大卡片（最高频操作） -->
+  <view
+    class="feed-card {{feedPress ? 'pressing' : ''}}"
+    bindtap="handleFeed"
+    hover-class="none"
+  >
+    <!-- 成功反馈遮罩 -->
+    <view class="success-overlay" wx:if="{{feedSuccess}}">
+      <view class="success-check">✓</view>
+      <view class="success-label">已记录喂奶</view>
+    </view>
+
+    <!-- 奶瓶 SVG 图标 -->
+    <view class="feed-icon-wrap">
+      <view class="feed-glow"></view>
+      <svg class="feed-svg" viewBox="0 0 80 80" aria-hidden="true">
+        <!-- 奶瓶瓶身 -->
+        <rect x="28" y="18" width="24" height="52" rx="6" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.95"/>
+        <!-- 瓶颈 -->
+        <rect x="32" y="10" width="16" height="8" rx="2" fill="none" stroke="#FFFFFF" stroke-width="2.5" opacity="0.95"/>
+        <!-- 奶嘴 -->
+        <path d="M34 10 Q40 2 46 10" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.95"/>
+        <!-- 液体 -->
+        <rect x="30" y="36" width="20" height="32" rx="4" fill="#FFFFFF" opacity="0.5"/>
+        <!-- 刻度线 -->
+        <line x1="30" y1="32" x2="34" y2="32" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
+        <line x1="30" y1="44" x2="34" y2="44" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
+        <line x1="30" y1="56" x2="34" y2="56" stroke="#FFFFFF" stroke-width="1.5" opacity="0.7"/>
+      </svg>
+    </view>
+
+    <view class="feed-label">喂奶</view>
+    <view class="feed-elapsed" wx:if="{{elapsedTexts.feed !== '--'}}">
+      距上次 <text class="elapsed-num">{{elapsedTexts.feed}}</text>
+    </view>
+    <view class="feed-hint" wx:else>点击记录</view>
+  </view>
+
+  <!-- 下方两个不对称卡片：换尿布 + 睡觉 -->
+  <view class="dual-area">
+    <!-- 换尿布 -->
+    <view
+      class="dual-card diaper-card {{diaperPress ? 'pressing' : ''}}"
+      bindtap="handleDiaper"
+      hover-class="none"
+    >
+      <view class="mini-success" wx:if="{{diaperSuccess}}">
+        <text>✓</text>
+      </view>
+      <view class="dual-icon-wrap">
+        <svg class="dual-svg" viewBox="0 0 60 60" aria-hidden="true">
+          <!-- 尿布形：底部弧形 -->
+          <path d="M12 18 Q12 22 14 26 L20 42 Q24 50 30 50 Q36 50 40 42 L46 26 Q48 22 48 18 Z"
+                fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linejoin="round" opacity="0.95"/>
+          <!-- 固定扣 -->
+          <circle cx="16" cy="20" r="2.5" fill="#FFFFFF" opacity="0.9"/>
+          <circle cx="44" cy="20" r="2.5" fill="#FFFFFF" opacity="0.9"/>
+          <!-- 中线 -->
+          <line x1="30" y1="22" x2="30" y2="46" stroke="#FFFFFF" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.6"/>
+        </svg>
+      </view>
+      <view class="dual-label">换尿布</view>
+      <view class="dual-elapsed" wx:if="{{elapsedTexts.diaper !== '--'}}">{{elapsedTexts.diaper}}</view>
+      <view class="dual-hint" wx:else>点击</view>
+    </view>
+
+    <!-- 睡觉 -->
+    <view
+      class="dual-card sleep-card {{sleepPress ? 'pressing' : ''}}"
+      bindtap="handleSleep"
+      hover-class="none"
+    >
+      <view class="mini-success" wx:if="{{sleepSuccess}}">
+        <text>✓</text>
+      </view>
+      <view class="dual-icon-wrap">
+        <svg class="dual-svg" viewBox="0 0 60 60" aria-hidden="true">
+          <!-- 月牙 -->
+          <path d="M38 14 Q26 18 26 32 Q26 46 38 50 Q28 48 24 36 Q24 24 38 14 Z"
+                fill="#FFFFFF" opacity="0.95"/>
+          <!-- 星星点缀 -->
+          <circle cx="14" cy="20" r="1.8" fill="#FFFFFF" opacity="0.8"/>
+          <circle cx="46" cy="42" r="1.5" fill="#FFFFFF" opacity="0.7"/>
+          <!-- Zzz -->
+          <text x="40" y="22" font-size="8" fill="#FFFFFF" opacity="0.8" font-weight="bold">z</text>
+          <text x="46" y="18" font-size="6" fill="#FFFFFF" opacity="0.6" font-weight="bold">z</text>
+        </svg>
+      </view>
+      <view class="dual-label">睡觉</view>
+      <view class="dual-elapsed" wx:if="{{elapsedTexts.sleep !== '--'}}">{{elapsedTexts.sleep}}</view>
+      <view class="dual-hint" wx:else>点击</view>
+    </view>
   </view>
 
   <!-- 底部小提示 -->
   <view class="bottom-hint">
-    <text>👆 点击按钮即记录，长按可补充详情</text>
+    <text>👆 一键即记，单手拇指轻松操作</text>
   </view>
 </view>

@@ -1,4 +1,4 @@
-/* pages/index/index.wxss - 首页 */
+/* pages/index/index.wxss - 首页（差异化布局重构） */
 
 .page-index {
   min-height: 100vh;
@@ -8,7 +8,7 @@
   flex-direction: column;
 }
 
-/* 顶部 */
+/* ===== 顶部 ===== */
 .header {
   display: flex;
   align-items: center;
@@ -16,14 +16,14 @@
 }
 
 .baby-avatar {
-  width: 96rpx;
-  height: 96rpx;
+  width: 88rpx;
+  height: 88rpx;
   border-radius: 50%;
   background: var(--color-primary-light);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 56rpx;
+  font-size: 52rpx;
   margin-right: 24rpx;
 }
 
@@ -62,31 +62,243 @@
   text-align: center;
 }
 
-/* 预测区 */
+/* ===== 预测胶囊 ===== */
 .prediction-area {
-  margin-bottom: 48rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
 }
 
-.predict-card {
+.predict-pill {
+  display: inline-flex;
+  align-items: center;
   background: var(--color-primary-bg);
-  border-radius: var(--radius-sm);
-  padding: 16rpx 24rpx;
-  margin-bottom: 12rpx;
+  border-radius: 32rpx;
+  padding: 10rpx 22rpx;
 }
 
-.predict-label {
-  font-size: var(--font-sm);
+.pill-icon {
+  font-size: 26rpx;
+  margin-right: 8rpx;
+}
+
+.pill-text {
+  font-size: var(--font-xs);
   color: var(--color-text-secondary);
 }
 
-/* 按钮区 */
-.buttons-area {
+/* ============================================
+   主操作区 - 差异化布局
+   ============================================ */
+
+/* ===== 喂奶大卡片（视觉中心，最高频） ===== */
+.feed-card {
+  position: relative;
+  background: linear-gradient(135deg, #F5C6A0 0%, #E89B5F 100%);
+  border-radius: 48rpx;
+  padding: 56rpx 32rpx 48rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 16rpx 48rpx rgba(232, 155, 95, 0.35);
   display: flex;
-  flex-direction: row;
-  justify-content: space-around;
-  align-items: flex-start;
-  padding: 48rpx 0 120rpx;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.feed-card.pressing {
+  transform: scale(0.96);
+  box-shadow: 0 8rpx 24rpx rgba(232, 155, 95, 0.3);
+}
+
+.feed-icon-wrap {
+  position: relative;
+  width: 160rpx;
+  height: 160rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+
+/* 光晕 */
+.feed-glow {
+  position: absolute;
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% { transform: scale(1); opacity: 0.15; }
+  50% { transform: scale(1.1); opacity: 0.3; }
+}
+
+.feed-svg {
+  position: relative;
+  z-index: 2;
+  width: 140rpx;
+  height: 140rpx;
+}
+
+.feed-label {
+  font-size: 44rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+  letter-spacing: 4rpx;
+  text-shadow: 0 2rpx 8rpx rgba(232, 155, 95, 0.4);
+}
+
+.feed-elapsed {
+  font-size: 28rpx;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 12rpx;
+}
+
+.elapsed-num {
+  font-weight: 600;
+  font-size: 32rpx;
+}
+
+.feed-hint {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 12rpx;
+}
+
+/* 成功遮罩 */
+.success-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  animation: fadeHold 1s ease forwards;
+}
+
+@keyframes fadeHold {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.success-check {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: #7FB069;
+  color: #FFFFFF;
+  font-size: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16rpx;
+  animation: checkBounce 0.4s ease;
+}
+
+@keyframes checkBounce {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.success-label {
+  font-size: 32rpx;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+/* ===== 下方双卡片区 ===== */
+.dual-area {
+  display: flex;
   gap: 24rpx;
+  margin-bottom: 32rpx;
+}
+
+.dual-card {
+  position: relative;
+  flex: 1;
+  border-radius: 36rpx;
+  padding: 36rpx 20rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dual-card.pressing {
+  transform: scale(0.95);
+}
+
+/* 换尿布：浅青色 */
+.diaper-card {
+  background: linear-gradient(135deg, #B8D4D0 0%, #7AAFA8 100%);
+  box-shadow: 0 12rpx 32rpx rgba(122, 175, 168, 0.3);
+}
+
+/* 睡觉：浅紫 */
+.sleep-card {
+  background: linear-gradient(135deg, #C7B8D9 0%, #8B7AAA 100%);
+  box-shadow: 0 12rpx 32rpx rgba(139, 122, 170, 0.3);
+}
+
+.dual-icon-wrap {
+  width: 96rpx;
+  height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16rpx;
+}
+
+.dual-svg {
+  width: 88rpx;
+  height: 88rpx;
+}
+
+.dual-label {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+  letter-spacing: 2rpx;
+  text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+}
+
+.dual-elapsed {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.9);
+  margin-top: 8rpx;
+  font-weight: 500;
+}
+
+.dual-hint {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8rpx;
+}
+
+/* 小成功标记 */
+.mini-success {
+  position: absolute;
+  top: 16rpx;
+  right: 16rpx;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  background: rgba(127, 176, 105, 0.95);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  z-index: 5;
+  animation: checkBounce 0.4s ease;
 }
 
 /* 底部提示 */
@@ -95,4 +307,8 @@
   font-size: var(--font-xs);
   color: var(--color-text-hint);
   padding-bottom: 40rpx;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
