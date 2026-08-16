@@ -8,20 +8,20 @@ Component({
       {
         pagePath: '/pages/index/index',
         text: '记录',
-        icon: '/images/tab-record-gray.svg',
-        iconActive: '/images/tab-record-active.svg'
+        icon: '/images/tab-record.png',
+        iconActive: '/images/tab-record-active.png'
       },
       {
         pagePath: '/pages/timeline/timeline',
         text: '时光轴',
-        icon: '/images/tab-timeline-gray.svg',
-        iconActive: '/images/tab-timeline-active.svg'
+        icon: '/images/tab-timeline.png',
+        iconActive: '/images/tab-timeline-active.png'
       },
       {
         pagePath: '/pages/growth/growth',
         text: '成长',
-        icon: '/images/tab-growth-gray.svg',
-        iconActive: '/images/tab-growth-active.svg'
+        icon: '/images/tab-growth.png',
+        iconActive: '/images/tab-growth-active.png'
       }
     ]
   },

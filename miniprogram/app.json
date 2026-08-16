@@ -24,20 +24,20 @@
       {
         "pagePath": "pages/index/index",
         "text": "记录",
-        "iconPath": "images/tab-record-gray.svg",
-        "selectedIconPath": "images/tab-record-active.svg"
+        "iconPath": "images/tab-record.png",
+        "selectedIconPath": "images/tab-record-active.png"
       },
       {
         "pagePath": "pages/timeline/timeline",
         "text": "时光轴",
-        "iconPath": "images/tab-timeline-gray.svg",
-        "selectedIconPath": "images/tab-timeline-active.svg"
+        "iconPath": "images/tab-timeline.png",
+        "selectedIconPath": "images/tab-timeline-active.png"
       },
       {
         "pagePath": "pages/growth/growth",
         "text": "成长",
-        "iconPath": "images/tab-growth-gray.svg",
-        "selectedIconPath": "images/tab-growth-active.svg"
+        "iconPath": "images/tab-growth.png",
+        "selectedIconPath": "images/tab-growth-active.png"
       }
     ]
   },
