@@ -32,13 +32,20 @@
 
 ### 2. 配置
 ```bash
-# 替换 project.config.json 中的 appid
-# 替换 miniprogram/app.js 中的云环境 ID
-# env: 'baby-log-prod'  →  你的实际云环境ID
+# 1) 替换 project.config.json 中的 appid 为你的小程序 AppID
+# 2) 打开 miniprogram/app.js 顶部的云环境配置区：
+#    - DEV_ENV ：开发/体验环境 ID（开发者工具调试 & 体验版使用）
+#    - PROD_ENV：生产环境 ID（正式版使用，留空则回退到 DEV_ENV）
+# 3) 小程序会自动切换：develop/trial → DEV_ENV，release → PROD_ENV，无需发版改代码
 ```
 
 ### 3. 部署云函数
 在微信开发者工具中，右键 `cloudfunctions/` 下每个云函数，选择"上传并部署：云端安装依赖"。
+
+> **多环境说明**：所有云函数均使用 `cloud.DYNAMIC_CURRENT_ENV`，不写死环境。
+> 部署时选中哪个环境，云函数就跑在哪个环境的数据库上：
+> - 开发调试：在 dev 环境（云开发控制台 → 环境 → 选择 dev）下上传部署
+> - 发布正式版：切到 prod 环境后上传部署同一份代码即可
 
 ### 4. 创建数据库集合
 在云开发控制台创建以下集合：

@@ -1,6 +1,43 @@
 // app.js - 秒记宝宝 全局逻辑
-// 云环境 ID 配置（按需修改为你自己的环境 ID）
-const CLOUD_ENV = 'cloud1-d9gi06a3f00988852'
+
+// ============================================================
+// 云环境自动切换配置（无需发版改代码）
+// ------------------------------------------------------------
+// 规则（基于 wx.getAccountInfoSync().miniProgram.envVersion）：
+//   - develop（开发者工具 / 真机调试开发版）  → DEV_ENV
+//   - trial（体验版）                          → DEV_ENV
+//   - release（正式版，提交审核发布后）        → PROD_ENV
+// 使用方式：
+//   1. 在云开发控制台创建两个环境（如 baby-log-dev / baby-log-prod）
+//   2. 把对应环境 ID 填入下方 DEV_ENV / PROD_ENV
+//   3. 同一份代码上传：开发者工具调试连 dev 库，发布正式版自动连 prod 库
+// 注意：
+//   - PROD_ENV 留空时，正式版会回退到 DEV_ENV（保证单环境也能正常跑）
+//   - 云函数代码全部使用 cloud.DYNAMIC_CURRENT_ENV，
+//     部署到哪个环境就操作哪个环境的数据库（见 cloudfunctions/ 下各函数）
+// ============================================================
+const DEV_ENV = 'cloud1-d9gi06a3f00988852'
+const PROD_ENV = ''   // TODO: 填入你的生产环境 ID（云开发控制台 → 环境 → 环境 ID）
+
+/**
+ * 根据小程序运行版本自动选择云环境 ID
+ * 获取失败或未知版本时按正式版处理（最稳妥：不会误操作 dev 数据）
+ */
+function resolveCloudEnv() {
+  let envVersion = 'release'
+  try {
+    const info = wx.getAccountInfoSync()
+    if (info && info.miniProgram && info.miniProgram.envVersion) {
+      envVersion = info.miniProgram.envVersion // 'develop' | 'trial' | 'release'
+    }
+  } catch (e) {
+    // 基础库过低等场景：按 release 处理
+  }
+  if (envVersion === 'develop' || envVersion === 'trial') {
+    return { envId: DEV_ENV, envVersion }
+  }
+  return { envId: PROD_ENV || DEV_ENV, envVersion }
+}
 
 App({
   globalData: {
@@ -11,6 +48,9 @@ App({
     familyRole: 'parent',
     isOnline: true,
     pendingSync: [],
+    // 当前云环境信息（用于调试确认连接的是 dev 还是 prod 库）
+    envVersion: 'release',
+    cloudEnvId: '',
     // 云开发是否可用（环境未创建时为 false）
     cloudReady: false,
     // 开发模式：跳过云函数调用（云环境未开通时不报错）
@@ -18,6 +58,12 @@ App({
   },
 
   onLaunch() {
+    // 自动解析当前应连接的云环境（develop/trial → dev，release → prod）
+    const cloudEnv = resolveCloudEnv()
+    this.globalData.envVersion = cloudEnv.envVersion
+    this.globalData.cloudEnvId = cloudEnv.envId
+    console.log(`[云环境] 运行版本: ${cloudEnv.envVersion} → 连接环境: ${cloudEnv.envId}`)
+
     // 初始化云开发（容错：环境不存在时不崩溃）
     if (!wx.cloud) {
       console.warn('当前基础库版本过低，不支持云能力')
@@ -25,7 +71,7 @@ App({
     } else {
       try {
         wx.cloud.init({
-          env: CLOUD_ENV,
+          env: cloudEnv.envId,
           traceUser: true
         })
         this.globalData.cloudReady = true
