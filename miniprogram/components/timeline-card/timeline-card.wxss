@@ -1,4 +1,4 @@
-/* components/timeline-card/timeline-card.wxss - 重构版 */
+/* components/timeline-card/timeline-card.wxss - 重构版：直接删除按钮 */
 
 .timeline-item {
   position: relative;
@@ -18,12 +18,13 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  transition: transform 0.25s ease;
+  transition: transform 0.15s ease;
   z-index: 2;
 }
 
-.card-wrapper.shifted {
-  transform: translateX(-160rpx);
+.card-hover {
+  transform: scale(0.98);
+  background: #FBF7F1;
 }
 
 /* 左侧色彩竖条 */
@@ -38,7 +39,7 @@
 .card-inner {
   display: flex;
   align-items: center;
-  padding: 24rpx;
+  padding: 24rpx 16rpx 24rpx 24rpx;
 }
 
 /* 图标 */
@@ -51,7 +52,7 @@
   justify-content: center;
   font-size: 40rpx;
   flex-shrink: 0;
-  margin-right: 24rpx;
+  margin-right: 20rpx;
 }
 
 /* 内容 */
@@ -91,35 +92,27 @@
   border-radius: 16rpx;
 }
 
-/* 删除按钮 */
-.delete-btn {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 160rpx;
-  background: var(--color-danger);
+/* 右侧直接显示的删除按钮 */
+.del-btn {
+  flex-shrink: 0;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: rgba(232, 85, 78, 0.08);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 1;
+  margin-left: 12rpx;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.del-btn-hover {
+  background: rgba(232, 85, 78, 0.18);
+  transform: scale(0.9);
 }
 
 .del-icon {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  color: #FFFFFF;
-  margin-bottom: 6rpx;
-}
-
-.del-text {
-  font-size: var(--font-xs);
-  color: #FFFFFF;
+  font-size: 28rpx;
+  color: var(--color-danger);
+  line-height: 1;
 }

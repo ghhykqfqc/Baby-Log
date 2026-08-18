@@ -1,0 +1,83 @@
+<!-- pages/profile/profile.wxml - 宝宝资料（自定义头像+昵称，含裁剪） -->
+<view class="page-profile">
+
+  <!-- ===== 头像预览（点击选图） ===== -->
+  <view class="avatar-block" bindtap="chooseAvatar" hover-class="avatar-tap" hover-stay-time="80">
+    <view class="avatar-ring">
+      <image
+        wx:if="{{avatarUrl}}"
+        class="avatar-img"
+        src="{{avatarUrl}}"
+        mode="aspectFill"
+      ></image>
+      <view wx:else class="avatar-emoji">👶</view>
+      <view class="camera-badge">
+        <text class="camera-icon">📷</text>
+      </view>
+    </view>
+    <view class="avatar-tip">点击更换头像</view>
+  </view>
+
+  <!-- ===== 昵称输入 ===== -->
+  <view class="form-block">
+    <view class="form-label">昵称</view>
+    <view class="form-field">
+      <input
+        class="form-input"
+        type="text"
+        maxlength="12"
+        placeholder="给宝宝起个昵称"
+        placeholder-class="form-placeholder"
+        value="{{babyName}}"
+        bindinput="onNameInput"
+        confirm-type="done"
+      />
+      <text class="form-count">{{babyName.length}}/12</text>
+    </view>
+  </view>
+
+  <!-- ===== 保存按钮 ===== -->
+  <view class="save-btn-wrap">
+    <view
+      class="save-btn {{submitting ? 'save-btn-loading' : ''}}"
+      bindtap="save"
+      hover-class="btn-hover"
+    >
+      {{submitting ? '保存中…' : '保存'}}
+    </view>
+  </view>
+
+  <!-- ===== 裁剪弹层 ===== -->
+  <view class="cropper-mask" wx:if="{{cropperVisible}}">
+    <view class="cropper-header">
+      <view class="cropper-btn-cancel" bindtap="cancelCrop">取消</view>
+      <view class="cropper-title">调整头像</view>
+      <view class="cropper-btn-done" bindtap="confirmCrop">完成</view>
+    </view>
+
+    <view
+      class="cropper-stage"
+      style="width: {{cropperSize}}px; height: {{cropperSize}}px;"
+      bindtouchstart="onCropTouchStart"
+      bindtouchmove="onCropTouchMove"
+      bindtouchend="onCropTouchEnd"
+    >
+      <image
+        class="cropper-image"
+        src="{{rawImagePath}}"
+        style="width: {{imgW}}px; height: {{imgH}}px; left: {{imgX}}px; top: {{imgY}}px;"
+        mode="scaleToFill"
+      ></image>
+      <!-- 中心镂空遮罩（box-shadow 扩展实现） -->
+      <view
+        class="cropper-frame"
+        style="left: {{cropLeft}}px; top: {{cropTop}}px; width: {{cropSize}}px; height: {{cropSize}}px;"
+      ></view>
+    </view>
+
+    <view class="cropper-tip">拖动调整位置 · 双指缩放</view>
+  </view>
+
+  <!-- 隐藏的裁剪导出 canvas（不参与布局） -->
+  <canvas type="2d" id="cropCanvas" class="crop-canvas-hidden"></canvas>
+</view>

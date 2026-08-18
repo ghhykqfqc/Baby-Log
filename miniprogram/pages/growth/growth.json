@@ -2,5 +2,7 @@
   "usingComponents": {
     "empty-state": "../../components/empty-state/empty-state"
   },
-  "navigationBarTitleText": "成长档案"
+  "navigationBarTitleText": "成长",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "light"
 }

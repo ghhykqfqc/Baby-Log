@@ -1,0 +1,240 @@
+/* pages/profile/profile.wxss - 宝宝资料页 */
+
+.page-profile {
+  min-height: 100vh;
+  padding: 0 32rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+/* ===== 头像区 ===== */
+.avatar-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64rpx 0 56rpx;
+}
+
+.avatar-ring {
+  position: relative;
+  width: 184rpx;
+  height: 184rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+  padding: 6rpx;
+  box-shadow: 0 8rpx 32rpx rgba(212, 184, 150, 0.35);
+}
+
+.avatar-img,
+.avatar-emoji {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar-img {
+  background: #F5EBDD;
+}
+
+.avatar-emoji {
+  font-size: 96rpx;
+}
+
+.camera-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: var(--color-bg-card);
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3rpx solid #FFFFFF;
+}
+
+.camera-icon {
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.avatar-tip {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+  margin-top: 24rpx;
+}
+
+.avatar-tap {
+  opacity: 0.85;
+}
+
+/* ===== 表单 ===== */
+.form-block {
+  margin-bottom: 32rpx;
+}
+
+.form-label {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  margin-bottom: 16rpx;
+  margin-left: 8rpx;
+}
+
+.form-field {
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-card);
+  border-radius: 24rpx;
+  padding: 0 28rpx;
+  height: 104rpx;
+  box-shadow: 0 2rpx 8rpx rgba(180, 150, 110, 0.06);
+}
+
+.form-input {
+  flex: 1;
+  font-size: 32rpx;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  min-width: 0;
+}
+
+.form-placeholder {
+  color: var(--color-text-hint);
+  font-weight: 400;
+  font-size: 30rpx;
+}
+
+.form-count {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  margin-left: 12rpx;
+  flex-shrink: 0;
+}
+
+/* ===== 保存按钮 ===== */
+.save-btn-wrap {
+  margin-top: auto;
+  padding: 32rpx 0 calc(env(safe-area-inset-bottom) + 40rpx);
+}
+
+.save-btn {
+  height: 96rpx;
+  border-radius: 48rpx;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-size: 32rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6rpx 20rpx rgba(212, 184, 150, 0.35);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.save-btn-loading {
+  opacity: 0.7;
+}
+
+.btn-hover {
+  transform: scale(0.97);
+}
+
+/* ===== 裁剪弹层 ===== */
+.cropper-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.cropper-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(env(safe-area-inset-top) + 88rpx);
+  padding-top: env(safe-area-inset-top);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.cropper-btn-cancel,
+.cropper-btn-done {
+  font-size: 30rpx;
+  padding: 16rpx 8rpx;
+}
+
+.cropper-btn-cancel {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.cropper-btn-done {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.cropper-title {
+  font-size: 32rpx;
+  font-weight: 500;
+  color: #FFFFFF;
+}
+
+/* 裁剪舞台 */
+.cropper-stage {
+  position: relative;
+  background: #2A2A2A;
+  overflow: hidden;
+  border-radius: 8rpx;
+  touch-action: none;
+}
+
+.cropper-image {
+  position: absolute;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 中心镂空遮罩：用 box-shadow 扩展到很大范围实现（经典做法） */
+.cropper-frame {
+  position: absolute;
+  border: 2rpx solid rgba(255, 255, 255, 0.9);
+  pointer-events: none;
+  box-sizing: border-box;
+  /* 阴影扩展超大，覆盖裁剪框外部全部区域 */
+  box-shadow: 0 0 0 9999rpx rgba(0, 0, 0, 0.55);
+}
+
+.cropper-tip {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 48rpx);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* 裁剪导出用的隐藏 canvas（不可见但需要存在） */
+.crop-canvas-hidden {
+  position: fixed;
+  left: -9999rpx;
+  top: -9999rpx;
+  width: 256rpx;
+  height: 256rpx;
+}

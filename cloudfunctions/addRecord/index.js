@@ -3,7 +3,46 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
-const _ = db.command
+
+// ====== 集合自愈 + 容错工具：集合不存在时自动创建，避免 -502005 报错 ======
+const _ensured = {}
+
+function isCollectionMissing(err) {
+  const msg = String((err && (err.errMsg || err.message)) || '')
+  return msg.includes('-502005') || msg.includes('DATABASE_COLLECTION_NOT_EXIST') || msg.includes('collection not exists')
+}
+
+async function ensureCollections(names) {
+  if (typeof db.createCollection !== 'function') return
+  for (const name of names) {
+    if (_ensured[name]) continue
+    try {
+      await db.createCollection(name)
+    } catch (e) {
+      // 已存在或暂不可用：忽略
+    }
+    _ensured[name] = true
+  }
+}
+
+async function safeDb(fn, fallback, collectionNames) {
+  try {
+    return await fn()
+  } catch (err) {
+    if (isCollectionMissing(err)) {
+      await ensureCollections(collectionNames)
+      try {
+        return await fn()
+      } catch (err2) {
+        console.error('集合自愈重试后仍失败:', err2)
+        return typeof fallback === 'function' ? fallback(err2) : fallback
+      }
+    }
+    console.error('数据库操作失败:', err)
+    return typeof fallback === 'function' ? fallback(err) : fallback
+  }
+}
+// ==================================================
 
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
@@ -27,16 +66,8 @@ exports.main = async (event, context) => {
     return { code: -1, message: '无效的记录类型' }
   }
 
-  // 权限校验：当前用户是否对该宝宝有写入权限
-  const memberRes = await db.collection('family_members').where({
-    babyId,
-    openid: OPENID,
-    role: 'parent'
-  }).count()
-
-  if (memberRes.total === 0 && babyId !== 'default') {
-    return { code: 403, message: '无写入权限' }
-  }
+  // 云端暂不可用时返回明确错误，前端会将记录入队本地待同步
+  const FALLBACK = { code: -1, message: '云端暂不可用，记录已保存到本地待同步' }
 
   const record = {
     babyId,
@@ -49,13 +80,26 @@ exports.main = async (event, context) => {
     createdAt: new Date()
   }
 
-  const result = await db.collection('records').add({ data: record })
+  return safeDb(async () => {
+    // 权限校验：当前用户是否对该宝宝有写入权限
+    const memberRes = await db.collection('family_members').where({
+      babyId,
+      openid: OPENID,
+      role: 'parent'
+    }).count()
 
-  return {
-    code: 0,
-    data: {
-      _id: result._id,
-      ...record
+    if (memberRes.total === 0 && babyId !== 'default') {
+      return { code: 403, message: '无写入权限' }
     }
-  }
+
+    const result = await db.collection('records').add({ data: record })
+
+    return {
+      code: 0,
+      data: {
+        _id: result._id,
+        ...record
+      }
+    }
+  }, FALLBACK, ['family_members', 'records'])
 }

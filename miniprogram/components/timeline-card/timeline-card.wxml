@@ -1,14 +1,7 @@
-<!-- components/timeline-card/timeline-card.wxml -->
+<!-- components/timeline-card/timeline-card.wxml - 重构：右侧直接显示删除按钮 -->
 <view class="timeline-item" style="animation-delay: {{index * 40}}ms;">
-  <!-- 可滑动卡片 -->
-  <view
-    class="card-wrapper {{showDelete ? 'shifted' : ''}}"
-    bindtouchstart="handleTouchStart"
-    bindtouchmove="handleTouchMove"
-    bindtouchend="handleTouchEnd"
-    bindtap="handleCardTap"
-  >
-    <!-- 左侧色彩竖条（替代原来的时间轴点） -->
+  <view class="card-wrapper" bindtap="handleCardTap" hover-class="card-hover" hover-stay-time="80">
+    <!-- 左侧色彩竖条 -->
     <view class="color-bar" style="background: {{record.color}};"></view>
 
     <view class="card-inner">
@@ -27,12 +20,11 @@
           <text class="extra-text">{{record.extra}}</text>
         </view>
       </view>
-    </view>
-  </view>
 
-  <!-- 删除按钮 -->
-  <view class="delete-btn" bindtap="handleDelete">
-    <view class="del-icon">✕</view>
-    <text class="del-text">删除</text>
+      <!-- 右侧直接可见的删除按钮（替代隐藏式左滑） -->
+      <view class="del-btn" catchtap="handleDelete" hover-class="del-btn-hover" hover-stay-time="80">
+        <view class="del-icon">✕</view>
+      </view>
+    </view>
   </view>
 </view>

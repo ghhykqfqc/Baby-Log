@@ -61,8 +61,8 @@ Page({
       this.setData({ babyName: babyInfo.name })
     }
 
-    // 优先尝试云端
-    if (app.globalData.isOnline) {
+    // 优先尝试云端（云环境就绪且在线时）
+    if (app.globalData.isOnline && app.globalData.cloudReady) {
       try {
         const result = await call('getDailySummary', {
           babyId: app.globalData.babyId || 'default',
@@ -84,7 +84,7 @@ Page({
           })
         }
       } catch (err) {
-        console.warn('云端拉取失败，尝试本地缓存:', err)
+        console.warn('云端拉取失败，尝试本地缓存:', (err && err.message) || (err && err.errMsg) || err)
         this.loadFromCache()
       }
     } else {

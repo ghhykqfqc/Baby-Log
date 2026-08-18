@@ -1,0 +1,9 @@
+{
+  "name": "saveBabyInfo",
+  "version": "1.0.0",
+  "description": "保存宝宝资料（昵称、头像、出生日期等）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

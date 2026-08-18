@@ -1,8 +1,11 @@
-<!-- pages/index/index.wxml - 首页极简打卡（差异化布局 + 图标修复） -->
+<!-- pages/index/index.wxml - 首页极简打卡（睡眠交互优化） -->
 <view class="page-index safe-bottom">
   <!-- 顶部宝宝信息 -->
   <view class="header">
-    <view class="baby-avatar">👶</view>
+    <view class="baby-avatar" bindtap="goProfile" hover-class="avatar-tap" hover-stay-time="80">
+      <image wx:if="{{babyInfo.avatar}}" class="avatar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
+      <view wx:else class="avatar-emoji">👶</view>
+    </view>
     <view class="baby-info">
       <view class="baby-name">{{babyInfo.name || '宝宝'}}</view>
       <view class="baby-meta">{{babyInfo.age || '新生儿'}}</view>
@@ -25,6 +28,9 @@
     <view class="predict-pill" wx:if="{{predictions.feed}}">
       <text class="pill-text">🍼 {{predictions.feed}}</text>
     </view>
+    <view class="predict-pill" wx:if="{{predictions.diaper}}">
+      <text class="pill-text">🧷 {{predictions.diaper}}</text>
+    </view>
     <view class="predict-pill" wx:if="{{predictions.sleep}}">
       <text class="pill-text">🌙 {{predictions.sleep}}</text>
     </view>
@@ -44,15 +50,16 @@
       <view class="success-label">已记录喂奶</view>
     </view>
 
-    <!-- 奶瓶图标（image 引用 SVG，小程序不支持内联 svg 标签） -->
+    <!-- 奶瓶图标 -->
     <view class="feed-icon-wrap">
       <view class="feed-glow"></view>
       <image class="feed-icon" src="/images/icons/bottle.svg" mode="aspectFit"></image>
     </view>
 
     <view class="feed-label">喂奶</view>
-    <view class="feed-elapsed" wx:if="{{elapsedTexts.feed !== '--'}}">
-      距上次 <text class="elapsed-num">{{elapsedTexts.feed}}</text>
+    <view class="card-info" wx:if="{{cardTexts.feed.elapsed !== '--'}}">
+      <view class="info-row">{{cardTexts.feed.elapsed}}</view>
+      <view class="info-row info-next" wx:if="{{cardTexts.feed.next}}">{{cardTexts.feed.next}}</view>
     </view>
     <view class="feed-hint" wx:else>点击记录</view>
   </view>
@@ -72,13 +79,16 @@
         <image class="dual-icon" src="/images/icons/diaper.svg" mode="aspectFit"></image>
       </view>
       <view class="dual-label">换尿布</view>
-      <view class="dual-elapsed" wx:if="{{elapsedTexts.diaper !== '--'}}">{{elapsedTexts.diaper}}</view>
+      <view class="card-info" wx:if="{{cardTexts.diaper.elapsed !== '--'}}">
+        <view class="info-row">{{cardTexts.diaper.elapsed}}</view>
+        <view class="info-row info-next" wx:if="{{cardTexts.diaper.next}}">{{cardTexts.diaper.next}}</view>
+      </view>
       <view class="dual-hint" wx:else>点击</view>
     </view>
 
     <!-- 睡觉 -->
     <view
-      class="dual-card sleep-card {{sleepPress ? 'pressing' : ''}}"
+      class="dual-card sleep-card {{sleepPress ? 'pressing' : ''}} {{sleeping ? 'sleeping-state' : ''}}"
       bindtap="handleSleep"
       hover-class="none"
     >
@@ -88,8 +98,11 @@
       <view class="dual-icon-wrap">
         <image class="dual-icon" src="/images/icons/moon.svg" mode="aspectFit"></image>
       </view>
-      <view class="dual-label">睡觉</view>
-      <view class="dual-elapsed" wx:if="{{elapsedTexts.sleep !== '--'}}">{{elapsedTexts.sleep}}</view>
+      <view class="dual-label">{{sleeping ? '已入睡' : '睡觉'}}</view>
+      <view class="card-info" wx:if="{{cardTexts.sleep.elapsed && cardTexts.sleep.elapsed !== '--'}}">
+        <view class="info-row">{{cardTexts.sleep.elapsed}}</view>
+        <view class="info-row info-next" wx:if="{{cardTexts.sleep.next}}">{{cardTexts.sleep.next}}</view>
+      </view>
       <view class="dual-hint" wx:else>点击</view>
     </view>
   </view>
@@ -97,5 +110,55 @@
   <!-- 底部小提示 -->
   <view class="bottom-hint">
     <text>👆 一键即记，单手拇指轻松操作</text>
+  </view>
+
+  <!-- ========== 睡眠操作弹层 ========== -->
+  <view class="sheet-mask" wx:if="{{showSleepSheet}}" bindtap="hideSleepSheet" catchtouchmove="noop">
+    <view class="sleep-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sleep-sheet-title">{{sleeping ? '结束睡眠' : '记录睡眠'}}</view>
+
+      <!-- 已入睡：显示当前睡眠时长 + 结束按钮 -->
+      <block wx:if="{{sleeping}}">
+        <view class="sleep-current">
+          <view class="sleep-current-num">{{sleepDurationText}}</view>
+          <view class="sleep-current-label">已入睡时长</view>
+        </view>
+        <view class="sleep-action-btn sleep-action-primary" bindtap="endSleep" hover-class="btn-hover">
+          🌅 宝宝起床了
+        </view>
+        <view class="sleep-cancel-link" bindtap="hideSleepSheet">取消</view>
+      </block>
+
+      <!-- 未入睡：三个快捷操作 -->
+      <block wx:else>
+        <view class="sleep-action-btn sleep-action-primary" bindtap="startSleep" hover-class="btn-hover">
+          🌙 宝宝刚刚入睡
+        </view>
+        <view class="sleep-action-btn sleep-action-secondary" bindtap="showDurationPicker" hover-class="btn-hover">
+          ⏱ 回忆记录（选择时长）
+        </view>
+        <view class="sleep-cancel-link" bindtap="hideSleepSheet">取消</view>
+      </block>
+    </view>
+  </view>
+
+  <!-- ========== 时长选择器弹层 ========== -->
+  <view class="sheet-mask" wx:if="{{showDurationPicker}}" bindtap="hideDurationPicker" catchtouchmove="noop">
+    <view class="sleep-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sleep-sheet-title">睡了多久？</view>
+      <view class="duration-grid">
+        <view class="duration-item" data-minutes="30" bindtap="selectDuration" hover-class="duration-item-hover">30分钟</view>
+        <view class="duration-item" data-minutes="60" bindtap="selectDuration" hover-class="duration-item-hover">1小时</view>
+        <view class="duration-item" data-minutes="90" bindtap="selectDuration" hover-class="duration-item-hover">1.5小时</view>
+        <view class="duration-item" data-minutes="120" bindtap="selectDuration" hover-class="duration-item-hover">2小时</view>
+        <view class="duration-item" data-minutes="150" bindtap="selectDuration" hover-class="duration-item-hover">2.5小时</view>
+        <view class="duration-item" data-minutes="180" bindtap="selectDuration" hover-class="duration-item-hover">3小时</view>
+        <view class="duration-item" data-minutes="240" bindtap="selectDuration" hover-class="duration-item-hover">4小时</view>
+        <view class="duration-item" data-minutes="480" bindtap="selectDuration" hover-class="duration-item-hover">8小时</view>
+      </view>
+      <view class="sleep-cancel-link" bindtap="hideDurationPicker">取消</view>
+    </view>
   </view>
 </view>

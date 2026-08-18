@@ -1,23 +1,36 @@
-<!-- pages/timeline/timeline.wxml -->
+<!-- pages/timeline/timeline.wxml - 时光轴（预测卡 + 删除重构） -->
 <view class="page-timeline">
   <!-- 日期标题 -->
   <view class="date-header">
     <view class="date-title">{{todayLabel}}</view>
-    <view class="summary-bar">
-      <view class="summary-item">
-        <text class="num">{{summary.feedCount}}</text>
-        <text class="label">喂奶</text>
-      </view>
-      <view class="divider"></view>
-      <view class="summary-item">
-        <text class="num">{{summary.diaperCount}}</text>
-        <text class="label">换尿布</text>
-      </view>
-      <view class="divider"></view>
-      <view class="summary-item">
-        <text class="num">{{summary.sleepDuration}}</text>
-        <text class="label">睡眠(分钟)</text>
-      </view>
+  </view>
+
+  <!-- ========== 三栏智能预测卡 ========== -->
+  <view class="predict-card" wx:if="{{!loading && hasRecords && hasPrediction}}">
+    <view class="predict-col {{item.overdue ? 'overdue' : ''}}" wx:for="{{predictList}}" wx:key="key" data-key="{{item.key}}">
+      <view class="predict-icon">{{item.icon}}</view>
+      <view class="predict-label">{{item.label}}</view>
+      <view class="predict-time {{item.overdue ? 'predict-time-overdue' : ''}}" wx:if="{{item.available}}">{{item.predictedText}}</view>
+      <view class="predict-time predict-time-empty" wx:else>{{item.predictedText}}</view>
+      <view class="predict-countdown" wx:if="{{item.available}}">{{item.countdownText}}</view>
+    </view>
+  </view>
+
+  <!-- 当日小结 -->
+  <view class="summary-bar" wx:if="{{hasRecords}}">
+    <view class="summary-item">
+      <text class="num">{{summary.feedCount}}</text>
+      <text class="label">喂奶</text>
+    </view>
+    <view class="divider"></view>
+    <view class="summary-item">
+      <text class="num">{{summary.diaperCount}}</text>
+      <text class="label">换尿布</text>
+    </view>
+    <view class="divider"></view>
+    <view class="summary-item">
+      <text class="num">{{summary.sleepDurationText}}</text>
+      <text class="label">睡眠</text>
     </view>
   </view>
 
@@ -25,8 +38,8 @@
   <empty-state
     wx:if="{{!loading && records.length === 0}}"
     icon="🌱"
-    title="还没有记录哦"
-    subtitle="去首页点击按钮记录宝宝的第一条作息吧"
+    title="今天还没有记录哦"
+    subtitle="去首页点击按钮，记录宝宝的第一条作息"
   />
 
   <!-- 时光轴列表 -->

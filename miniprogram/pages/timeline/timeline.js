@@ -1,17 +1,24 @@
-// pages/timeline/timeline.js - 时光轴回顾（修复重复行 + NaN bug）
+// pages/timeline/timeline.js - 时光轴（预测卡 + 删除重构）
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
 const { formatTime, minutesToText, toMs } = require('../../utils/time')
 const { RECORD_CONFIG } = require('../../utils/constants')
+const { predictDetail } = require('../../utils/predict')
 
 Page({
   data: {
     records: [],
     loading: true,
     todayLabel: '',
-    summary: { feedCount: 0, diaperCount: 0, sleepDuration: 0 }
+    hasRecords: false,
+    predictList: [],          // 三栏预测卡数据
+    hasPrediction: false,     // 是否有可用预测
+    summary: { feedCount: 0, diaperCount: 0, sleepDurationText: '0小时' }
   },
+
+  _countdownTimer: null,
+  _allRecords: [],   // 完整数据用于重新计算预测
 
   onLoad() {
     const today = new Date()
@@ -26,19 +33,33 @@ Page({
     this.loadData()
   },
 
+  onHide() {
+    this.stopCountdown()
+  },
+
+  onUnload() {
+    this.stopCountdown()
+  },
+
   onPullDownRefresh() {
-    this.loadData().then(() => {
-      wx.stopPullDownRefresh()
-    })
+    this.loadData().then(() => wx.stopPullDownRefresh())
+  },
+
+  stopCountdown() {
+    if (this._countdownTimer) {
+      clearInterval(this._countdownTimer)
+      this._countdownTimer = null
+    }
   },
 
   /**
-   * 优先本地缓存，再拉取云端（含去重）
+   * 优先本地缓存，再拉云端
    */
   async loadData() {
-    // 先展示本地缓存
     const cached = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
+    this._allRecords = cached
     this.renderRecords(cached)
+    this.updatePredictions()
 
     try {
       const result = await call('getRecords', {
@@ -46,18 +67,17 @@ Page({
         days: 1
       })
       if (result && result.records) {
-        // 云端数据为权威来源，直接替换本地缓存（避免重复）
-        // 统一 timestamp 为数字毫秒
         const normalized = result.records.map(r => ({
           ...r,
           timestamp: toMs(r.timestamp)
         }))
+        this._allRecords = normalized
         this.renderRecords(normalized)
-        // 更新本地缓存为云端数据（覆盖式更新）
         storage.set(storage.CACHE_KEYS.TODAY_RECORDS, normalized)
+        this.updatePredictions()
       }
     } catch (err) {
-      console.warn('拉取今日记录失败:', err)
+      console.warn('拉取今日记录失败，使用本地缓存:', (err && err.message) || (err && err.errMsg) || err)
     } finally {
       this.setData({ loading: false })
     }
@@ -65,22 +85,23 @@ Page({
 
   /**
    * 渲染记录列表（去重 + 倒序）
-   * 去重 key: timestamp + recordType（毫秒级+类型足够唯一）
    */
   renderRecords(rawRecords) {
     if (!rawRecords || rawRecords.length === 0) {
-      this.setData({ records: [], summary: { feedCount: 0, diaperCount: 0, sleepDuration: 0 } })
+      this.setData({
+        records: [],
+        hasRecords: false,
+        summary: { feedCount: 0, diaperCount: 0, sleepDurationText: '0小时' }
+      })
       return
     }
 
-    // 统一时间戳格式 + 去重
     const seen = new Set()
     const deduped = []
 
     rawRecords.forEach(r => {
       const ts = toMs(r.timestamp)
-      if (!ts) return // 过滤无效时间戳
-
+      if (!ts) return
       const dedupKey = `${ts}_${r.recordType}`
       if (seen.has(dedupKey)) return
       seen.add(dedupKey)
@@ -107,20 +128,50 @@ Page({
       })
     })
 
-    // 倒序
     deduped.sort((a, b) => b.timestamp - a.timestamp)
 
-    // 统计当日小结
     const feedCount = deduped.filter(r => r.recordType === 'feed').length
     const diaperCount = deduped.filter(r => r.recordType === 'diaper').length
-    const sleepDuration = deduped
+    const sleepDurationTotal = deduped
       .filter(r => r.recordType === 'sleep' && r.duration)
       .reduce((sum, r) => sum + r.duration, 0)
 
     this.setData({
       records: deduped,
-      summary: { feedCount, diaperCount, sleepDuration }
+      hasRecords: deduped.length > 0,
+      summary: {
+        feedCount,
+        diaperCount,
+        sleepDurationText: sleepDurationTotal ? minutesToText(sleepDurationTotal) : '0小时'
+      }
     })
+  },
+
+  /**
+   * 计算并刷新三栏预测卡（含倒计时）
+   */
+  updatePredictions() {
+    const detail = predictDetail(this._allRecords)
+    const predictList = [
+      { key: 'feed', ...detail.feed },
+      { key: 'diaper', ...detail.diaper },
+      { key: 'sleep', ...detail.sleep }
+    ]
+    this.setData({ predictList, hasPrediction: predictList.some(p => p.available) })
+
+    // 启动倒计时刷新（每 30 秒更新一次）
+    this.stopCountdown()
+    const hasAnyAvailable = predictList.some(p => p.available)
+    if (hasAnyAvailable) {
+      this._countdownTimer = setInterval(() => {
+        const refreshed = predictList.map(p => {
+          if (!p.available) return p
+          const detail = predictDetail(this._allRecords)[p.key]
+          return { ...p, countdownText: detail.countdownText }
+        })
+        this.setData({ predictList: refreshed })
+      }, 30000)
+    }
   },
 
   /**
@@ -132,15 +183,14 @@ Page({
     if (!target) return
 
     wx.showLoading({ title: '删除中...' })
-
     try {
-      // 仅当不是本地临时记录时调用云端
       if (!String(id).startsWith('local_')) {
         await call('deleteRecord', { id })
       }
-      // 从本地列表移除
       const records = this.data.records.filter(r => r._id !== id)
+      this._allRecords = this._allRecords.filter(r => (r._id || `local_${toMs(r.timestamp)}`) !== id)
       this.renderRecords(records)
+      this.updatePredictions()
       storage.removeTodayRecord(id)
       wx.showToast({ title: '已删除', icon: 'success' })
     } catch (err) {
@@ -152,5 +202,12 @@ Page({
 
   goShareCard() {
     wx.navigateTo({ url: '/pages/share/share' })
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '秒记宝宝 - 看看宝宝今天的表现',
+      path: '/pages/timeline/timeline'
+    }
   }
 })

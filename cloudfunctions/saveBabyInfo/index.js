@@ -1,10 +1,10 @@
-// cloudfunctions/addGrowthData/index.js
+// cloudfunctions/saveBabyInfo/index.js
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 
-// ====== 集合自愈 + 容错工具：集合不存在时自动创建，避免 -502005 报错 ======
+// ====== 集合自愈 + 容错工具 ======
 const _ensured = {}
 
 function isCollectionMissing(err) {
@@ -18,9 +18,7 @@ async function ensureCollections(names) {
     if (_ensured[name]) continue
     try {
       await db.createCollection(name)
-    } catch (e) {
-      // 已存在或暂不可用：忽略
-    }
+    } catch (e) {}
     _ensured[name] = true
   }
 }
@@ -46,33 +44,38 @@ async function safeDb(fn, fallback, collectionNames) {
 
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
-  const { babyId, height, weight, measureDate, headCircumference } = event
+  const { babyId, name, avatar, birthDate, gender } = event
 
-  if (!babyId || (!height && !weight)) {
-    return { code: -1, message: '参数缺失' }
+  if (!babyId) {
+    return { code: -1, message: '缺少 babyId' }
   }
 
-  const data = {
+  const update = {
     babyId,
-    height: height || null,
-    weight: weight || null,
-    headCircumference: headCircumference || null,
-    measureDate,
+    name: name || '',
+    avatar: avatar || '',
+    birthDate: birthDate || '',
+    gender: gender || '',
     userId: OPENID,
-    createdAt: new Date()
+    updatedAt: new Date()
   }
 
-  const FALLBACK = { code: -1, message: '云端暂不可用，请稍后重试' }
+  const FALLBACK = { code: -1, message: '云端暂不可用，资料已保存到本地' }
 
   return safeDb(async () => {
-    const result = await db.collection('growth_data').add({ data })
+    // 查找是否已存在该 babyId 的资料
+    const existing = await db.collection('babies').where({ babyId, userId: OPENID }).limit(1).get()
 
-    return {
-      code: 0,
-      data: {
-        _id: result._id,
-        ...data
-      }
+    if (existing.data && existing.data.length > 0) {
+      // 更新
+      const id = existing.data[0]._id
+      await db.collection('babies').doc(id).update({ data: update })
+      return { code: 0, data: { _id: id, ...update } }
+    } else {
+      // 新增
+      update.createdAt = new Date()
+      const res = await db.collection('babies').add({ data: update })
+      return { code: 0, data: { _id: res._id, ...update } }
     }
-  }, FALLBACK, ['growth_data'])
+  }, FALLBACK, ['babies'])
 }

@@ -1,6 +1,6 @@
 // app.js - 秒记宝宝 全局逻辑
 // 云环境 ID 配置（按需修改为你自己的环境 ID）
-const CLOUD_ENV = 'baby-log-prod'
+const CLOUD_ENV = 'cloud1-d9gi06a3f00988852'
 
 App({
   globalData: {

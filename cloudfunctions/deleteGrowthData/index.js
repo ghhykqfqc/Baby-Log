@@ -1,4 +1,4 @@
-// cloudfunctions/addGrowthData/index.js
+// cloudfunctions/deleteGrowthData/index.js
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -46,33 +46,28 @@ async function safeDb(fn, fallback, collectionNames) {
 
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
-  const { babyId, height, weight, measureDate, headCircumference } = event
+  const { id } = event
 
-  if (!babyId || (!height && !weight)) {
-    return { code: -1, message: '参数缺失' }
-  }
-
-  const data = {
-    babyId,
-    height: height || null,
-    weight: weight || null,
-    headCircumference: headCircumference || null,
-    measureDate,
-    userId: OPENID,
-    createdAt: new Date()
+  if (!id) {
+    return { code: -1, message: '缺少记录ID' }
   }
 
   const FALLBACK = { code: -1, message: '云端暂不可用，请稍后重试' }
 
   return safeDb(async () => {
-    const result = await db.collection('growth_data').add({ data })
-
-    return {
-      code: 0,
-      data: {
-        _id: result._id,
-        ...data
-      }
+    // 查询记录是否存在并校验权限
+    const recordRes = await db.collection('growth_data').doc(id).get()
+    if (!recordRes.data) {
+      return { code: 404, message: '记录不存在' }
     }
+
+    // 仅记录创建者本人可删除
+    if (recordRes.data.userId && recordRes.data.userId !== OPENID) {
+      return { code: 403, message: '无删除权限' }
+    }
+
+    await db.collection('growth_data').doc(id).remove()
+
+    return { code: 0, data: { id } }
   }, FALLBACK, ['growth_data'])
 }
