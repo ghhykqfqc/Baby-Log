@@ -1,0 +1,7 @@
+{
+  "name": "getWeather",
+  "version": "1.0.0",
+  "description": "查询实时天气（IP定位 + Open-Meteo），返回皮肤分类",
+  "main": "index.js",
+  "dependencies": {}
+}

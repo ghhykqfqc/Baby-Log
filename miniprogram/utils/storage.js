@@ -6,7 +6,9 @@ const CACHE_KEYS = {
   PREDICTION: 'prediction',          // 预测数据
   GROWTH_DATA: 'growthData',         // 成长数据
   BABY_INFO: 'babyInfo',
-  PENDING_SYNC: 'pendingSync'
+  PENDING_SYNC: 'pendingSync',
+  ALBUM_PHOTOS: 'albumPhotos',       // 宝宝封面相册 [{ id, src }]
+  WEATHER_INFO: 'weatherInfo'        // 天气缓存 { category, temp, ts }
 }
 
 /**

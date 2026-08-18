@@ -1,115 +1,175 @@
-<!-- pages/index/index.wxml - 首页极简打卡（睡眠交互优化） -->
+<!-- pages/index/index.wxml - 首页（天气皮肤 + 预测卡 + 相册轮播 + 单行记录） -->
 <view class="page-index safe-bottom">
-  <!-- 顶部宝宝信息 -->
-  <view class="header">
-    <view class="baby-avatar" bindtap="goProfile" hover-class="avatar-tap" hover-stay-time="80">
-      <image wx:if="{{babyInfo.avatar}}" class="avatar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
-      <view wx:else class="avatar-emoji">👶</view>
-    </view>
-    <view class="baby-info">
-      <view class="baby-name">{{babyInfo.name || '宝宝'}}</view>
-      <view class="baby-meta">{{babyInfo.age || '新生儿'}}</view>
-    </view>
-    <view class="date-badge">{{todayText}}</view>
+
+  <!-- ===== 天气皮肤背景层（纯装饰，最底层） ===== -->
+  <view class="weather-bg wx-{{weatherClass}}">
+    <!-- 晴：太阳光晕 + 云朵 -->
+    <block wx:if="{{weatherClass === 'sunny'}}">
+      <view class="sun-glow"></view>
+      <view class="cloud cloud-1"></view>
+      <view class="cloud cloud-2"></view>
+      <view class="cloud cloud-3"></view>
+    </block>
+    <!-- 多云：灰白云 -->
+    <block wx:if="{{weatherClass === 'cloudy'}}">
+      <view class="cloud cloud-1 cloud-dim"></view>
+      <view class="cloud cloud-2 cloud-dim"></view>
+    </block>
+    <!-- 雨：玻璃水雾 + 雨丝 -->
+    <block wx:if="{{weatherClass === 'rain'}}">
+      <view class="glass-mist"></view>
+      <view class="rain-layer"></view>
+      <view class="droplet droplet-1"></view>
+      <view class="droplet droplet-2"></view>
+    </block>
+    <!-- 雪 -->
+    <block wx:if="{{weatherClass === 'snow'}}">
+      <view class="snow-layer"></view>
+    </block>
+    <!-- 风：落叶风絮 -->
+    <block wx:if="{{weatherClass === 'wind'}}">
+      <view class="leaf leaf-1">🍂</view>
+      <view class="leaf leaf-2">🍃</view>
+      <view class="leaf leaf-3">🍁</view>
+      <view class="leaf leaf-4">🍃</view>
+      <view class="leaf leaf-5">🍂</view>
+    </block>
   </view>
 
-  <!-- 网络状态提示 -->
-  <view class="offline-tip" wx:if="{{isOffline}}">
-    <text>📴 当前离线，记录已保存本地，联网后自动同步</text>
-  </view>
+  <!-- ===== 页面内容层 ===== -->
+  <view class="content-layer">
 
-  <!-- 云开发未就绪提示（仅开发期） -->
-  <view class="env-tip" wx:if="{{!cloudReady}}">
-    <text>🔧 云开发未开通，当前为离线模式。记录会保存到本地，开通云环境后自动同步。</text>
-  </view>
-
-  <!-- 智能预测提示区 -->
-  <view class="prediction-area" wx:if="{{hasPrediction}}">
-    <view class="predict-pill" wx:if="{{predictions.feed}}">
-      <text class="pill-text">🍼 {{predictions.feed}}</text>
-    </view>
-    <view class="predict-pill" wx:if="{{predictions.diaper}}">
-      <text class="pill-text">🧷 {{predictions.diaper}}</text>
-    </view>
-    <view class="predict-pill" wx:if="{{predictions.sleep}}">
-      <text class="pill-text">🌙 {{predictions.sleep}}</text>
-    </view>
-  </view>
-
-  <!-- ============ 主操作区：差异化布局 ============ -->
-
-  <!-- 喂奶：占据视觉中心的大卡片 -->
-  <view
-    class="feed-card {{feedPress ? 'pressing' : ''}}"
-    bindtap="handleFeed"
-    hover-class="none"
-  >
-    <!-- 成功反馈遮罩 -->
-    <view class="success-overlay" wx:if="{{feedSuccess}}">
-      <view class="success-check">✓</view>
-      <view class="success-label">已记录喂奶</view>
-    </view>
-
-    <!-- 奶瓶图标 -->
-    <view class="feed-icon-wrap">
-      <view class="feed-glow"></view>
-      <image class="feed-icon" src="/images/icons/bottle.svg" mode="aspectFit"></image>
-    </view>
-
-    <view class="feed-label">喂奶</view>
-    <view class="card-info" wx:if="{{cardTexts.feed.elapsed !== '--'}}">
-      <view class="info-row">{{cardTexts.feed.elapsed}}</view>
-      <view class="info-row info-next" wx:if="{{cardTexts.feed.next}}">{{cardTexts.feed.next}}</view>
-    </view>
-    <view class="feed-hint" wx:else>点击记录</view>
-  </view>
-
-  <!-- 下方两个不对称卡片 -->
-  <view class="dual-area">
-    <!-- 换尿布 -->
-    <view
-      class="dual-card diaper-card {{diaperPress ? 'pressing' : ''}}"
-      bindtap="handleDiaper"
-      hover-class="none"
-    >
-      <view class="mini-success" wx:if="{{diaperSuccess}}">
-        <text>✓</text>
+    <!-- 顶部宝宝信息 -->
+    <view class="header">
+      <view class="baby-avatar" bindtap="goProfile" hover-class="avatar-tap" hover-stay-time="80">
+        <image wx:if="{{babyInfo.avatar}}" class="avatar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
+        <view wx:else class="avatar-emoji">👶</view>
       </view>
-      <view class="dual-icon-wrap">
-        <image class="dual-icon" src="/images/icons/diaper.svg" mode="aspectFit"></image>
+      <view class="baby-info">
+        <view class="baby-name">{{babyInfo.name || '宝宝'}}</view>
+        <view class="baby-meta">{{babyInfo.age || '新生儿'}}</view>
       </view>
-      <view class="dual-label">换尿布</view>
-      <view class="card-info" wx:if="{{cardTexts.diaper.elapsed !== '--'}}">
-        <view class="info-row">{{cardTexts.diaper.elapsed}}</view>
-        <view class="info-row info-next" wx:if="{{cardTexts.diaper.next}}">{{cardTexts.diaper.next}}</view>
-      </view>
-      <view class="dual-hint" wx:else>点击</view>
+      <view class="weather-chip" wx:if="{{weatherText}}">{{weatherText}}</view>
+      <view class="date-badge" wx:else>{{todayText}}</view>
     </view>
 
-    <!-- 睡觉 -->
-    <view
-      class="dual-card sleep-card {{sleepPress ? 'pressing' : ''}} {{sleeping ? 'sleeping-state' : ''}}"
-      bindtap="handleSleep"
-      hover-class="none"
-    >
-      <view class="mini-success" wx:if="{{sleepSuccess}}">
-        <text>✓</text>
-      </view>
-      <view class="dual-icon-wrap">
-        <image class="dual-icon" src="/images/icons/moon.svg" mode="aspectFit"></image>
-      </view>
-      <view class="dual-label">{{sleeping ? '已入睡' : '睡觉'}}</view>
-      <view class="card-info" wx:if="{{cardTexts.sleep.elapsed && cardTexts.sleep.elapsed !== '--'}}">
-        <view class="info-row">{{cardTexts.sleep.elapsed}}</view>
-        <view class="info-row info-next" wx:if="{{cardTexts.sleep.next}}">{{cardTexts.sleep.next}}</view>
-      </view>
-      <view class="dual-hint" wx:else>点击</view>
+    <!-- 网络状态提示 -->
+    <view class="offline-tip" wx:if="{{isOffline}}">
+      <text>📴 当前离线，记录已保存本地，联网后自动同步</text>
     </view>
-  </view>
 
-  <!-- 底部小提示 -->
-  <view class="bottom-hint">
-    <text>👆 一键即记，单手拇指轻松操作</text>
+    <!-- 云开发未就绪提示（仅开发期） -->
+    <view class="env-tip" wx:if="{{!cloudReady}}">
+      <text>🔧 云开发未开通，当前为离线模式。记录会保存到本地，开通云环境后自动同步。</text>
+    </view>
+
+    <!-- ===== 三栏智能预测卡（对齐时光轴，适配首页奶咖色系） ===== -->
+    <view class="predict-card" wx:if="{{hasPrediction}}">
+      <view class="predict-col {{item.overdue ? 'overdue' : ''}}" wx:for="{{predictList}}" wx:key="key">
+        <view class="predict-icon">{{item.icon}}</view>
+        <view class="predict-label">{{item.label}}</view>
+        <view class="predict-time {{item.overdue ? 'predict-time-overdue' : ''}}" wx:if="{{item.available}}">{{item.predictedText}}</view>
+        <view class="predict-time predict-time-empty" wx:else>{{item.predictedText}}</view>
+        <view class="predict-countdown" wx:if="{{item.available}}">{{item.countdownText}}</view>
+      </view>
+    </view>
+
+    <!-- ===== 宝宝封面相册（横板轮播） ===== -->
+    <view class="album">
+      <swiper
+        wx:if="{{albumPhotos.length > 0}}"
+        class="album-swiper"
+        indicator-dots="{{albumPhotos.length > 1}}"
+        indicator-color="rgba(255,255,255,0.4)"
+        indicator-active-color="#FFFFFF"
+        autoplay="{{albumPhotos.length > 1}}"
+        interval="4000"
+        circular="{{albumPhotos.length > 1}}"
+      >
+        <swiper-item wx:for="{{albumPhotos}}" wx:key="id">
+          <view class="album-item" longpress="removeAlbumPhoto" data-index="{{index}}">
+            <image class="album-img" src="{{item.src}}" mode="aspectFill" lazy-load="{{true}}"></image>
+          </view>
+        </swiper-item>
+        <!-- 上传入口：不足 9 张时显示 -->
+        <swiper-item wx:if="{{albumPhotos.length < 9 && albumPhotos.length > 0}}">
+          <view class="album-item album-add" bindtap="addAlbumPhoto" hover-class="album-add-hover">
+            <view class="album-add-icon">📷</view>
+            <view class="album-add-text">上传照片</view>
+            <view class="album-add-sub">{{albumPhotos.length}}/9</view>
+          </view>
+        </swiper-item>
+      </swiper>
+
+      <!-- 空相册：整卡即上传入口 -->
+      <view class="album-empty" wx:if="{{albumPhotos.length === 0}}" bindtap="addAlbumPhoto" hover-class="album-add-hover">
+        <view class="album-add-icon">📷</view>
+        <view class="album-add-text">为宝宝添加封面相册</view>
+        <view class="album-add-sub">记录每一个可爱瞬间</view>
+      </view>
+    </view>
+
+    <!-- ===== 记录控件：三卡一行 ===== -->
+    <view class="record-row">
+      <!-- 喂奶 -->
+      <view
+        class="record-card feed-card {{feedPress ? 'pressing' : ''}}"
+        bindtap="handleFeed"
+        hover-class="none"
+      >
+        <view class="mini-success" wx:if="{{feedSuccess}}"><text>✓</text></view>
+        <view class="record-icon-wrap">
+          <image class="record-icon" src="/images/icons/bottle.svg" mode="aspectFit"></image>
+        </view>
+        <view class="record-label">喂奶</view>
+        <view class="card-info" wx:if="{{cardTexts.feed.elapsed !== '--'}}">
+          <view class="info-row">{{cardTexts.feed.elapsed}}</view>
+          <view class="info-row info-next" wx:if="{{cardTexts.feed.next}}">{{cardTexts.feed.next}}</view>
+        </view>
+        <view class="record-hint" wx:else>点击记录</view>
+      </view>
+
+      <!-- 换尿布 -->
+      <view
+        class="record-card diaper-card {{diaperPress ? 'pressing' : ''}}"
+        bindtap="handleDiaper"
+        hover-class="none"
+      >
+        <view class="mini-success" wx:if="{{diaperSuccess}}"><text>✓</text></view>
+        <view class="record-icon-wrap">
+          <image class="record-icon" src="/images/icons/diaper.svg" mode="aspectFit"></image>
+        </view>
+        <view class="record-label">换尿布</view>
+        <view class="card-info" wx:if="{{cardTexts.diaper.elapsed !== '--'}}">
+          <view class="info-row">{{cardTexts.diaper.elapsed}}</view>
+          <view class="info-row info-next" wx:if="{{cardTexts.diaper.next}}">{{cardTexts.diaper.next}}</view>
+        </view>
+        <view class="record-hint" wx:else>点击记录</view>
+      </view>
+
+      <!-- 睡觉 -->
+      <view
+        class="record-card sleep-card {{sleepPress ? 'pressing' : ''}} {{sleeping ? 'sleeping-state' : ''}}"
+        bindtap="handleSleep"
+        hover-class="none"
+      >
+        <view class="mini-success" wx:if="{{sleepSuccess}}"><text>✓</text></view>
+        <view class="record-icon-wrap">
+          <image class="record-icon" src="/images/icons/moon.svg" mode="aspectFit"></image>
+        </view>
+        <view class="record-label">{{sleeping ? '已入睡' : '睡觉'}}</view>
+        <view class="card-info" wx:if="{{cardTexts.sleep.elapsed && cardTexts.sleep.elapsed !== '--'}}">
+          <view class="info-row">{{cardTexts.sleep.elapsed}}</view>
+          <view class="info-row info-next" wx:if="{{cardTexts.sleep.next}}">{{cardTexts.sleep.next}}</view>
+        </view>
+        <view class="record-hint" wx:else>点击</view>
+      </view>
+    </view>
+
+    <!-- 底部小提示 -->
+    <view class="bottom-hint">
+      <text>👆 一键即记 · 长按相册照片可删除</text>
+    </view>
   </view>
 
   <!-- ========== 睡眠操作弹层 ========== -->

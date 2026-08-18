@@ -1,13 +1,37 @@
-// pages/index/index.js - 首页极简打卡（睡眠交互优化 + 文案优化）
+// pages/index/index.js - 首页（天气皮肤 + 预测卡 + 相册轮播 + 单行记录）
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
 const { formatElapsedSmart, formatRemainingSmart, formatDurationSmart } = require('../../utils/time')
-const { predictAll } = require('../../utils/predict')
+const { predictAll, predictDetail } = require('../../utils/predict')
 const { RECORD_TYPES } = require('../../utils/constants')
 
 // 入睡后超过此时间（毫秒）仍未结束，视为漏记结束，自动复位
 const SLEEP_RESET_MS = 12 * 60 * 60 * 1000
+
+// 天气缓存有效期（30 分钟）
+const WEATHER_CACHE_MS = 30 * 60 * 1000
+
+// 相册最多张数
+const ALBUM_MAX = 9
+
+// 天气分类 → 展示文案
+const WEATHER_LABELS = {
+  sunny: '☀️ 晴',
+  cloudy: '⛅ 多云',
+  rain: '🌧 雨',
+  snow: '❄️ 雪',
+  wind: '🌬 有风'
+}
+
+// 天气分类 → 页面背景色（同步导航栏/窗口背景）
+const WEATHER_BG = {
+  sunny: '#D8EDF8',
+  cloudy: '#E4E7E6',
+  rain: '#DCE5EB',
+  snow: '#E4EBF1',
+  wind: '#EFEAD9'
+}
 
 Page({
   data: {
@@ -19,9 +43,14 @@ Page({
       diaper: { elapsed: '--', next: '' },
       sleep:  { elapsed: '--', next: '' }
     },
-    // 预测胶囊数据（顶部一行）
-    predictions: { feed: '', diaper: '', sleep: '' },
+    // 三栏预测卡数据（对齐时光轴）
+    predictList: [],
     hasPrediction: false,
+    // 天气皮肤
+    weatherClass: 'sunny',
+    weatherText: '',
+    // 宝宝相册
+    albumPhotos: [],
     isOffline: false,
     cloudReady: true,
     todayText: '',
@@ -41,6 +70,8 @@ Page({
 
   _timer: null,
   _sleepTick: null,
+  _countdownTimer: null,
+  _allRecords: [],   // 用于预测计算的完整记录
 
   onLoad() {
     app.eventBus.on('recordsUpdated', this.refreshFromCache.bind(this))
@@ -53,7 +84,9 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/index/index')
     }
+    this.loadAlbum()
     this.refreshFromCache()
+    this.loadWeather()
     if (app.globalData.cloudReady) {
       this.fetchCloudData()
     }
@@ -66,11 +99,13 @@ Page({
       clearInterval(this._timer)
       this._timer = null
     }
+    this.stopCountdown()
     this.stopSleepTick()
   },
 
   onUnload() {
     if (this._timer) clearInterval(this._timer)
+    this.stopCountdown()
     this.stopSleepTick()
     app.eventBus.off('recordsUpdated', this.refreshFromCache)
   },
@@ -80,6 +115,168 @@ Page({
     const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
     this.setData({ todayText: `${d.getMonth() + 1}/${d.getDate()} 周${week}` })
   },
+
+  // ============================================
+  // 天气皮肤
+  // ============================================
+
+  /**
+   * 加载天气：本地缓存优先（30 分钟有效），否则调云函数
+   */
+  async loadWeather() {
+    let weather = null
+    try {
+      const cached = storage.get(storage.CACHE_KEYS.WEATHER_INFO)
+      if (cached && (Date.now() - cached.ts) < WEATHER_CACHE_MS && cached.category) {
+        weather = cached
+      }
+    } catch (e) {}
+
+    if (!weather) {
+      if (app.globalData.cloudReady) {
+        try {
+          const res = await call('getWeather', {})
+          if (res && res.category) {
+            weather = { ...res, ts: Date.now() }
+            storage.set(storage.CACHE_KEYS.WEATHER_INFO, weather)
+          }
+        } catch (err) {
+          console.warn('获取天气失败，使用默认晴天皮肤:', (err && err.message) || err)
+        }
+      }
+      if (!weather) {
+        // 兜底：默认晴天，短缓存避免每次进页都请求
+        weather = { category: 'sunny', temp: '', ts: Date.now() - WEATHER_CACHE_MS + 5 * 60 * 1000 }
+      }
+    }
+
+    this.applyWeather(weather)
+  },
+
+  applyWeather(weather) {
+    const category = WEATHER_LABELS[weather.category] ? weather.category : 'sunny'
+    const label = WEATHER_LABELS[category]
+    const temp = (weather.temp !== undefined && weather.temp !== null && weather.temp !== '') ? ` ${Math.round(weather.temp)}°` : ''
+    const d = new Date()
+    this.setData({
+      weatherClass: category,
+      weatherText: `${label}${temp} · ${d.getMonth() + 1}/${d.getDate()}`
+    })
+    try {
+      wx.setBackgroundColor({ backgroundColor: WEATHER_BG[category] })
+    } catch (e) {}
+  },
+
+  // ============================================
+  // 宝宝封面相册
+  // ============================================
+
+  loadAlbum() {
+    const album = storage.get(storage.CACHE_KEYS.ALBUM_PHOTOS) || []
+    this.setData({ albumPhotos: album })
+  },
+
+  /**
+   * 上传照片到相册
+   */
+  addAlbumPhoto() {
+    const remain = ALBUM_MAX - this.data.albumPhotos.length
+    if (remain <= 0) {
+      wx.showToast({ title: `最多 ${ALBUM_MAX} 张`, icon: 'none' })
+      return
+    }
+    wx.chooseMedia({
+      count: remain,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: async (res) => {
+        const files = (res.tempFiles || []).map(f => f.tempFilePath).filter(Boolean)
+        if (!files.length) return
+
+        wx.showLoading({ title: '添加中...' })
+        const babyId = app.globalData.babyId || 'default'
+        const uploaded = []
+
+        for (let i = 0; i < files.length; i++) {
+          const path = files[i]
+          // 云可用：上传换取永久 fileID；否则退化为本地临时路径
+          if (app.globalData.cloudReady) {
+            try {
+              const up = await wx.cloud.uploadFile({
+                cloudPath: `album/${babyId}/${Date.now()}_${i}.jpg`,
+                filePath: path
+              })
+              uploaded.push({ id: up.fileID, src: up.fileID })
+              continue
+            } catch (err) {
+              console.warn('相册照片上传失败，暂用本地路径:', (err && err.errMsg) || err)
+            }
+          }
+          uploaded.push({ id: `local_${Date.now()}_${i}`, src: path })
+        }
+
+        const albumPhotos = this.data.albumPhotos.concat(uploaded).slice(0, ALBUM_MAX)
+        storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, albumPhotos)
+        this.setData({ albumPhotos })
+
+        // 云端持久化（babies.albumPhotos），失败不影响本地使用
+        if (app.globalData.cloudReady) {
+          try {
+            await call('saveBabyInfo', {
+              babyId,
+              albumPhotos: albumPhotos.map(p => p.src)
+            })
+          } catch (err) {
+            console.warn('相册云端保存失败:', (err && err.message) || err)
+          }
+        }
+
+        wx.hideLoading()
+        wx.showToast({ title: '已添加', icon: 'success' })
+      },
+      fail: () => {}
+    })
+  },
+
+  /**
+   * 长按删除相册照片
+   */
+  async removeAlbumPhoto(e) {
+    const index = Number(e.currentTarget.dataset.index)
+    const target = this.data.albumPhotos[index]
+    if (!target) return
+
+    const { confirm } = await wx.showModal({
+      title: '删除照片',
+      content: '确定从相册删除这张照片吗？',
+      confirmColor: '#E8554E'
+    }).catch(() => ({ confirm: false }))
+    if (!confirm) return
+
+    const albumPhotos = this.data.albumPhotos.filter((_, i) => i !== index)
+    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, albumPhotos)
+    this.setData({ albumPhotos })
+
+    // 删除云文件 + 更新云端相册列表
+    if (app.globalData.cloudReady) {
+      if (String(target.id).startsWith('cloud://')) {
+        wx.cloud.deleteFile({ fileList: [target.id] }).catch(() => {})
+      }
+      try {
+        await call('saveBabyInfo', {
+          babyId: app.globalData.babyId || 'default',
+          albumPhotos: albumPhotos.map(p => p.src)
+        })
+      } catch (err) {
+        console.warn('相册云端更新失败:', (err && err.message) || err)
+      }
+    }
+  },
+
+  // ============================================
+  // 睡眠状态
+  // ============================================
 
   /**
    * 从本地存储恢复睡眠中的状态（应对小程序被关闭重开）
@@ -139,22 +336,50 @@ Page({
     return remain ? `${hours}小时${remain}分` : `${hours}小时`
   },
 
+  // ============================================
+  // 数据刷新
+  // ============================================
+
+  stopCountdown() {
+    if (this._countdownTimer) {
+      clearInterval(this._countdownTimer)
+      this._countdownTimer = null
+    }
+  },
+
+  /**
+   * 计算三栏预测卡（预计时间点 + 倒计时）
+   */
+  updatePredictions() {
+    const detail = predictDetail(this._allRecords)
+    const predictList = [
+      { key: 'feed', ...detail.feed },
+      { key: 'diaper', ...detail.diaper },
+      { key: 'sleep', ...detail.sleep }
+    ]
+    const hasPrediction = predictList.some(p => p.available)
+    this.setData({ predictList, hasPrediction })
+
+    this.stopCountdown()
+    if (hasPrediction) {
+      this._countdownTimer = setInterval(() => {
+        const refreshed = predictList.map(p => {
+          if (!p.available) return p
+          const d = predictDetail(this._allRecords)[p.key]
+          return { ...p, countdownText: d.countdownText, overdue: d.overdue, predictedText: d.predictedText }
+        })
+        this.setData({ predictList: refreshed })
+      }, 30000)
+    }
+  },
+
   refreshFromCache() {
     const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || { name: '宝宝', age: '新生儿' }
     const lastRecords = storage.getLastRecords()
-    const predictionData = storage.get(storage.CACHE_KEYS.PREDICTION)
+    this._allRecords = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
 
-    let predictions = { feed: '', diaper: '', sleep: '' }
-    if (predictionData) {
-      predictions = {
-        feed: predictionData.feed?.text || '',
-        diaper: predictionData.diaper?.text || '',
-        sleep: predictionData.sleep?.text || ''
-      }
-    }
-
-    const hasPrediction = !!(predictions.feed || predictions.diaper || predictions.sleep)
-    this.setData({ babyInfo, lastRecords, predictions, hasPrediction })
+    this.setData({ babyInfo, lastRecords })
+    this.updatePredictions()
     this.updateCardTexts()
   },
 
@@ -203,33 +428,25 @@ Page({
       })
       if (data && data.records) {
         const lastRecords = { feed: 0, diaper: 0, sleep: 0 }
-        data.records.forEach(r => {
-          const ts = this.normalizeTimestamp(r.timestamp)
+        const normalized = data.records.map(r => ({
+          ...r,
+          timestamp: this.normalizeTimestamp(r.timestamp)
+        }))
+        normalized.forEach(r => {
           if (lastRecords[r.recordType] !== undefined) {
-            if (!lastRecords[r.recordType] || ts > lastRecords[r.recordType]) {
-              lastRecords[r.recordType] = ts
+            if (!lastRecords[r.recordType] || r.timestamp > lastRecords[r.recordType]) {
+              lastRecords[r.recordType] = r.timestamp
             }
           }
         })
         storage.set(storage.CACHE_KEYS.LAST_RECORDS, lastRecords)
 
-        const predictionResult = predictAll(data.records.map(r => ({
-          ...r,
-          timestamp: this.normalizeTimestamp(r.timestamp)
-        })))
+        const predictionResult = predictAll(normalized)
         storage.set(storage.CACHE_KEYS.PREDICTION, predictionResult)
 
-        const predictions = {
-          feed: predictionResult.feed.text,
-          diaper: predictionResult.diaper.text,
-          sleep: predictionResult.sleep.text
-        }
-
-        this.setData({
-          lastRecords,
-          predictions,
-          hasPrediction: !!(predictions.feed || predictions.diaper || predictions.sleep)
-        })
+        this._allRecords = normalized
+        this.setData({ lastRecords })
+        this.updatePredictions()
         this.updateCardTexts()
       }
     } catch (err) {
@@ -248,7 +465,10 @@ Page({
     return isNaN(d.getTime()) ? 0 : d.getTime()
   },
 
-  // ===== 喂奶 / 尿布 =====
+  // ============================================
+  // 记录操作：喂奶 / 尿布 / 睡觉
+  // ============================================
+
   async handleFeed() {
     await this.recordAction(RECORD_TYPES.FEED, 'feedPress', 'feedSuccess', '已记录喂奶')
   },

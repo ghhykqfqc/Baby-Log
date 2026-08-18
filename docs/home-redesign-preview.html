@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>首页改版预览 - 秒记宝宝</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #2b2320;
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px;
+    min-height: 100vh;
+  }
+  .stage {
+    width: 390px;
+    height: 780px;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 24px 80px rgba(0,0,0,.5);
+    flex-shrink: 0;
+  }
+
+  /* ===== 天气背景层 ===== */
+  .weather-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .wx-sunny { background: linear-gradient(180deg, #C4E5F8 0%, #DFF1FB 32%, #F3EEE3 70%, #FAF6F0 100%); }
+  .wx-cloudy { background: linear-gradient(180deg, #D8E2E8 0%, #E9E9E4 35%, #F5F1EA 70%, #FAF6F0 100%); }
+  .wx-rain { background: linear-gradient(180deg, #C3D5E0 0%, #DCE7EE 35%, #EFEFE9 70%, #F6F3EC 100%); }
+  .wx-wind { background: linear-gradient(180deg, #E4E0CF 0%, #EFEAD9 35%, #F5F0E4 70%, #FAF6F0 100%); }
+  .wx-snow { background: linear-gradient(180deg, #D6E2EC 0%, #E9EFF4 35%, #F4F2EC 70%, #FAF6F0 100%); }
+
+  .sun-glow {
+    position: absolute; top: -60px; right: -40px; width: 210px; height: 210px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,244,200,.9) 0%, rgba(255,240,190,.35) 45%, rgba(255,240,190,0) 70%);
+    animation: sunPulse 6s ease-in-out infinite;
+  }
+  @keyframes sunPulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.06);opacity:1} }
+
+  .cloud {
+    --cloud-scale: 1;
+    position: absolute; width: 110px; height: 35px; border-radius: 30px;
+    background: rgba(255,255,255,.85); filter: blur(1px);
+    box-shadow: 20px -14px 0 4px rgba(255,255,255,.75), -23px -10px 0 0 rgba(255,255,255,.65), 45px 3px 0 -3px rgba(255,255,255,.55);
+  }
+  .cloud-1 { top: 45px; left: -130px; animation: drift 46s linear infinite; }
+  .cloud-2 { top: 120px; left: -150px; --cloud-scale: .7; opacity: .8; animation: drift 64s linear infinite; animation-delay: -20s; }
+  .cloud-3 { top: 30px; left: -110px; --cloud-scale: 1.2; opacity: .55; animation: drift 80s linear infinite; animation-delay: -48s; }
+  @keyframes drift { from { transform: translateX(0) scale(var(--cloud-scale)); } to { transform: translateX(calc(390px + 300px)) scale(var(--cloud-scale)); } }
+
+  .glass-mist {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 30%, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 70%),
+      radial-gradient(ellipse 50% 35% at 80% 55%, rgba(255,255,255,.28) 0%, rgba(255,255,255,0) 70%),
+      radial-gradient(ellipse 70% 45% at 50% 15%, rgba(226,238,246,.5) 0%, rgba(226,238,246,0) 75%);
+  }
+  .rain-layer {
+    position: absolute; top: -100px; left: 0; right: 0; bottom: 0;
+    background-image: repeating-linear-gradient(102deg, transparent 0, transparent 26px, rgba(174,194,224,.30) 26px, rgba(174,194,224,.30) 27px, transparent 27px);
+    animation: rainFall 1.1s linear infinite;
+  }
+  @keyframes rainFall { from { transform: translateY(-70px); } to { transform: translateY(70px); } }
+  .droplet {
+    position: absolute; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.85), rgba(200,218,236,.35) 60%, rgba(200,218,236,.15));
+    animation: dropletSlide 7s ease-in infinite;
+  }
+  .droplet-1 { width: 23px; height: 23px; top: 18%; left: 12%; }
+  .droplet-2 { width: 15px; height: 15px; top: 34%; right: 16%; animation-delay: -3.5s; }
+  @keyframes dropletSlide { 0%{transform:translateY(0) scale(1);opacity:0} 15%{opacity:1} 85%{opacity:1} 100%{transform:translateY(150px) scale(1.15);opacity:0} }
+
+  .snow-layer {
+    position: absolute; top: -170px; left: 0; right: 0; bottom: 0;
+    background-image:
+      radial-gradient(circle 3px at 20px 50px, rgba(255,255,255,.95) 90%, transparent),
+      radial-gradient(circle 2px at 80px 110px, rgba(255,255,255,.8) 90%, transparent),
+      radial-gradient(circle 2.5px at 140px 30px, rgba(255,255,255,.85) 90%, transparent),
+      radial-gradient(circle 1.5px at 170px 140px, rgba(255,255,255,.75) 90%, transparent);
+    background-size: 200px 170px;
+    animation: snowFall 9s linear infinite;
+  }
+  @keyframes snowFall { from { transform: translateY(0); } to { transform: translateY(170px); } }
+
+  .leaf { position: absolute; font-size: 20px; opacity: 0; animation: leafBlow 11s ease-in infinite; }
+  .leaf-1 { top: 16%; font-size: 24px; animation-duration: 12s; }
+  .leaf-2 { top: 30%; animation-delay: -2.5s; animation-duration: 10s; }
+  .leaf-3 { top: 8%; font-size: 18px; animation-delay: -5s; animation-duration: 14s; }
+  .leaf-4 { top: 24%; font-size: 16px; animation-delay: -7.5s; animation-duration: 9s; }
+  .leaf-5 { top: 40%; font-size: 21px; animation-delay: -4s; animation-duration: 13s; }
+  @keyframes leafBlow {
+    0% { transform: translate(-60px,0) rotate(0); opacity: 0; }
+    8% { opacity: .75; }
+    50% { transform: translate(175px,-35px) rotate(300deg); opacity: .65; }
+    90% { opacity: .3; }
+    100% { transform: translate(430px,30px) rotate(680deg); opacity: 0; }
+  }
+
+  /* ===== 内容层 ===== */
+  .content-layer { position: relative; z-index: 1; height: 100%; padding: 56px 16px 0; display: flex; flex-direction: column; }
+
+  .header { display: flex; align-items: center; margin-bottom: 12px; }
+  .baby-avatar {
+    width: 44px; height: 44px; border-radius: 50%; background: #E8D5B8;
+    border: 1.5px solid rgba(255,255,255,.8);
+    display: flex; align-items: center; justify-content: center; font-size: 26px; margin-right: 12px;
+  }
+  .baby-info { flex: 1; }
+  .baby-name { font-size: 18px; font-weight: 600; color: #3D3027; }
+  .baby-meta { font-size: 13px; color: #8B7D6E; margin-top: 2px; }
+  .weather-chip {
+    font-size: 11px; color: #8B7D6E; background: rgba(255,255,255,.65);
+    border: .5px solid rgba(255,255,255,.9); padding: 4px 10px; border-radius: 10px;
+  }
+
+  .predict-card {
+    display: flex; background: rgba(255,255,255,.82); backdrop-filter: blur(6px);
+    border: .5px solid rgba(255,255,255,.9); border-radius: 16px;
+    padding: 15px 8px 13px; margin-bottom: 12px;
+    box-shadow: 0 4px 16px rgba(180,150,110,.12);
+  }
+  .predict-col { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+  .predict-col:not(:last-child)::after {
+    content: ''; position: absolute; right: 0; top: 8px; bottom: 8px; width: .5px; background: #F0E8DE;
+  }
+  .predict-icon { font-size: 22px; line-height: 1; margin-bottom: 6px; }
+  .predict-label { font-size: 11px; color: #8B7D6E; margin-bottom: 4px; }
+  .predict-time { font-size: 14px; font-weight: 600; color: #C0A07A; font-variant-numeric: tabular-nums; }
+  .predict-time-overdue { color: #E8554E; }
+  .predict-countdown { font-size: 10px; color: #B5A795; margin-top: 3px; }
+  .predict-col.overdue .predict-countdown { color: #E8554E; }
+
+  .album { margin-bottom: 14px; }
+  .album-frame {
+    height: 160px; border-radius: 16px; overflow: hidden; position: relative;
+    box-shadow: 0 6px 18px rgba(150,120,80,.18);
+    background: linear-gradient(135deg, #F7E8D8, #EFD5BC);
+  }
+  .album-img {
+    width: 100%; height: 100%; object-fit: cover;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(255,255,255,.5), transparent 50%),
+      repeating-linear-gradient(45deg, #F2DDC4 0 22px, #EDD3B4 22px 44px);
+    display: flex; align-items: center; justify-content: center; font-size: 56px;
+  }
+  .album-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+  .dot { width: 5px; height: 5px; border-radius: 3px; background: rgba(180,150,110,.3); }
+  .dot.active { background: #D4B896; width: 14px; }
+
+  .record-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .record-card {
+    flex: 1; border-radius: 18px; padding: 18px 6px 15px;
+    display: flex; flex-direction: column; align-items: center; position: relative;
+    transition: transform .15s ease;
+  }
+  .record-card:active { transform: scale(.94); }
+  .feed-card { background: linear-gradient(150deg, #F5C6A0 0%, #E89B5F 100%); box-shadow: 0 6px 16px rgba(232,155,95,.32); }
+  .diaper-card { background: linear-gradient(150deg, #B8D4D0 0%, #7AAFA8 100%); box-shadow: 0 6px 16px rgba(122,175,168,.28); }
+  .sleep-card { background: linear-gradient(150deg, #C7B8D9 0%, #8B7AAA 100%); box-shadow: 0 6px 16px rgba(139,122,170,.28); }
+  .record-icon-wrap {
+    width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,.22);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 10px; font-size: 30px;
+  }
+  .record-label { font-size: 15px; font-weight: 600; color: #fff; letter-spacing: 1px; }
+  .card-info { margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .info-row { font-size: 10.5px; color: rgba(255,255,255,.92); white-space: nowrap; }
+  .info-next { font-size: 9.5px; color: rgba(255,255,255,.72); }
+
+  .bottom-hint {
+    flex: 1; display: flex; align-items: flex-end; justify-content: center;
+    font-size: 11px; color: #B5A795; padding-bottom: 16px;
+  }
+
+  /* tabBar 示意 */
+  .fake-tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 58px; background: rgba(255,255,255,.96);
+    display: flex; align-items: center; justify-content: space-around;
+    border-top: .5px solid #F0E8DE; z-index: 5;
+  }
+  .tab-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #B5A795; gap: 2px; }
+  .tab-item.active { color: #D4B896; font-weight: 600; }
+  .tab-icon { font-size: 20px; }
+
+  /* 侧边皮肤切换 */
+  .skin-panel {
+    position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 8px; z-index: 99;
+  }
+  .skin-btn {
+    width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25);
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.9); transition: transform .15s ease;
+  }
+  .skin-btn:hover { transform: scale(1.1); }
+  .skin-btn.active { border-color: #D4B896; box-shadow: 0 0 0 3px rgba(212,184,150,.3); }
+  @media (max-width: 900px) { .skin-panel { top: auto; bottom: 16px; transform: none; flex-direction: row; right: 16px; } }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="weather-bg wx-sunny" id="weatherBg">
+      <div id="weatherFx"></div>
+    </div>
+    <div class="content-layer">
+      <div class="header">
+        <div class="baby-avatar">👶</div>
+        <div class="baby-info">
+          <div class="baby-name">小桃子</div>
+          <div class="baby-meta">8个月16天</div>
+        </div>
+        <div class="weather-chip" id="weatherChip">☀️ 晴 31° · 8/19</div>
+      </div>
+
+      <div class="predict-card">
+        <div class="predict-col">
+          <div class="predict-icon">🍼</div>
+          <div class="predict-label">下次喂奶</div>
+          <div class="predict-time">今天 14:30</div>
+          <div class="predict-countdown">0时52分</div>
+        </div>
+        <div class="predict-col overdue">
+          <div class="predict-icon">🧷</div>
+          <div class="predict-label">下次换尿布</div>
+          <div class="predict-time predict-time-overdue">今天 13:05</div>
+          <div class="predict-countdown">超时 0时33分</div>
+        </div>
+        <div class="predict-col">
+          <div class="predict-icon">🌙</div>
+          <div class="predict-label">下次睡觉</div>
+          <div class="predict-time">今天 15:40</div>
+          <div class="predict-countdown">2时2分</div>
+        </div>
+      </div>
+
+      <div class="album">
+        <div class="album-frame"><div class="album-img">🧸</div></div>
+        <div class="album-dots">
+          <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+      </div>
+
+      <div class="record-row">
+        <div class="record-card feed-card">
+          <div class="record-icon-wrap">🍼</div>
+          <div class="record-label">喂奶</div>
+          <div class="card-info">
+            <div class="info-row">距上次 1.5小时</div>
+            <div class="info-next">预计 0时52分后</div>
+          </div>
+        </div>
+        <div class="record-card diaper-card">
+          <div class="record-icon-wrap">🧷</div>
+          <div class="record-label">换尿布</div>
+          <div class="card-info">
+            <div class="info-row">距上次 3.5小时</div>
+            <div class="info-next">已超时</div>
+          </div>
+        </div>
+        <div class="record-card sleep-card">
+          <div class="record-icon-wrap">🌙</div>
+          <div class="record-label">睡觉</div>
+          <div class="card-info">
+            <div class="info-row">距上次 2小时</div>
+            <div class="info-next">预计 2时2分后</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-hint">👆 一键即记 · 长按相册照片可删除</div>
+    </div>
+
+    <div class="fake-tabbar">
+      <div class="tab-item active"><span class="tab-icon">📝</span>记录</div>
+      <div class="tab-item"><span class="tab-icon">📅</span>时光轴</div>
+      <div class="tab-item"><span class="tab-icon">🌱</span>成长</div>
+    </div>
+  </div>
+
+  <div class="skin-panel">
+    <div class="skin-btn active" data-skin="sunny" title="晴">☀️</div>
+    <div class="skin-btn" data-skin="rain" title="雨">🌧️</div>
+    <div class="skin-btn" data-skin="wind" title="风">🍂</div>
+    <div class="skin-btn" data-skin="cloudy" title="多云">⛅</div>
+    <div class="skin-btn" data-skin="snow" title="雪">❄️</div>
+  </div>
+
+<script>
+  const FX = {
+    sunny: `
+      <div class="sun-glow"></div>
+      <div class="cloud cloud-1"></div>
+      <div class="cloud cloud-2"></div>
+      <div class="cloud cloud-3"></div>`,
+    cloudy: `
+      <div class="cloud cloud-1" style="filter:blur(1px)"></div>
+      <div class="cloud cloud-2" style="filter:blur(1.5px)"></div>`,
+    rain: `
+      <div class="glass-mist"></div>
+      <div class="rain-layer"></div>
+      <div class="droplet droplet-1"></div>
+      <div class="droplet droplet-2"></div>`,
+    wind: `
+      <div class="leaf leaf-1">🍂</div>
+      <div class="leaf leaf-2">🍃</div>
+      <div class="leaf leaf-3">🍁</div>
+      <div class="leaf leaf-4">🍃</div>
+      <div class="leaf leaf-5">🍂</div>`,
+    snow: `<div class="snow-layer"></div>`
+  }
+  const CHIPS = {
+    sunny: '☀️ 晴 31° · 8/19',
+    rain: '🌧 小雨 25° · 8/19',
+    wind: '🌬 有风 22° · 8/19',
+    cloudy: '⛅ 多云 26° · 8/19',
+    snow: '❄️ 小雪 -2° · 8/19'
+  }
+  const bg = document.getElementById('weatherBg')
+  const fx = document.getElementById('weatherFx')
+  const chip = document.getElementById('weatherChip')
+
+  document.querySelectorAll('.skin-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.skin-btn').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      const skin = btn.dataset.skin
+      bg.className = 'weather-bg wx-' + skin
+      fx.innerHTML = FX[skin] || ''
+      chip.textContent = CHIPS[skin] || ''
+    })
+  })
+</script>
+</body>
+</html>
