@@ -1,4 +1,4 @@
-<!-- components/timeline-card/timeline-card.wxml - 重构：右侧直接显示删除按钮 -->
+<!-- components/timeline-card/timeline-card.wxml - 重构：编辑 + 删除按钮 -->
 <view class="timeline-item" style="animation-delay: {{index * 40}}ms;">
   <view class="card-wrapper" bindtap="handleCardTap" hover-class="card-hover" hover-stay-time="80">
     <!-- 左侧色彩竖条 -->
@@ -17,13 +17,18 @@
           <text class="card-time">{{record.timeText}}</text>
         </view>
         <view class="card-extra-row" wx:if="{{record.extra}}">
-          <text class="extra-text">{{record.extra}}</text>
+          <text class="extra-text {{record.extraClass || ''}}">{{record.extra}}</text>
         </view>
       </view>
 
-      <!-- 右侧垃圾桶删除按钮（带确认提示防误触） -->
-      <view class="del-btn" catchtap="handleDelete" hover-class="del-btn-hover" hover-stay-time="80">
-        <image class="del-icon" src="/images/icons/trash.svg" mode="aspectFit"></image>
+      <!-- 右侧编辑 + 删除按钮 -->
+      <view class="action-group">
+        <view class="edit-btn" catchtap="handleEdit" hover-class="edit-btn-hover" hover-stay-time="80">
+          <image class="action-icon" src="/images/icons/edit.svg" mode="aspectFit"></image>
+        </view>
+        <view class="del-btn" catchtap="handleDelete" hover-class="del-btn-hover" hover-stay-time="80">
+          <image class="action-icon" src="/images/icons/trash.svg" mode="aspectFit"></image>
+        </view>
       </view>
     </view>
   </view>

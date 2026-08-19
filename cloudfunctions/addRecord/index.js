@@ -53,6 +53,7 @@ exports.main = async (event, context) => {
     timestamp,
     duration,
     amount,
+    subType,
     note
   } = event
 
@@ -75,6 +76,7 @@ exports.main = async (event, context) => {
     timestamp: new Date(timestamp).getTime(),
     duration: duration || 0,
     amount: amount || 0,
+    subType: subType || '',
     note: note || '',
     userId: OPENID,
     createdAt: new Date()

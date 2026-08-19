@@ -2,6 +2,7 @@
   "pages": [
     "pages/index/index",
     "pages/timeline/timeline",
+    "pages/timeline-records/timeline-records",
     "pages/growth/growth",
     "pages/history/history",
     "pages/profile/profile",

@@ -1,0 +1,123 @@
+<!-- pages/timeline-records/timeline-records.wxml - 时光轴记录列表（日期分组 + 滚动分页） -->
+<view class="page-tr">
+  <!-- 顶部标题栏 -->
+  <view class="tr-header">
+    <view class="tr-title">作息记录</view>
+    <view class="tr-sub">{{todayLabel}}</view>
+  </view>
+
+  <!-- 滚动列表区 -->
+  <scroll-view
+    class="list-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-default-style="black"
+    refresher-background="#FAF6F0"
+    refresher-triggered="{{refresherTriggered}}"
+    bindrefresherrefresh="onRefresherRefresh"
+    bindscrolltolower="onLoadMore"
+    lower-threshold="120"
+  >
+    <!-- 首次加载中 -->
+    <view class="list-loading" wx:if="{{loading && records.length === 0}}">
+      <view class="list-loading-text">加载中…</view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="list-empty" wx:if="{{!loading && records.length === 0}}">
+      <view class="empty-icon">🌱</view>
+      <view class="empty-title">还没有记录</view>
+      <view class="empty-sub">去首页点击按钮，记录宝宝的第一条作息</view>
+    </view>
+
+    <!-- 按日期分组的时光轴列表 -->
+    <block wx:for="{{groups}}" wx:key="key" wx:for-item="group">
+      <view class="date-group-label">
+        <view class="group-line"></view>
+        <view class="group-text">{{group.label}}</view>
+        <view class="group-line"></view>
+      </view>
+      <timeline-card
+        wx:for="{{group.records}}"
+        wx:key="_id"
+        record="{{item}}"
+        index="{{index}}"
+        binddelete="handleDelete"
+        bindedit="handleEdit"
+      />
+    </block>
+
+    <!-- 分页加载状态 -->
+    <view class="list-footer" wx:if="{{records.length > 0}}">
+      <view class="footer-text" wx:if="{{isLoadingMore}}">加载中…</view>
+      <view class="footer-text footer-end" wx:elif="{{noMore}}">— 最多展示近{{maxDays}}天 —</view>
+      <view class="footer-text footer-hint" wx:else>上拉查看更早的记录</view>
+    </view>
+
+    <view class="scroll-tail"></view>
+  </scroll-view>
+
+  <!-- ========== 编辑弹层 ========== -->
+  <view class="sheet-mask" wx:if="{{showEditSheet}}" bindtap="hideEditSheet" catchtouchmove="noop">
+    <view class="form-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="form-title">编辑{{editFormData.label}}</view>
+
+      <!-- 日期 -->
+      <view class="form-item">
+        <text class="form-label">日期</text>
+        <picker mode="date" value="{{editFormData.date}}" bindchange="onEditDateChange">
+          <view class="form-field field-picker">
+            <text class="field-text">{{editFormData.date}}</text>
+            <text class="field-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+
+      <!-- 时间 -->
+      <view class="form-item">
+        <text class="form-label">时间</text>
+        <picker mode="time" value="{{editFormData.time}}" bindchange="onEditTimeChange">
+          <view class="form-field field-picker">
+            <text class="field-text">{{editFormData.time}}</text>
+            <text class="field-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+
+      <!-- 喂奶量（仅喂奶） -->
+      <view class="form-item" wx:if="{{editFormData.recordType === 'feed'}}">
+        <text class="form-label">喂奶量</text>
+        <view class="form-field">
+          <input class="field-input" type="digit" placeholder="如 120" value="{{editFormData.amount}}" bindinput="onEditAmountInput" />
+          <text class="field-unit">ml</text>
+        </view>
+      </view>
+
+      <!-- 尿布类型（仅尿布） -->
+      <view class="form-item" wx:if="{{editFormData.recordType === 'diaper'}}">
+        <text class="form-label">类型</text>
+        <view class="diaper-type-row">
+          <view class="diaper-type-btn {{editFormData.subType === 'pee' ? 'active' : ''}}" data-type="pee" bindtap="onEditSubType" hover-class="btn-hover">💦 小便</view>
+          <view class="diaper-type-btn {{editFormData.subType === 'poop' ? 'active' : ''}}" data-type="poop" bindtap="onEditSubType" hover-class="btn-hover">💩 大便</view>
+        </view>
+      </view>
+
+      <!-- 睡眠时长（仅睡眠） -->
+      <view class="form-item" wx:if="{{editFormData.recordType === 'sleep'}}">
+        <text class="form-label">时长</text>
+        <view class="form-field">
+          <input class="field-input" type="digit" placeholder="如 90" value="{{editFormData.duration}}" bindinput="onEditDurationInput" />
+          <text class="field-unit">分钟</text>
+        </view>
+      </view>
+
+      <view class="form-actions">
+        <view class="btn-cancel" bindtap="hideEditSheet" hover-class="btn-hover">取消</view>
+        <view class="btn-confirm" bindtap="submitEdit" hover-class="btn-hover">保存</view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,6 +1,6 @@
-/* pages/timeline/timeline.wxss - 时光轴（固定头部 + 列表区滚动 + 分页加载） */
+/* pages/timeline/timeline.wxss - 时光轴（摘要卡 + 自定义时间线图） */
 
-/* 页面骨架：整页不滚动，flex 三段式（头部 / 滚动列表 / 底部按钮） */
+/* 整页锁定一屏：不滚动 */
 .page-timeline {
   height: 100vh;
   display: flex;
@@ -8,7 +8,6 @@
   overflow: hidden;
   padding: 24rpx 32rpx 0;
   box-sizing: border-box;
-  /* 底部让出自定义 tabBar（110rpx + 安全区） */
   padding-bottom: calc(env(safe-area-inset-bottom) + 110rpx);
 }
 
@@ -17,9 +16,11 @@
   flex-shrink: 0;
 }
 
-/* 日期头部 */
 .date-header {
-  padding: 8rpx 4rpx 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 16rpx;
 }
 
 .date-title {
@@ -28,13 +29,14 @@
   color: var(--color-text-primary);
 }
 
-/* ===== 三栏智能预测卡 ===== */
+/* ===== 预测卡 ===== */
 .predict-card {
   display: flex;
+  flex-shrink: 0;
   background: var(--color-bg-card);
   border-radius: 32rpx;
-  padding: 32rpx 16rpx 28rpx;
-  margin-bottom: 20rpx;
+  padding: 24rpx 16rpx 22rpx;
+  margin-bottom: 16rpx;
   box-shadow: 0 8rpx 32rpx rgba(180, 150, 110, 0.10);
 }
 
@@ -98,24 +100,29 @@
   color: var(--color-danger);
 }
 
-/* ===== 当日小结 ===== */
-.summary-bar {
+/* ===== 当日摘要卡 ===== */
+.summary-card {
+  flex-shrink: 0;
+  background: var(--color-bg-card);
+  border-radius: 32rpx;
+  padding: 28rpx 24rpx 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 8rpx 32rpx rgba(180, 150, 110, 0.10);
+}
+
+.summary-row {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  background: var(--color-primary-bg);
-  border-radius: var(--radius-md);
-  padding: 20rpx 24rpx;
-  margin-bottom: 8rpx;
 }
 
-.summary-item {
+.summary-col {
   flex: 1;
   text-align: center;
 }
 
-.summary-item .num {
-  font-size: 36rpx;
+.summary-num {
+  font-size: 44rpx;
   font-weight: 700;
   color: var(--color-primary-dark);
   display: block;
@@ -123,84 +130,297 @@
   font-variant-numeric: tabular-nums;
 }
 
-.summary-item .label {
+.sleep-num {
+  font-size: 34rpx;
+}
+
+.summary-label {
   font-size: 22rpx;
   color: var(--color-text-secondary);
   margin-top: 6rpx;
   display: block;
 }
 
-.divider {
+.summary-divider {
   width: 1rpx;
   height: 56rpx;
-  background: rgba(180, 150, 110, 0.18);
-}
-
-/* ===== 中间滚动列表区 ===== */
-.list-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* 首次加载占位 */
-.list-loading {
-  display: flex;
-  justify-content: center;
-  padding: 120rpx 0;
-}
-
-.list-loading-text {
-  font-size: var(--font-sm);
-  color: var(--color-text-hint);
-}
-
-/* 日期分组标签 */
-.date-group-label {
-  display: flex;
-  align-items: center;
-  padding: 28rpx 8rpx 16rpx;
-}
-
-.group-line {
-  flex: 1;
-  height: 1rpx;
   background: var(--color-divider);
 }
 
-.group-text {
-  padding: 0 20rpx;
-  font-size: 22rpx;
-  color: var(--color-text-hint);
-  letter-spacing: 2rpx;
+/* 记录列表入口按钮（在日期标题行右侧） */
+.records-entry {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 8rpx 18rpx;
+  background: var(--color-primary-bg);
+  border-radius: 24rpx;
+  transition: transform 0.15s ease, background 0.2s ease;
 }
 
-/* 分页加载状态 */
-.list-footer {
+.records-entry-hover {
+  transform: scale(0.94);
+  background: var(--color-primary-light);
+}
+
+.records-entry-icon {
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.records-entry-text {
+  font-size: 22rpx;
+  color: var(--color-primary-dark);
+  font-weight: 500;
+}
+
+/* 睡眠时段明细 */
+.sleep-sessions {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid var(--color-divider);
+}
+
+.sleep-sessions-label {
+  font-size: 20rpx;
+  color: var(--color-text-hint);
+  display: block;
+  margin-bottom: 10rpx;
+}
+
+.sleep-sessions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.sleep-session {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  background: rgba(139, 122, 170, 0.08);
+  border-radius: 16rpx;
+  padding: 6rpx 14rpx;
+}
+
+.sleep-session-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #8B7AAA;
+  flex-shrink: 0;
+}
+
+.sleep-session-dot.ongoing {
+  background: #8B7AAA;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.sleep-session-time {
+  font-size: 22rpx;
+  color: var(--color-text-primary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.sleep-session-dur {
+  font-size: 20rpx;
+  color: var(--color-text-hint);
+}
+
+/* ===== 时间线分布图卡 ===== */
+.chart-card {
+  flex: 1;
+  min-height: 0;
+  background: var(--color-bg-card);
+  border-radius: 32rpx;
+  padding: 20rpx 16rpx 12rpx;
+  box-shadow: 0 8rpx 32rpx rgba(180, 150, 110, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8rpx 12rpx;
+}
+
+.chart-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.chart-legend {
+  display: flex;
+  gap: 16rpx;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: 20rpx;
+  color: var(--color-text-secondary);
+}
+
+.legend-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+}
+
+.legend-feed { background: #E89B5F; }
+.legend-diaper { background: #7AAFA8; }
+
+.legend-bar {
+  width: 20rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+}
+
+.legend-sleep { background: #8B7AAA; }
+
+/* 刻度切换标签（日/周/月，参照 Apple Health 风格） */
+.chart-scale-tabs {
+  display: flex;
+  background: var(--color-primary-bg);
+  border-radius: 20rpx;
+  padding: 4rpx;
+  gap: 2rpx;
+}
+
+.scale-tab {
+  padding: 6rpx 20rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  border-radius: 16rpx;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.scale-tab.active {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  box-shadow: 0 2rpx 8rpx rgba(212, 184, 150, 0.3);
+}
+
+/* canvas 包裹层（tooltip 定位基准） */
+.chart-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.timeline-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 280rpx;
+}
+
+/* 图例（移到 canvas 下方） */
+.chart-legend {
+  flex-shrink: 0;
   display: flex;
   justify-content: center;
-  padding: 24rpx 0 8rpx;
+  gap: 24rpx;
+  padding: 8rpx 0 4rpx;
 }
 
-.footer-text {
-  font-size: 22rpx;
-  color: var(--color-text-hint);
+/* 节点详情气泡 */
+.chart-tooltip {
+  position: absolute;
+  z-index: 20;
+  background: rgba(61, 48, 39, 0.95);
+  border-radius: 16rpx;
+  padding: 12rpx 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  pointer-events: none;
+  animation: tooltipIn 0.15s ease;
+  max-width: 400rpx;
 }
 
-.footer-end {
-  opacity: 0.7;
+/* 默认在节点上方 */
+.chart-tooltip.above {
+  transform: translate(-50%, calc(-100% - 12px));
 }
 
-.footer-hint {
-  opacity: 0.8;
+/* 近顶部时显示在下方 */
+.chart-tooltip.below {
+  transform: translate(-50%, 12px);
 }
 
-/* 列表底部留白（与固定按钮保持距离） */
-.scroll-tail {
-  height: 24rpx;
+@keyframes tooltipIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* ===== 底部固定分享按钮（flex 布局的最后一段，无需 position: fixed） ===== */
+/* 箭头（上方） */
+.chart-tooltip.above .tooltip-arrow {
+  position: absolute;
+  bottom: -6rpx;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12rpx;
+  height: 12rpx;
+  background: rgba(61, 48, 39, 0.95);
+}
+
+/* 箭头（下方） */
+.chart-tooltip.below .tooltip-arrow {
+  position: absolute;
+  top: -6rpx;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12rpx;
+  height: 12rpx;
+  background: rgba(61, 48, 39, 0.95);
+}
+
+.tooltip-icon {
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.tooltip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+}
+
+.tooltip-title {
+  font-size: 24rpx;
+  color: #FFFFFF;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tooltip-sub {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+/* ===== 空状态 ===== */
+.empty-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== 底部分享按钮 ===== */
 .bottom-bar {
   flex-shrink: 0;
   padding: 16rpx 0 8rpx;

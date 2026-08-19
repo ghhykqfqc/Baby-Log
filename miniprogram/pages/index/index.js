@@ -64,8 +64,13 @@ Page({
     sleeping: false,
     sleepStartTime: 0,
     sleepDurationText: '',     // 已睡时长文案
-    showSleepSheet: false,     // 睡眠操作面板
-    showDurationPicker: false  // 时长选择器
+    showSleepSheet: false,     // 睡眠回忆记录面板（长按触发）
+    // 喂奶量弹层（长按触发）
+    showFeedSheet: false,
+    feedAmountInput: '',
+    // 尿布类型弹层（长按触发）
+    showDiaperSheet: false,
+    diaperTypeInput: ''
   },
 
   _timer: null,
@@ -468,6 +473,8 @@ Page({
   // ============================================
   // 记录操作：喂奶 / 尿布 / 睡觉
   // ============================================
+  // 记录操作：单击 = 记录时间点，长按 = 弹层填详情
+  // ============================================
 
   async handleFeed() {
     await this.recordAction(RECORD_TYPES.FEED, 'feedPress', 'feedSuccess', '已记录喂奶')
@@ -478,11 +485,123 @@ Page({
   },
 
   /**
-   * 点击睡觉卡片：弹出操作面板
+   * 睡眠单击：切换入睡/醒来
    */
-  handleSleep() {
+  handleSleepTap() {
+    if (this.data.sleeping) {
+      this.endSleep()
+    } else {
+      this.startSleep()
+    }
+  },
+
+  /**
+   * 睡眠长按：弹出回忆记录面板
+   */
+  showSleepSheet() {
     wx.vibrateShort({ type: 'light' })
     this.setData({ showSleepSheet: true })
+  },
+
+  // ===== 喂奶量弹层（长按） =====
+  showFeedSheet() {
+    wx.vibrateShort({ type: 'light' })
+    this.setData({ showFeedSheet: true, feedAmountInput: '' })
+  },
+
+  hideFeedSheet() {
+    this.setData({ showFeedSheet: false })
+  },
+
+  onFeedAmountInput(e) {
+    this.setData({ feedAmountInput: e.detail.value })
+  },
+
+  async saveFeedWithAmount() {
+    const amount = parseFloat(this.data.feedAmountInput) || 0
+    this.setData({ showFeedSheet: false })
+    wx.vibrateShort({ type: 'light' })
+    this.setData({ feedPress: true })
+    setTimeout(() => this.setData({ feedPress: false }), 300)
+
+    const timestamp = Date.now()
+    const babyId = app.globalData.babyId || 'default'
+    const record = {
+      babyId,
+      recordType: RECORD_TYPES.FEED,
+      timestamp,
+      amount,
+      duration: 0,
+      userId: app.globalData.openid || '',
+      createdAt: new Date().toISOString()
+    }
+
+    storage.updateLastRecord(RECORD_TYPES.FEED, timestamp)
+    storage.appendTodayRecord({ ...record, _id: `local_${timestamp}` })
+    app.eventBus.emit('recordsUpdated')
+    this.updateCardTexts()
+
+    this.setData({ feedSuccess: true })
+    setTimeout(() => this.setData({ feedSuccess: false }), 1000)
+
+    if (app.globalData.cloudReady && app.globalData.isOnline) {
+      try { await call('addRecord', record) } catch (err) { app.enqueuePendingSync(record) }
+    } else {
+      app.enqueuePendingSync(record)
+    }
+
+    wx.showToast({ title: amount ? `已记录 ${amount}ml` : '已记录喂奶', icon: 'success' })
+  },
+
+  // ===== 尿布类型弹层（长按） =====
+  showDiaperSheet() {
+    wx.vibrateShort({ type: 'light' })
+    this.setData({ showDiaperSheet: true, diaperTypeInput: '' })
+  },
+
+  hideDiaperSheet() {
+    this.setData({ showDiaperSheet: false })
+  },
+
+  selectDiaperType(e) {
+    this.setData({ diaperTypeInput: e.currentTarget.dataset.type })
+  },
+
+  async saveDiaperWithType() {
+    const subType = this.data.diaperTypeInput
+    this.setData({ showDiaperSheet: false })
+    wx.vibrateShort({ type: 'light' })
+    this.setData({ diaperPress: true })
+    setTimeout(() => this.setData({ diaperPress: false }), 300)
+
+    const timestamp = Date.now()
+    const babyId = app.globalData.babyId || 'default'
+    const record = {
+      babyId,
+      recordType: RECORD_TYPES.DIAPER,
+      timestamp,
+      subType,
+      duration: 0,
+      userId: app.globalData.openid || '',
+      createdAt: new Date().toISOString()
+    }
+
+    storage.updateLastRecord(RECORD_TYPES.DIAPER, timestamp)
+    storage.appendTodayRecord({ ...record, _id: `local_${timestamp}` })
+    app.eventBus.emit('recordsUpdated')
+    this.updateCardTexts()
+
+    this.setData({ diaperSuccess: true })
+    setTimeout(() => this.setData({ diaperSuccess: false }), 1000)
+
+    if (app.globalData.cloudReady && app.globalData.isOnline) {
+      try { await call('addRecord', record) } catch (err) { app.enqueuePendingSync(record) }
+    } else {
+      app.enqueuePendingSync(record)
+    }
+
+    const typeText = subType === 'poop' ? '大便' : subType === 'pee' ? '小便' : ''
+    wx.showToast({ title: typeText ? `已记录${typeText}` : '已记录换尿布', icon: 'success' })
   },
 
   /**
@@ -575,17 +694,7 @@ Page({
   },
 
   /**
-   * 回忆记录：展示时长选择器
-   */
-  showDurationPicker() {
-    this.setData({ showSleepSheet: false, showDurationPicker: true })
-  },
 
-  hideDurationPicker() {
-    this.setData({ showDurationPicker: false })
-  },
-
-  /**
    * 选择一个时长，立即记录"刚刚结束"的一次睡眠
    */
   async selectDuration(e) {
@@ -595,7 +704,7 @@ Page({
     const start = end - minutes * 60000
 
     wx.vibrateShort({ type: 'light' })
-    this.setData({ showDurationPicker: false, sleepPress: true })
+    this.setData({ showSleepSheet: false, sleepPress: true })
     setTimeout(() => this.setData({ sleepPress: false }), 300)
 
     const babyId = app.globalData.babyId || 'default'

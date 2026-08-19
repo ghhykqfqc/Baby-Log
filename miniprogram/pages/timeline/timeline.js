@@ -1,40 +1,39 @@
-// pages/timeline/timeline.js - 时光轴（固定头部 + 列表区滚动分页加载）
+// pages/timeline/timeline.js - 时光轴（摘要卡 + 自定义时间线分布图）
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
 const { formatTime, minutesToText, toMs } = require('../../utils/time')
-const { RECORD_CONFIG } = require('../../utils/constants')
 const { predictDetail } = require('../../utils/predict')
-
-// 分页配置：每次上拉多加载 7 天，最多展示 60 天
-const PAGE_STEP = 7
-const MAX_DAYS = 60
 
 Page({
   data: {
-    records: [],
-    groups: [],              // 按日期分组的记录（列表渲染用）
     loading: true,
-    isLoadingMore: false,    // 分页加载中
-    noMore: false,           // 是否已到最大范围
-    refresherTriggered: false,
-    maxDays: MAX_DAYS,
     todayLabel: '',
-    hasRecords: false,       // 今日是否有记录（控制预测卡/小结）
-    predictList: [],         // 三栏预测卡数据
-    hasPrediction: false,    // 是否有可用预测
-    summary: { feedCount: 0, diaperCount: 0, sleepDurationText: '0小时' }
+    hasRecords: false,
+    hasChartData: false,   // 是否有任何记录（控制图表显示，比 hasRecords 更宽松）
+    predictList: [],
+    hasPrediction: false,
+    chartScale: 'day',      // hour | day | week | month
+    tooltip: null,           // 点击节点的详情气泡 {x, y, icon, title, sub}
+    summary: {
+      feedCount: 0,
+      diaperCount: 0,
+      sleepDurationText: '0小时',
+      sleepSessions: []
+    }
   },
 
   _countdownTimer: null,
-  _allRecords: [],   // 完整数据用于重新计算预测
-  _loadedDays: 1,    // 当前已加载的天数范围
-  _autoLoaded: false, // 是否已自动尝试加载过历史（防止空库时递归翻页）
+  _allRecords: [],
+  _chartData: null,     // 图表原始数据（时间戳，绘制时转 x 坐标）
+  _todayStart: 0,       // 今天 0 点的时间戳
+  _chartDots: [],       // 节点位置（用于点击命中检测）
+  _chartBars: [],       // 睡眠条形位置（用于点击命中检测）
+  _canvasRect: null,    // canvas 在页面中的位置（坐标转换用）
 
   onLoad() {
     const today = new Date()
-    const todayLabel = `${today.getMonth() + 1}月${today.getDate()}日`
-    this.setData({ todayLabel })
+    this.setData({ todayLabel: `${today.getMonth() + 1}月${today.getDate()}日` })
   },
 
   onShow() {
@@ -60,26 +59,26 @@ Page({
   },
 
   /**
-   * 优先本地缓存，再拉云端（按当前已加载范围）
+   * 优先本地缓存，再拉云端
    */
   async loadData() {
     const cached = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
     this._allRecords = cached
-    this.renderRecords(cached)
+    this.renderSummary(cached)
     this.updatePredictions()
 
-    await this.fetchRecords(true)
+    await this.fetchRecords()
   },
 
   /**
-   * 拉取云端记录（days = 当前分页范围）
-   * @param {Boolean} isRefresh 是否为刷新（今天无记录时自动加载历史）
+   * 拉取记录（根据当前刻度决定天数范围）
    */
-  async fetchRecords(isRefresh) {
+  async fetchRecords() {
+    const scaleDays = this.data.chartScale === 'hour' ? 1 : this.data.chartScale === 'day' ? 1 : this.data.chartScale === 'week' ? 7 : 30
     try {
       const result = await call('getRecords', {
         babyId: app.globalData.babyId || 'default',
-        days: this._loadedDays
+        days: scaleDays
       })
       if (result && result.records) {
         const normalized = result.records.map(r => ({
@@ -87,24 +86,20 @@ Page({
           timestamp: toMs(r.timestamp)
         }))
         this._allRecords = normalized
-        this.renderRecords(normalized)
-        // 缓存仍只存今日记录（分享页/首页依赖 todayRecords 的语义）
+        // 缓存只存今日记录（分享页/首页依赖 todayRecords 的语义）
         const todayRecords = normalized.filter(r => this.isSameDay(r.timestamp, Date.now()))
         storage.set(storage.CACHE_KEYS.TODAY_RECORDS, todayRecords)
+        this.renderSummary(normalized)
         this.updatePredictions()
-
-        // 今天无记录时，自动加载一次历史，避免列表空白
-        if (isRefresh && normalized.length === 0 && !this._autoLoaded && !this.data.noMore) {
-          this._autoLoaded = true
-          this.setData({ loading: false })
-          this.onLoadMore()
-          return
-        }
       }
     } catch (err) {
-      console.warn('拉取记录失败，使用本地缓存:', (err && err.message) || (err && err.errMsg) || err)
+      console.warn('拉取记录失败:', (err && err.message) || (err && err.errMsg) || err)
     } finally {
       this.setData({ loading: false })
+      // 数据就绪后绘制图表（周/月视图即使今天无记录也要画）
+      if (this.data.hasChartData) {
+        setTimeout(() => this.drawTimelineChart(), 50)
+      }
     }
   },
 
@@ -120,131 +115,96 @@ Page({
   },
 
   /**
-   * 日期分组标签：今天 / 昨天 / M月D日（跨年带年份）
+   * 渲染摘要 + 准备图表数据
    */
-  formatGroupLabel(timestamp) {
-    const d = new Date(timestamp)
-    const now = new Date()
-    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-    if (this.isSameDay(timestamp, now.getTime())) return '今天'
-    if (this.isSameDay(timestamp, yesterday.getTime())) return '昨天'
-    const label = `${d.getMonth() + 1}月${d.getDate()}日`
-    return d.getFullYear() === now.getFullYear() ? label : `${d.getFullYear()}年${label}`
-  },
+  renderSummary(rawRecords) {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    this._todayStart = todayStart.getTime()
 
-  /**
-   * 上拉加载更早的记录（scroll-view 触底触发）
-   */
-  async onLoadMore() {
-    if (this.data.loading || this.data.isLoadingMore || this.data.noMore) return
+    const todayRecords = (rawRecords || []).filter(r => this.isSameDay(toMs(r.timestamp), Date.now()))
 
-    this._loadedDays = Math.min(this._loadedDays + PAGE_STEP, MAX_DAYS)
-    this.setData({
-      isLoadingMore: true,
-      noMore: this._loadedDays >= MAX_DAYS
-    })
-
-    await this.fetchRecords(false)
-    this.setData({ isLoadingMore: false })
-  },
-
-  /**
-   * 下拉刷新（scroll-view refresher）
-   */
-  async onRefresherRefresh() {
-    this.setData({ refresherTriggered: true })
-    try {
-      // 保留已加载范围，刷新数据
-      await this.fetchRecords(true)
-    } finally {
-      this.setData({ refresherTriggered: false })
-    }
-  },
-
-  /**
-   * 渲染记录列表（去重 + 倒序 + 按日期分组）
-   */
-  renderRecords(rawRecords) {
-    if (!rawRecords || rawRecords.length === 0) {
+    if (todayRecords.length === 0) {
       this.setData({
-        records: [],
-        groups: [],
         hasRecords: false,
-        summary: { feedCount: 0, diaperCount: 0, sleepDurationText: '0小时' }
+        hasChartData: (rawRecords || []).length > 0,
+        summary: { feedCount: 0, diaperCount: 0, sleepDurationText: '0小时', sleepSessions: [] }
       })
       return
     }
 
-    const seen = new Set()
-    const deduped = []
-
-    rawRecords.forEach(r => {
-      const ts = toMs(r.timestamp)
-      if (!ts) return
-      const dedupKey = `${ts}_${r.recordType}`
-      if (seen.has(dedupKey)) return
-      seen.add(dedupKey)
-
-      const config = RECORD_CONFIG[r.recordType] || {}
-      let extra = ''
-      if (r.recordType === 'sleep' && r.duration) {
-        extra = minutesToText(r.duration)
-      } else if (r.recordType === 'feed' && r.amount) {
-        extra = `${r.amount}ml`
-      }
-
-      deduped.push({
-        _id: r._id || `local_${ts}`,
-        recordType: r.recordType,
-        timestamp: ts,
-        duration: r.duration || 0,
-        amount: r.amount || 0,
-        label: config.label || r.recordType,
-        icon: config.icon || '📝',
-        color: config.color || '#D4B896',
-        timeText: formatTime(ts),
-        extra
-      })
-    })
-
-    deduped.sort((a, b) => b.timestamp - a.timestamp)
-
-    // 按日期分组（倒序）
-    const groups = []
-    let lastDayKey = ''
-    deduped.forEach(r => {
-      const d = new Date(r.timestamp)
-      const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
-      if (key !== lastDayKey) {
-        groups.push({ key, label: this.formatGroupLabel(r.timestamp), records: [] })
-        lastDayKey = key
-      }
-      groups[groups.length - 1].records.push(r)
-    })
-
-    // 当日小结只统计今天的记录
-    const now = Date.now()
-    const todayRecords = deduped.filter(r => this.isSameDay(r.timestamp, now))
     const feedCount = todayRecords.filter(r => r.recordType === 'feed').length
     const diaperCount = todayRecords.filter(r => r.recordType === 'diaper').length
-    const sleepDurationTotal = todayRecords
-      .filter(r => r.recordType === 'sleep' && r.duration)
-      .reduce((sum, r) => sum + r.duration, 0)
+
+    // 睡眠统计
+    const sleepRecords = todayRecords.filter(r => r.recordType === 'sleep' && r.duration > 0)
+    const sleepDurationTotal = sleepRecords.reduce((sum, r) => sum + r.duration, 0)
+
+    // 睡眠时段明细
+    const sleepSessions = sleepRecords.map(r => {
+      const startTs = toMs(r.timestamp)
+      const endTs = startTs + (r.duration || 0) * 60000
+      return {
+        startText: formatTime(startTs),
+        endText: formatTime(endTs),
+        durationText: minutesToText(r.duration),
+        ongoing: false
+      }
+    })
+
+    // 检查正在进行的睡眠
+    const sleepStart = wx.getStorageSync('sleepStartTime') || 0
+    if (sleepStart && this.isSameDay(sleepStart, Date.now())) {
+      const elapsedMin = Math.floor((Date.now() - sleepStart) / 60000)
+      sleepSessions.push({
+        startText: formatTime(sleepStart),
+        endText: '入睡中',
+        durationText: minutesToText(elapsedMin),
+        ongoing: true
+      })
+    }
+
+    // 准备图表数据（时间戳，绘制时转 x 坐标）
+    this._chartData = {
+      feeds: todayRecords.filter(r => r.recordType === 'feed').map(r => toMs(r.timestamp)),
+      diapers: todayRecords.filter(r => r.recordType === 'diaper').map(r => toMs(r.timestamp)),
+      sleepBars: [],
+      sleepDots: []
+    }
+
+    sleepRecords.forEach(r => {
+      const startTs = toMs(r.timestamp)
+      const endTs = startTs + (r.duration || 0) * 60000
+      this._chartData.sleepBars.push({ start: startTs, end: endTs })
+      this._chartData.sleepDots.push({ ts: startTs, isStart: true })
+      this._chartData.sleepDots.push({ ts: endTs, isStart: false })
+    })
+
+    // duration=0 的入睡标记
+    todayRecords.filter(r => r.recordType === 'sleep' && !r.duration).forEach(r => {
+      this._chartData.sleepDots.push({ ts: toMs(r.timestamp), isStart: true })
+    })
+
+    // 正在进行的睡眠条
+    if (sleepStart && this.isSameDay(sleepStart, Date.now())) {
+      this._chartData.sleepBars.push({ start: sleepStart, end: Date.now() })
+      this._chartData.sleepDots.push({ ts: sleepStart, isStart: true })
+    }
 
     this.setData({
-      records: deduped,
-      groups,
-      hasRecords: todayRecords.length > 0,
+      hasRecords: true,
+      hasChartData: true,
       summary: {
         feedCount,
         diaperCount,
-        sleepDurationText: sleepDurationTotal ? minutesToText(sleepDurationTotal) : '0小时'
+        sleepDurationText: sleepDurationTotal ? minutesToText(sleepDurationTotal) : '0小时',
+        sleepSessions
       }
     })
   },
 
   /**
-   * 计算并刷新三栏预测卡（含倒计时）
+   * 计算并刷新三栏预测卡
    */
   updatePredictions() {
     const detail = predictDetail(this._allRecords)
@@ -255,7 +215,6 @@ Page({
     ]
     this.setData({ predictList, hasPrediction: predictList.some(p => p.available) })
 
-    // 启动倒计时刷新（每 30 秒更新一次）
     this.stopCountdown()
     const hasAnyAvailable = predictList.some(p => p.available)
     if (hasAnyAvailable) {
@@ -270,30 +229,480 @@ Page({
     }
   },
 
-  /**
-   * 删除记录
-   */
-  async handleDelete(e) {
-    const { id } = e.detail
-    const target = this.data.records.find(r => r._id === id)
-    if (!target) return
+  /* ============================================
+     自定义 Canvas 2D 时间线分布图
+     三泳道（喂奶 / 换尿布 / 睡眠），24 小时横轴，
+     圆点标记事件，睡眠时段为条形线段
+     ============================================ */
 
-    wx.showLoading({ title: '删除中...' })
-    try {
-      if (!String(id).startsWith('local_')) {
-        await call('deleteRecord', { id })
-      }
-      const records = this.data.records.filter(r => r._id !== id)
-      this._allRecords = this._allRecords.filter(r => (r._id || `local_${toMs(r.timestamp)}`) !== id)
-      this.renderRecords(records)
-      this.updatePredictions()
-      storage.removeTodayRecord(id)
-      wx.showToast({ title: '已删除', icon: 'success' })
-    } catch (err) {
-      wx.showToast({ title: '删除失败', icon: 'none' })
-    } finally {
-      wx.hideLoading()
+  drawTimelineChart() {
+    const query = wx.createSelectorQuery().in(this)
+    query.select('#timelineChart')
+      .fields({ node: true, size: true, rect: true })
+      .exec((res) => {
+        if (!res || !res[0] || !res[0].node) return
+
+        const canvas = res[0].node
+        const ctx = canvas.getContext('2d')
+        const dpr = wx.getSystemInfoSync().pixelRatio || 2
+        const W = res[0].width
+        const H = res[0].height
+
+        // 存储 canvas 在页面中的位置（点击坐标转换用）
+        this._canvasRect = { left: res[0].left, top: res[0].top, width: W, height: H }
+
+        if (!W || !H) {
+          setTimeout(() => this.drawTimelineChart(), 120)
+          return
+        }
+
+        canvas.width = W * dpr
+        canvas.height = H * dpr
+        ctx.scale(dpr, dpr)
+
+        // 清空命中检测数据
+        this._chartDots = []
+        this._chartBars = []
+
+        // 按刻度分派渲染
+        const scale = this.data.chartScale
+        if (scale === 'hour') {
+          this.renderTimelineChart(ctx, W, H, Date.now() - 3 * 3600000, 3)
+        } else if (scale === 'day') {
+          this.renderTimelineChart(ctx, W, H, this._todayStart, 24)
+        } else if (scale === 'week') {
+          this.renderAggregateChart(ctx, W, H, 7)
+        } else if (scale === 'month') {
+          this.renderAggregateChart(ctx, W, H, 30)
+        }
+      })
+  },
+
+  /* ============================================
+     时间线视图（时/日共用）：三泳道 + 圆点 + 睡眠条形
+     @param windowStart 窗口起始时间戳
+     @param windowHours 窗口时长（3 或 24）
+     ============================================ */
+  renderTimelineChart(ctx, W, H, windowStart, windowHours) {
+    ctx.clearRect(0, 0, W, H)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, W, H)
+
+    const pad = { left: 50, right: 14, top: 8, bottom: 24 }
+    const chartW = W - pad.left - pad.right
+    const chartH = H - pad.top - pad.bottom
+
+    const laneY = {
+      feed: pad.top + chartH * 1 / 6,
+      diaper: pad.top + chartH * 3 / 6,
+      sleep: pad.top + chartH * 5 / 6
     }
+    const colors = {
+      feed: '#E89B5F', diaper: '#7AAFA8', sleep: '#8B7AAA', sleepLight: '#C7B8D9',
+      grid: '#F3EDE4', axis: '#C4B8A8', text: '#8B7D6E', now: 'rgba(232, 85, 78, 0.25)'
+    }
+
+    const tsToX = (ts) => {
+      const hours = (ts - windowStart) / 3600000
+      return pad.left + (Math.max(0, Math.min(windowHours, hours)) / windowHours) * chartW
+    }
+
+    // 从 _allRecords 构建窗口内图表数据
+    const windowEnd = windowStart + windowHours * 3600000
+    const winRecords = this._allRecords.filter(r => r.timestamp >= windowStart && r.timestamp <= windowEnd)
+    const feeds = winRecords.filter(r => r.recordType === 'feed').map(r => r.timestamp)
+    const diapers = winRecords.filter(r => r.recordType === 'diaper').map(r => r.timestamp)
+    const sleepBars = []
+    const sleepDots = []
+    winRecords.filter(r => r.recordType === 'sleep').forEach(r => {
+      if (r.duration > 0) {
+        const endTs = r.timestamp + r.duration * 60000
+        sleepBars.push({ start: r.timestamp, end: endTs })
+        sleepDots.push({ ts: r.timestamp, isStart: true })
+        sleepDots.push({ ts: endTs, isStart: false })
+      } else {
+        sleepDots.push({ ts: r.timestamp, isStart: true })
+      }
+    })
+    const sleepStart = wx.getStorageSync('sleepStartTime') || 0
+    if (sleepStart && sleepStart >= windowStart) {
+      sleepBars.push({ start: sleepStart, end: Date.now() })
+      sleepDots.push({ ts: sleepStart, isStart: true })
+    }
+
+    // ===== 1. 泳道引导线 =====
+    Object.values(laneY).forEach(y => {
+      ctx.strokeStyle = colors.grid
+      ctx.lineWidth = 0.5
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + chartW, y); ctx.stroke()
+    })
+
+    // ===== 2. 时间刻度轴 =====
+    const pad2 = (n) => String(n).padStart(2, '0')
+    ctx.fillStyle = colors.axis
+    ctx.font = '9px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+
+    // 主刻度间隔：3h 视图每 30min，24h 视图每 3h
+    const majorStep = windowHours === 3 ? 0.5 : 3
+    for (let h = 0; h <= windowHours; h += majorStep) {
+      const x = pad.left + (h / windowHours) * chartW
+      const ts = windowStart + h * 3600000
+      const d = new Date(ts)
+      const label = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+      ctx.fillText(label, x, pad.top + chartH + 6)
+      ctx.strokeStyle = colors.axis
+      ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(x, pad.top + chartH); ctx.lineTo(x, pad.top + chartH + 4); ctx.stroke()
+    }
+    // 小刻度
+    const minorStep = windowHours === 3 ? 0.5 : 1
+    for (let h = 0; h <= windowHours; h += minorStep) {
+      if (h % majorStep === 0) continue
+      const x = pad.left + (h / windowHours) * chartW
+      ctx.strokeStyle = colors.grid
+      ctx.lineWidth = 0.5
+      ctx.beginPath(); ctx.moveTo(x, pad.top + chartH); ctx.lineTo(x, pad.top + chartH + 2); ctx.stroke()
+    }
+
+    // ===== 3. 泳道标签 =====
+    ctx.font = '10px sans-serif'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = colors.feed; ctx.fillText('喂奶', pad.left - 6, laneY.feed)
+    ctx.fillStyle = colors.diaper; ctx.fillText('尿布', pad.left - 6, laneY.diaper)
+    ctx.fillStyle = colors.sleep; ctx.fillText('睡眠', pad.left - 6, laneY.sleep)
+
+    // ===== 4. 睡眠条形 =====
+    const barH = 10
+    sleepBars.forEach(bar => {
+      const x1 = tsToX(bar.start)
+      const x2 = tsToX(bar.end)
+      const y = laneY.sleep
+      const w = Math.max(3, x2 - x1)
+      const grad = ctx.createLinearGradient(x1, y, x2, y)
+      grad.addColorStop(0, colors.sleep); grad.addColorStop(1, colors.sleepLight)
+      ctx.fillStyle = grad
+      this.roundRect(ctx, x1, y - barH / 2, w, barH, barH / 2)
+      ctx.fill()
+      this._chartBars.push({ x1, x2, y, h: barH, start: bar.start, end: bar.end })
+    })
+
+    // ===== 5. 喂奶圆点 =====
+    feeds.forEach(ts => {
+      const x = tsToX(ts)
+      ctx.fillStyle = colors.feed
+      ctx.beginPath(); ctx.arc(x, laneY.feed, 4.5, 0, 2 * Math.PI); ctx.fill()
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.stroke()
+      this._chartDots.push({ x, y: laneY.feed, r: 4.5, type: 'feed', ts })
+    })
+
+    // ===== 6. 换尿布圆点 =====
+    diapers.forEach(ts => {
+      const x = tsToX(ts)
+      ctx.fillStyle = colors.diaper
+      ctx.beginPath(); ctx.arc(x, laneY.diaper, 4.5, 0, 2 * Math.PI); ctx.fill()
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.stroke()
+      this._chartDots.push({ x, y: laneY.diaper, r: 4.5, type: 'diaper', ts })
+    })
+
+    // ===== 7. 睡眠圆点 =====
+    sleepDots.forEach(d => {
+      const x = tsToX(d.ts)
+      ctx.fillStyle = d.isStart ? colors.sleep : colors.sleepLight
+      ctx.beginPath(); ctx.arc(x, laneY.sleep, 4.5, 0, 2 * Math.PI); ctx.fill()
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5; ctx.stroke()
+      this._chartDots.push({ x, y: laneY.sleep, r: 4.5, type: 'sleep', ts: d.ts, isStart: d.isStart })
+    })
+
+    // ===== 8. 当前时间指示线 =====
+    const nowX = tsToX(Date.now())
+    if (nowX > pad.left && nowX < pad.left + chartW) {
+      ctx.strokeStyle = colors.now
+      ctx.lineWidth = 1; ctx.setLineDash([3, 3])
+      ctx.beginPath(); ctx.moveTo(nowX, pad.top); ctx.lineTo(nowX, pad.top + chartH); ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = 'rgba(232, 85, 78, 0.4)'
+      ctx.beginPath(); ctx.moveTo(nowX - 3, pad.top); ctx.lineTo(nowX + 3, pad.top); ctx.lineTo(nowX, pad.top + 4); ctx.closePath(); ctx.fill()
+    }
+  },
+
+  /* ============================================
+     周/月视图：按天聚合的三泳道柱状图
+     每天一列，3 个泳道各一根柱子（喂奶次数/尿布次数/睡眠小时数）
+     ============================================ */
+  renderAggregateChart(ctx, W, H, days) {
+    ctx.clearRect(0, 0, W, H)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillRect(0, 0, W, H)
+
+    const pad = { left: 42, right: 14, top: 12, bottom: 24 }
+    const chartW = W - pad.left - pad.right
+    const chartH = H - pad.top - pad.bottom
+    const laneH = chartH / 3
+    const laneY = {
+      feed: pad.top + laneH * 0.5,
+      diaper: pad.top + laneH * 1.5,
+      sleep: pad.top + laneH * 2.5
+    }
+    const colors = {
+      feed: '#E89B5F',
+      diaper: '#7AAFA8',
+      sleep: '#8B7AAA',
+      grid: '#F3EDE4',
+      axis: '#C4B8A8',
+      text: '#8B7D6E'
+    }
+
+    // 按天聚合数据
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    const dayStart = now.getTime()
+    const dailyData = []
+    for (let i = days - 1; i >= 0; i--) {
+      const dStart = dayStart - i * 86400000
+      const dEnd = dStart + 86400000
+      const dayRecords = this._allRecords.filter(r => r.timestamp >= dStart && r.timestamp < dEnd)
+      dailyData.push({
+        date: new Date(dStart),
+        feedCount: dayRecords.filter(r => r.recordType === 'feed').length,
+        diaperCount: dayRecords.filter(r => r.recordType === 'diaper').length,
+        sleepMinutes: dayRecords
+          .filter(r => r.recordType === 'sleep' && r.duration > 0)
+          .reduce((sum, r) => sum + r.duration, 0)
+      })
+    }
+
+    // 计算各泳道最大值（用于柱高归一化）
+    const maxFeed = Math.max(1, ...dailyData.map(d => d.feedCount))
+    const maxDiaper = Math.max(1, ...dailyData.map(d => d.diaperCount))
+    const maxSleep = Math.max(1, ...dailyData.map(d => d.sleepMinutes))
+    const barMaxH = laneH * 0.7
+
+    // 泳道引导线
+    Object.values(laneY).forEach(y => {
+      ctx.strokeStyle = colors.grid
+      ctx.lineWidth = 0.5
+      ctx.beginPath()
+      ctx.moveTo(pad.left, y)
+      ctx.lineTo(pad.left + chartW, y)
+      ctx.stroke()
+    })
+
+    // 泳道标签
+    ctx.font = '9px sans-serif'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = colors.feed
+    ctx.fillText('喂奶', pad.left - 4, laneY.feed)
+    ctx.fillStyle = colors.diaper
+    ctx.fillText('尿布', pad.left - 4, laneY.diaper)
+    ctx.fillStyle = colors.sleep
+    ctx.fillText('睡眠', pad.left - 4, laneY.sleep)
+
+    // 每天一列
+    const colW = chartW / days
+    const barW = Math.min(colW * 0.5, 16)
+
+    dailyData.forEach((d, i) => {
+      const cx = pad.left + colW * (i + 0.5)
+      const isToday = i === days - 1
+
+      // 今天列高亮
+      if (isToday) {
+        ctx.fillStyle = 'rgba(212, 184, 150, 0.06)'
+        ctx.fillRect(cx - colW / 2, pad.top, colW, chartH)
+      }
+
+      // 喂奶柱
+      const feedH = (d.feedCount / maxFeed) * barMaxH
+      ctx.fillStyle = colors.feed
+      this.roundRect(ctx, cx - barW / 2, laneY.feed - feedH, barW, feedH, 2)
+      ctx.fill()
+      if (d.feedCount > 0) {
+        ctx.fillStyle = '#FFFFFF'
+        ctx.font = '8px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText(`${d.feedCount}`, cx, laneY.feed - feedH - 2)
+      }
+
+      // 尿布柱
+      const diaperH = (d.diaperCount / maxDiaper) * barMaxH
+      ctx.fillStyle = colors.diaper
+      this.roundRect(ctx, cx - barW / 2, laneY.diaper - diaperH, barW, diaperH, 2)
+      ctx.fill()
+      if (d.diaperCount > 0) {
+        ctx.fillStyle = '#FFFFFF'
+        ctx.font = '8px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText(`${d.diaperCount}`, cx, laneY.diaper - diaperH - 2)
+      }
+
+      // 睡眠柱（向下生长）
+      const sleepH = (d.sleepMinutes / maxSleep) * barMaxH
+      ctx.fillStyle = colors.sleep
+      this.roundRect(ctx, cx - barW / 2, laneY.sleep, barW, sleepH, 2)
+      ctx.fill()
+      if (d.sleepMinutes > 0) {
+        ctx.fillStyle = '#FFFFFF'
+        ctx.font = '8px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.fillText(`${(d.sleepMinutes / 60).toFixed(1)}h`, cx, laneY.sleep + sleepH + 2)
+      }
+
+      // X 轴日期标签
+      ctx.fillStyle = isToday ? colors.text : colors.axis
+      ctx.font = `${isToday ? 'bold ' : ''}9px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      const label = days === 7
+        ? ['日', '一', '二', '三', '四', '五', '六'][d.date.getDay()]
+        : `${d.date.getDate()}`
+      ctx.fillText(label, cx, pad.top + chartH + 6)
+
+      // 存储柱子位置（点击命中检测用）
+      this._chartBars.push({
+        x1: cx - colW / 2, x2: cx + colW / 2,
+        y: pad.top, h: chartH,
+        dailyData: d, type: 'aggregate'
+      })
+    })
+
+    // X 轴线
+    ctx.strokeStyle = colors.axis
+    ctx.lineWidth = 0.5
+    ctx.beginPath()
+    ctx.moveTo(pad.left, pad.top + chartH)
+    ctx.lineTo(pad.left + chartW, pad.top + chartH)
+    ctx.stroke()
+  },
+
+  /* ============================================
+     图表点击：命中检测 → 显示详情气泡
+     ============================================ */
+  onChartTap(e) {
+    let pageX, pageY
+    if (e.detail && e.detail.x !== undefined) {
+      pageX = e.detail.x; pageY = e.detail.y
+    } else if (e.changedTouches && e.changedTouches[0]) {
+      pageX = e.changedTouches[0].clientX; pageY = e.changedTouches[0].clientY
+    } else { return }
+
+    // 异步查询 canvas 当前位置（避免 _canvasRect 过期）
+    const query = wx.createSelectorQuery().in(this)
+    query.select('#timelineChart').fields({ size: true, rect: true }).exec((res) => {
+      if (!res || !res[0]) return
+      const rect = res[0]
+      let touchX = pageX - rect.left
+      let touchY = pageY - rect.top
+      // 坐标系自动修正：如果偏移太大说明 e.detail 已是 canvas 相对坐标
+      if (touchX < -50 || touchX > rect.width + 50) { touchX = pageX; touchY = pageY }
+      this._performHitTest(touchX, touchY)
+    })
+  },
+
+  _performHitTest(touchX, touchY) {
+    let hit = null
+    let hitType = null
+
+    if (this.data.chartScale === 'hour' || this.data.chartScale === 'day') {
+      const hitR = 22
+      for (const dot of this._chartDots) {
+        const dx = touchX - dot.x
+        const dy = touchY - dot.y
+        if (dx * dx + dy * dy <= hitR * hitR) { hit = dot; hitType = 'dot'; break }
+      }
+      if (!hit) {
+        for (const bar of this._chartBars) {
+          if (touchX >= bar.x1 - 6 && touchX <= bar.x2 + 6 && Math.abs(touchY - bar.y) <= bar.h + 6) {
+            hit = bar; hitType = 'bar'; break
+          }
+        }
+      }
+    } else {
+      for (const bar of this._chartBars) {
+        if (touchX >= bar.x1 && touchX <= bar.x2) { hit = bar; hitType = 'aggregate'; break }
+      }
+    }
+
+    if (!hit) { this.setData({ tooltip: null }); return }
+    const tooltip = this.buildTooltip(hit, hitType)
+    if (tooltip) this.setData({ tooltip })
+  },
+
+  /**
+   * 根据命中对象构建气泡数据
+   */
+  buildTooltip(hit, hitType) {
+    // 智能定位：近顶部（y<50）显示在下方，否则上方
+    const pos = (hit.y < 50) ? 'below' : 'above'
+
+    if (hitType === 'dot') {
+      const time = formatTime(hit.ts)
+      if (hit.type === 'feed') {
+        const record = this._allRecords.find(r => r.timestamp === hit.ts && r.recordType === 'feed')
+        const amount = record && record.amount ? `${record.amount}ml` : ''
+        return { x: hit.x, y: hit.y, pos, icon: '🍼', title: `${time} 喂奶`, sub: amount || '' }
+      }
+      if (hit.type === 'diaper') {
+        const record = this._allRecords.find(r => r.timestamp === hit.ts && r.recordType === 'diaper')
+        const subType = record && record.subType ? (record.subType === 'poop' ? '大便' : '小便') : ''
+        return { x: hit.x, y: hit.y, pos, icon: '🧷', title: `${time} 换尿布`, sub: subType || '' }
+      }
+      if (hit.type === 'sleep') {
+        return { x: hit.x, y: hit.y, pos, icon: hit.isStart ? '😴' : '🌅', title: `${time} ${hit.isStart ? '入睡' : '醒来'}`, sub: '' }
+      }
+    }
+    if (hitType === 'bar') {
+      const startT = formatTime(hit.start)
+      const endT = formatTime(hit.end)
+      const dur = Math.round((hit.end - hit.start) / 60000)
+      return { x: (hit.x1 + hit.x2) / 2, y: hit.y, pos, icon: '😴', title: `${startT}-${endT}`, sub: minutesToText(dur) }
+    }
+    if (hitType === 'aggregate') {
+      const d = hit.dailyData
+      const dateStr = `${d.date.getMonth() + 1}/${d.date.getDate()}`
+      const sleepH = (d.sleepMinutes / 60).toFixed(1)
+      return { x: (hit.x1 + hit.x2) / 2, y: hit.y, pos, icon: '📊', title: dateStr, sub: `喂奶${d.feedCount} 尿布${d.diaperCount} 睡眠${sleepH}h` }
+    }
+    return null
+  },
+
+  /**
+   * 切换刻度（日/周/月）
+   */
+  switchScale(e) {
+    const scale = e.currentTarget.dataset.scale
+    if (scale === this.data.chartScale) return
+
+    this.setData({ chartScale: scale, tooltip: null })
+    // 重新加载数据（周/月需要更多天数）+ 重绘
+    this.loadData()
+  },
+
+  /**
+   * 圆角矩形辅助
+   */
+  roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.arcTo(x + w, y, x + w, y + h, r)
+    ctx.arcTo(x + w, y + h, x, y + h, r)
+    ctx.arcTo(x, y + h, x, y, r)
+    ctx.arcTo(x, y, x + w, y, r)
+    ctx.closePath()
+  },
+
+  /* ============================================
+     页面跳转
+     ============================================ */
+
+  goRecords() {
+    wx.navigateTo({ url: '/pages/timeline-records/timeline-records' })
   },
 
   goShareCard() {

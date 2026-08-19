@@ -1,4 +1,4 @@
-/* components/timeline-card/timeline-card.wxss - 重构版：直接删除按钮 */
+/* components/timeline-card/timeline-card.wxss - 重构版：编辑 + 删除按钮 */
 
 .timeline-item {
   position: relative;
@@ -92,18 +92,42 @@
   border-radius: 16rpx;
 }
 
-/* 右侧直接显示的删除按钮 */
-.del-btn {
+.extra-text.extra-no-data {
+  color: var(--color-text-hint);
+  background: rgba(181, 167, 149, 0.1);
+}
+
+/* 右侧操作按钮组 */
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
   flex-shrink: 0;
-  width: 64rpx;
-  height: 64rpx;
+  margin-left: 12rpx;
+}
+
+.edit-btn,
+.del-btn {
+  width: 56rpx;
+  height: 56rpx;
   border-radius: 50%;
-  background: rgba(232, 85, 78, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-left: 12rpx;
   transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.edit-btn {
+  background: rgba(108, 163, 197, 0.08);
+}
+
+.edit-btn-hover {
+  background: rgba(108, 163, 197, 0.18);
+  transform: scale(0.9);
+}
+
+.del-btn {
+  background: rgba(232, 85, 78, 0.08);
 }
 
 .del-btn-hover {
@@ -111,7 +135,7 @@
   transform: scale(0.9);
 }
 
-.del-icon {
-  width: 32rpx;
-  height: 32rpx;
+.action-icon {
+  width: 28rpx;
+  height: 28rpx;
 }

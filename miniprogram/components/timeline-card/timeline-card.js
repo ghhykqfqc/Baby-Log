@@ -1,4 +1,4 @@
-// components/timeline-card/timeline-card.js - 重构：去掉滑动，直接删除按钮
+// components/timeline-card/timeline-card.js - 编辑 + 删除按钮
 Component({
   properties: {
     record: {
@@ -26,8 +26,12 @@ Component({
       })
     },
 
+    handleEdit() {
+      this.triggerEvent('edit', { record: this.data.record })
+    },
+
     handleCardTap() {
-      // 卡片点击预留扩展位（未来可查看详情）
+      // 卡片点击预留扩展位
     }
   }
 })

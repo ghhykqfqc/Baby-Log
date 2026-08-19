@@ -109,12 +109,13 @@
       </view>
     </view>
 
-    <!-- ===== 记录控件：三卡一行 ===== -->
+    <!-- ===== 记录控件：三卡一行（单击记录时间点，长按填写详情） ===== -->
     <view class="record-row">
       <!-- 喂奶 -->
       <view
         class="record-card feed-card {{feedPress ? 'pressing' : ''}}"
         bindtap="handleFeed"
+        bindlongpress="showFeedSheet"
         hover-class="none"
       >
         <view class="mini-success" wx:if="{{feedSuccess}}"><text>✓</text></view>
@@ -126,13 +127,14 @@
           <view class="info-row">{{cardTexts.feed.elapsed}}</view>
           <view class="info-row info-next" wx:if="{{cardTexts.feed.next}}">{{cardTexts.feed.next}}</view>
         </view>
-        <view class="record-hint" wx:else>点击记录</view>
+        <view class="record-hint" wx:else>点击记录 · 长按填量</view>
       </view>
 
       <!-- 换尿布 -->
       <view
         class="record-card diaper-card {{diaperPress ? 'pressing' : ''}}"
         bindtap="handleDiaper"
+        bindlongpress="showDiaperSheet"
         hover-class="none"
       >
         <view class="mini-success" wx:if="{{diaperSuccess}}"><text>✓</text></view>
@@ -147,10 +149,11 @@
         <view class="record-hint" wx:else>点击记录</view>
       </view>
 
-      <!-- 睡觉 -->
+      <!-- 睡觉（单击切换入睡/醒来，长按回忆记录） -->
       <view
         class="record-card sleep-card {{sleepPress ? 'pressing' : ''}} {{sleeping ? 'sleeping-state' : ''}}"
-        bindtap="handleSleep"
+        bindtap="handleSleepTap"
+        bindlongpress="showSleepSheet"
         hover-class="none"
       >
         <view class="mini-success" wx:if="{{sleepSuccess}}"><text>✓</text></view>
@@ -162,52 +165,56 @@
           <view class="info-row">{{cardTexts.sleep.elapsed}}</view>
           <view class="info-row info-next" wx:if="{{cardTexts.sleep.next}}">{{cardTexts.sleep.next}}</view>
         </view>
-        <view class="record-hint" wx:else>点击</view>
+        <view class="record-hint" wx:else>点击记录 · 长按回忆</view>
       </view>
     </view>
 
     <!-- 底部小提示 -->
     <view class="bottom-hint">
-      <text>👆 一键即记 · 长按相册照片可删除</text>
+      <text>👆 单击即记 · 长按填详情</text>
     </view>
   </view>
 
-  <!-- ========== 睡眠操作弹层 ========== -->
+  <!-- ========== 喂奶量弹层（长按触发） ========== -->
+  <view class="sheet-mask" wx:if="{{showFeedSheet}}" bindtap="hideFeedSheet" catchtouchmove="noop">
+    <view class="sleep-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sleep-sheet-title">记录喂奶</view>
+      <view class="sheet-sub">填入喂奶量，不填也可记录时间点</view>
+      <view class="amount-input-row">
+        <input class="amount-input" type="digit" placeholder="如 120" value="{{feedAmountInput}}" bindinput="onFeedAmountInput" confirm-type="done" bindconfirm="saveFeedWithAmount" />
+        <text class="amount-unit">ml</text>
+      </view>
+      <view class="sleep-action-btn sleep-action-primary" bindtap="saveFeedWithAmount" hover-class="btn-hover">
+        💾 保存
+      </view>
+      <view class="sleep-cancel-link" bindtap="hideFeedSheet">取消</view>
+    </view>
+  </view>
+
+  <!-- ========== 尿布类型弹层（长按触发） ========== -->
+  <view class="sheet-mask" wx:if="{{showDiaperSheet}}" bindtap="hideDiaperSheet" catchtouchmove="noop">
+    <view class="sleep-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sleep-sheet-title">记录换尿布</view>
+      <view class="sheet-sub">选择类型，不选也可记录时间点</view>
+      <view class="diaper-type-grid">
+        <view class="diaper-type-item {{diaperTypeInput === 'pee' ? 'active' : ''}}" data-type="pee" bindtap="selectDiaperType" hover-class="duration-item-hover">💦 小便</view>
+        <view class="diaper-type-item {{diaperTypeInput === 'poop' ? 'active' : ''}}" data-type="poop" bindtap="selectDiaperType" hover-class="duration-item-hover">💩 大便</view>
+      </view>
+      <view class="sleep-action-btn sleep-action-primary" bindtap="saveDiaperWithType" hover-class="btn-hover">
+        💾 保存
+      </view>
+      <view class="sleep-cancel-link" bindtap="hideDiaperSheet">取消</view>
+    </view>
+  </view>
+
+  <!-- ========== 睡眠回忆记录弹层（长按触发） ========== -->
   <view class="sheet-mask" wx:if="{{showSleepSheet}}" bindtap="hideSleepSheet" catchtouchmove="noop">
     <view class="sleep-sheet" catchtap="noop">
       <view class="sheet-handle"></view>
-      <view class="sleep-sheet-title">{{sleeping ? '结束睡眠' : '记录睡眠'}}</view>
-
-      <!-- 已入睡：显示当前睡眠时长 + 结束按钮 -->
-      <block wx:if="{{sleeping}}">
-        <view class="sleep-current">
-          <view class="sleep-current-num">{{sleepDurationText}}</view>
-          <view class="sleep-current-label">已入睡时长</view>
-        </view>
-        <view class="sleep-action-btn sleep-action-primary" bindtap="endSleep" hover-class="btn-hover">
-          🌅 宝宝起床了
-        </view>
-        <view class="sleep-cancel-link" bindtap="hideSleepSheet">取消</view>
-      </block>
-
-      <!-- 未入睡：三个快捷操作 -->
-      <block wx:else>
-        <view class="sleep-action-btn sleep-action-primary" bindtap="startSleep" hover-class="btn-hover">
-          🌙 宝宝刚刚入睡
-        </view>
-        <view class="sleep-action-btn sleep-action-secondary" bindtap="showDurationPicker" hover-class="btn-hover">
-          ⏱ 回忆记录（选择时长）
-        </view>
-        <view class="sleep-cancel-link" bindtap="hideSleepSheet">取消</view>
-      </block>
-    </view>
-  </view>
-
-  <!-- ========== 时长选择器弹层 ========== -->
-  <view class="sheet-mask" wx:if="{{showDurationPicker}}" bindtap="hideDurationPicker" catchtouchmove="noop">
-    <view class="sleep-sheet" catchtap="noop">
-      <view class="sheet-handle"></view>
-      <view class="sleep-sheet-title">睡了多久？</view>
+      <view class="sleep-sheet-title">回忆记录睡眠</view>
+      <view class="sheet-sub">选择刚刚结束的睡眠时长</view>
       <view class="duration-grid">
         <view class="duration-item" data-minutes="30" bindtap="selectDuration" hover-class="duration-item-hover">30分钟</view>
         <view class="duration-item" data-minutes="60" bindtap="selectDuration" hover-class="duration-item-hover">1小时</view>
@@ -218,7 +225,7 @@
         <view class="duration-item" data-minutes="240" bindtap="selectDuration" hover-class="duration-item-hover">4小时</view>
         <view class="duration-item" data-minutes="480" bindtap="selectDuration" hover-class="duration-item-hover">8小时</view>
       </view>
-      <view class="sleep-cancel-link" bindtap="hideDurationPicker">取消</view>
+      <view class="sleep-cancel-link" bindtap="hideSleepSheet">取消</view>
     </view>
   </view>
 </view>

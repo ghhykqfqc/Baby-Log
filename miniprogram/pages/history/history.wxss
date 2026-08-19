@@ -150,7 +150,81 @@
   margin-left: 2rpx;
 }
 
-/* ===== 分页加载状态 ===== */
+/* 编辑 + 删除按钮 */
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-shrink: 0;
+  margin-left: 12rpx;
+}
+
+.edit-btn,
+.del-btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.edit-btn { background: rgba(108, 163, 197, 0.08); }
+.del-btn { background: rgba(232, 85, 78, 0.08); }
+
+.action-btn-hover {
+  transform: scale(0.9);
+}
+
+.action-btn-hover.edit-btn,
+.edit-btn:hover { background: rgba(108, 163, 197, 0.18); }
+.action-btn-hover.del-btn,
+.del-btn:hover { background: rgba(232, 85, 78, 0.18); }
+
+.action-icon {
+  width: 28rpx;
+  height: 28rpx;
+}
+
+/* ===== 编辑弹层 ===== */
+.sheet-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 10000;
+  display: flex;
+  align-items: flex-end;
+  animation: maskIn 0.25s ease;
+}
+
+@keyframes maskIn { from { opacity: 0; } to { opacity: 1; } }
+
+.form-sheet {
+  width: 100%;
+  background: var(--color-bg);
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 32rpx);
+  animation: sheetUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.sheet-handle { width: 64rpx; height: 8rpx; border-radius: 4rpx; background: var(--color-divider); margin: 8rpx auto 24rpx; }
+.form-title { font-size: 36rpx; font-weight: 600; color: var(--color-text-primary); text-align: center; margin-bottom: 32rpx; }
+.form-item { margin-bottom: 24rpx; }
+.form-label { display: block; font-size: 24rpx; color: var(--color-text-secondary); margin-bottom: 12rpx; margin-left: 4rpx; }
+.form-field { display: flex; align-items: center; background: var(--color-bg-card); border-radius: 20rpx; padding: 0 28rpx; height: 96rpx; box-shadow: 0 2rpx 8rpx rgba(180, 150, 110, 0.06); }
+.field-picker { justify-content: space-between; }
+.field-text { font-size: 30rpx; color: var(--color-text-primary); font-weight: 500; }
+.field-arrow { font-size: 24rpx; color: var(--color-text-hint); }
+.field-input { flex: 1; font-size: 36rpx; font-weight: 500; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.field-unit { font-size: 26rpx; color: var(--color-text-secondary); margin-left: 12rpx; }
+.form-actions { display: flex; gap: 20rpx; margin-top: 40rpx; }
+.btn-cancel, .btn-confirm { flex: 1; height: 96rpx; border-radius: 48rpx; display: flex; align-items: center; justify-content: center; font-size: 30rpx; font-weight: 600; transition: transform 0.15s ease; }
+.btn-hover { transform: scale(0.97); }
+.btn-cancel { background: var(--color-divider); color: var(--color-text-secondary); }
+.btn-confirm { background: var(--color-primary); color: #FFFFFF; box-shadow: 0 6rpx 20rpx rgba(212, 184, 150, 0.35); }
 .list-footer {
   display: flex;
   justify-content: center;

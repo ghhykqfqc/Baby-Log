@@ -45,7 +45,6 @@
       wx:for="{{visibleRecords}}"
       wx:key="_id"
       data-id="{{item._id}}"
-      bindlongpress="onDeleteRecord"
       hover-class="history-item-hover"
     >
       <view class="history-date">
@@ -58,6 +57,15 @@
         <text class="history-value" wx:if="{{item.weight}}">{{item.weight}}<text class="history-unit">kg</text></text>
         <text class="history-value history-value-miss" wx:else>—</text>
       </view>
+      <!-- 编辑 + 删除按钮 -->
+      <view class="action-group">
+        <view class="edit-btn" catchtap="onEditRecord" data-record="{{item}}" hover-class="action-btn-hover">
+          <image class="action-icon" src="/images/icons/edit.svg" mode="aspectFit"></image>
+        </view>
+        <view class="del-btn" catchtap="onDeleteRecord" data-id="{{item._id}}" hover-class="action-btn-hover">
+          <image class="action-icon" src="/images/icons/trash.svg" mode="aspectFit"></image>
+        </view>
+      </view>
     </view>
 
     <!-- 分页加载状态 -->
@@ -67,7 +75,45 @@
       <view class="footer-text footer-hint" wx:else>上拉加载更多</view>
     </view>
 
-    <view class="list-tip" wx:if="{{records.length > 0}}">长按记录可删除</view>
     <view class="scroll-tail"></view>
   </scroll-view>
+
+  <!-- ========== 编辑弹层 ========== -->
+  <view class="sheet-mask" wx:if="{{showEditSheet}}" bindtap="hideEditSheet" catchtouchmove="noop">
+    <view class="form-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="form-title">编辑成长记录</view>
+
+      <view class="form-item">
+        <text class="form-label">测量日期</text>
+        <picker mode="date" value="{{editForm.measureDate}}" bindchange="onEditDateChange">
+          <view class="form-field field-picker">
+            <text class="field-text">{{editForm.measureDate}}</text>
+            <text class="field-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">身高</text>
+        <view class="form-field">
+          <input class="field-input" type="digit" placeholder="如 70.5" value="{{editForm.height}}" bindinput="onEditHeightInput" />
+          <text class="field-unit">cm</text>
+        </view>
+      </view>
+
+      <view class="form-item">
+        <text class="form-label">体重</text>
+        <view class="form-field">
+          <input class="field-input" type="digit" placeholder="如 8.2" value="{{editForm.weight}}" bindinput="onEditWeightInput" />
+          <text class="field-unit">kg</text>
+        </view>
+      </view>
+
+      <view class="form-actions">
+        <view class="btn-cancel" bindtap="hideEditSheet" hover-class="btn-hover">取消</view>
+        <view class="btn-confirm" bindtap="submitEdit" hover-class="btn-hover">保存</view>
+      </view>
+    </view>
+  </view>
 </view>

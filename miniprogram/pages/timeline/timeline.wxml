@@ -1,10 +1,14 @@
-<!-- pages/timeline/timeline.wxml - 时光轴（固定头部 + 列表区滚动 + 分页加载） -->
+<!-- pages/timeline/timeline.wxml - 时光轴（摘要卡 + 自定义时间线分布图） -->
 <view class="page-timeline">
-  <!-- ========== 固定头部区（不随列表滚动） ========== -->
+  <!-- ========== 固定头部区 ========== -->
   <view class="fixed-header">
-    <!-- 日期标题 -->
+    <!-- 日期标题 + 记录入口 -->
     <view class="date-header">
       <view class="date-title">{{todayLabel}}</view>
+      <view class="records-entry" wx:if="{{!loading && hasRecords}}" bindtap="goRecords" hover-class="records-entry-hover" hover-stay-time="80">
+        <text class="records-entry-icon">📋</text>
+        <text class="records-entry-text">记录</text>
+      </view>
     </view>
 
     <!-- 三栏智能预测卡 -->
@@ -18,80 +22,75 @@
       </view>
     </view>
 
-    <!-- 当日小结 -->
-    <view class="summary-bar" wx:if="{{hasRecords}}">
-      <view class="summary-item">
-        <text class="num">{{summary.feedCount}}</text>
-        <text class="label">喂奶</text>
+    <!-- 当日摘要卡 -->
+    <view class="summary-card" wx:if="{{!loading && hasRecords}}">
+      <view class="summary-row">
+        <view class="summary-col">
+          <text class="summary-num">{{summary.feedCount}}</text>
+          <text class="summary-label">喂奶</text>
+        </view>
+        <view class="summary-divider"></view>
+        <view class="summary-col">
+          <text class="summary-num">{{summary.diaperCount}}</text>
+          <text class="summary-label">换尿布</text>
+        </view>
+        <view class="summary-divider"></view>
+        <view class="summary-col">
+          <text class="summary-num sleep-num">{{summary.sleepDurationText}}</text>
+          <text class="summary-label">睡眠</text>
+        </view>
       </view>
-      <view class="divider"></view>
-      <view class="summary-item">
-        <text class="num">{{summary.diaperCount}}</text>
-        <text class="label">换尿布</text>
-      </view>
-      <view class="divider"></view>
-      <view class="summary-item">
-        <text class="num">{{summary.sleepDurationText}}</text>
-        <text class="label">睡眠</text>
+      <!-- 睡眠时段明细 -->
+      <view class="sleep-sessions" wx:if="{{summary.sleepSessions.length > 0}}">
+        <text class="sleep-sessions-label">睡眠时段</text>
+        <view class="sleep-sessions-list">
+          <view class="sleep-session" wx:for="{{summary.sleepSessions}}" wx:key="index">
+            <view class="sleep-session-dot {{item.ongoing ? 'ongoing' : ''}}"></view>
+            <text class="sleep-session-time">{{item.startText}}-{{item.endText}}</text>
+            <text class="sleep-session-dur">{{item.durationText}}</text>
+          </view>
+        </view>
       </view>
     </view>
   </view>
 
-  <!-- ========== 中间滚动列表区（分页加载更早的记录） ========== -->
-  <scroll-view
-    class="list-scroll"
-    scroll-y
-    enhanced
-    show-scrollbar="{{false}}"
-    refresher-enabled
-    refresher-default-style="black"
-    refresher-background="#FAF6F0"
-    refresher-triggered="{{refresherTriggered}}"
-    bindrefresherrefresh="onRefresherRefresh"
-    bindscrolltolower="onLoadMore"
-    lower-threshold="120"
-  >
-    <!-- 首次加载中 -->
-    <view class="list-loading" wx:if="{{loading && records.length === 0}}">
-      <view class="list-loading-text">加载中…</view>
-    </view>
-
-    <!-- 空状态 -->
-    <empty-state
-      wx:if="{{!loading && records.length === 0}}"
-      icon="🌱"
-      title="今天还没有记录哦"
-      subtitle="去首页点击按钮，记录宝宝的第一条作息"
-    />
-
-    <!-- 按日期分组的时光轴列表 -->
-    <block wx:for="{{groups}}" wx:key="key" wx:for-item="group">
-      <view class="date-group-label">
-        <view class="group-line"></view>
-        <view class="group-text">{{group.label}}</view>
-        <view class="group-line"></view>
+  <!-- ========== 今日时间线分布图 ========== -->
+  <view class="chart-card" wx:if="{{!loading && hasChartData}}">
+    <view class="chart-head">
+      <view class="chart-title">{{chartScale === 'hour' ? '近3小时' : chartScale === 'day' ? '今日时间线' : chartScale === 'week' ? '本周概览' : '本月概览'}}</view>
+      <view class="chart-scale-tabs">
+        <view class="scale-tab {{chartScale === 'hour' ? 'active' : ''}}" data-scale="hour" bindtap="switchScale">时</view>
+        <view class="scale-tab {{chartScale === 'day' ? 'active' : ''}}" data-scale="day" bindtap="switchScale">日</view>
+        <view class="scale-tab {{chartScale === 'week' ? 'active' : ''}}" data-scale="week" bindtap="switchScale">周</view>
+        <view class="scale-tab {{chartScale === 'month' ? 'active' : ''}}" data-scale="month" bindtap="switchScale">月</view>
       </view>
-      <timeline-card
-        wx:for="{{group.records}}"
-        wx:key="_id"
-        record="{{item}}"
-        index="{{index}}"
-        binddelete="handleDelete"
-      />
-    </block>
-
-    <!-- 分页加载状态 -->
-    <view class="list-footer" wx:if="{{records.length > 0}}">
-      <view class="footer-text" wx:if="{{isLoadingMore}}">加载中…</view>
-      <view class="footer-text footer-end" wx:elif="{{noMore}}">— 最多展示近{{maxDays}}天 —</view>
-      <view class="footer-text footer-hint" wx:else>上拉查看更早的记录</view>
     </view>
+    <view class="chart-canvas-wrap">
+      <canvas type="2d" id="timelineChart" class="timeline-chart" bindtap="onChartTap"></canvas>
+      <!-- 节点详情气泡 -->
+      <view class="chart-tooltip {{tooltip.pos === 'below' ? 'below' : 'above'}}" wx:if="{{tooltip}}" style="left:{{tooltip.x}}px;top:{{tooltip.y}}px;">
+        <view class="tooltip-arrow"></view>
+        <text class="tooltip-icon">{{tooltip.icon}}</text>
+        <view class="tooltip-body">
+          <text class="tooltip-title">{{tooltip.title}}</text>
+          <text class="tooltip-sub" wx:if="{{tooltip.sub}}">{{tooltip.sub}}</text>
+        </view>
+      </view>
+    </view>
+    <!-- 图例（仅日视图显示） -->
+    <view class="chart-legend" wx:if="{{chartScale === 'day'}}">
+      <view class="legend-item"><view class="legend-dot legend-feed"></view><text>喂奶</text></view>
+      <view class="legend-item"><view class="legend-dot legend-diaper"></view><text>尿布</text></view>
+      <view class="legend-item"><view class="legend-bar legend-sleep"></view><text>睡眠</text></view>
+    </view>
+  </view>
 
-    <!-- 底部留白，保证最后一条不被固定按钮贴住 -->
-    <view class="scroll-tail"></view>
-  </scroll-view>
+  <!-- 空状态（占据剩余空间） -->
+  <view class="empty-wrap" wx:if="{{!loading && !hasRecords}}">
+    <empty-state icon="🌱" title="今天还没有记录哦" subtitle="去首页点击按钮，记录宝宝的第一条作息" />
+  </view>
 
-  <!-- ========== 底部固定分享按钮（位于自定义 tabBar 之上） ========== -->
+  <!-- ========== 底部固定分享按钮 ========== -->
   <view class="bottom-bar">
     <view class="share-btn" bindtap="goShareCard" hover-class="share-btn-hover" hover-stay-time="80">
       <text>📸 生成分享卡片</text>

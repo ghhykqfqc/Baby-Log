@@ -15,7 +15,10 @@ Page({
     isLoadingMore: false,
     noMore: false,
     latestHeight: '--',
-    latestWeight: '--'
+    latestWeight: '--',
+    // 编辑弹层
+    showEditSheet: false,
+    editForm: { _id: '', measureDate: '', height: '', weight: '' }
   },
 
   _pageIndex: 0,  // 当前已加载页数
@@ -117,7 +120,7 @@ Page({
   },
 
   /**
-   * 长按删除记录
+   * 删除记录（按钮点击触发）
    */
   onDeleteRecord(e) {
     const id = e.currentTarget.dataset.id
@@ -146,6 +149,79 @@ Page({
         }
       }
     })
+  },
+
+  // ===== 编辑功能 =====
+
+  noop() {},
+
+  onEditRecord(e) {
+    const record = e.currentTarget.dataset.record
+    if (!record) return
+    this.setData({
+      showEditSheet: true,
+      editForm: {
+        _id: record._id,
+        measureDate: record.measureDate || '',
+        height: record.height ? String(record.height) : '',
+        weight: record.weight ? String(record.weight) : ''
+      }
+    })
+  },
+
+  hideEditSheet() {
+    this.setData({ showEditSheet: false })
+  },
+
+  onEditDateChange(e) {
+    this.setData({ 'editForm.measureDate': e.detail.value })
+  },
+
+  onEditHeightInput(e) {
+    this.setData({ 'editForm.height': e.detail.value })
+  },
+
+  onEditWeightInput(e) {
+    this.setData({ 'editForm.weight': e.detail.value })
+  },
+
+  async submitEdit() {
+    const f = this.data.editForm
+    if (!f._id) return
+    if (!f.height && !f.weight) {
+      wx.showToast({ title: '身高或体重至少填一项', icon: 'none' })
+      return
+    }
+
+    wx.showLoading({ title: '保存中...' })
+    this.setData({ showEditSheet: false })
+    try {
+      const isLocal = String(f._id).startsWith('local_')
+      if (!isLocal) {
+        await call('updateGrowthData', {
+          id: f._id,
+          height: f.height ? parseFloat(f.height) : null,
+          weight: f.weight ? parseFloat(f.weight) : null,
+          measureDate: f.measureDate
+        })
+      }
+      // 更新本地数据
+      const records = this.data.records.map(r => {
+        if (r._id === f._id) {
+          return { ...r, height: f.height ? parseFloat(f.height) : null, weight: f.weight ? parseFloat(f.weight) : null, measureDate: f.measureDate, displayDate: this.formatShortDate(f.measureDate) }
+        }
+        return r
+      })
+      storage.set(storage.CACHE_KEYS.GROWTH_DATA, records)
+      this.applyRecords(records)
+      wx.showToast({ title: '已保存', icon: 'success' })
+    } catch (err) {
+      console.warn('编辑失败:', err)
+      const msg = (err && (err.message || err.errMsg)) || '保存失败'
+      wx.showToast({ title: msg, icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
   },
 
   /**
