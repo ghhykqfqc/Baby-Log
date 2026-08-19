@@ -67,15 +67,6 @@
     </view>
     <view class="chart-canvas-wrap">
       <canvas type="2d" id="timelineChart" class="timeline-chart" bindtap="onChartTap"></canvas>
-      <!-- 节点详情气泡 -->
-      <view class="chart-tooltip {{tooltip.pos === 'below' ? 'below' : 'above'}}" wx:if="{{tooltip}}" style="left:{{tooltip.x}}px;top:{{tooltip.y}}px;">
-        <view class="tooltip-arrow"></view>
-        <text class="tooltip-icon">{{tooltip.icon}}</text>
-        <view class="tooltip-body">
-          <text class="tooltip-title">{{tooltip.title}}</text>
-          <text class="tooltip-sub" wx:if="{{tooltip.sub}}">{{tooltip.sub}}</text>
-        </view>
-      </view>
     </view>
     <!-- 图例（仅日视图显示） -->
     <view class="chart-legend" wx:if="{{chartScale === 'day'}}">

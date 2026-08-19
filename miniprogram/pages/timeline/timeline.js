@@ -14,7 +14,6 @@ Page({
     predictList: [],
     hasPrediction: false,
     chartScale: 'day',      // hour | day | week | month
-    tooltip: null,           // 点击节点的详情气泡 {x, y, icon, title, sub}
     summary: {
       feedCount: 0,
       diaperCount: 0,
@@ -30,6 +29,10 @@ Page({
   _chartDots: [],       // 节点位置（用于点击命中检测）
   _chartBars: [],       // 睡眠条形位置（用于点击命中检测）
   _canvasRect: null,    // canvas 在页面中的位置（坐标转换用）
+  _activeTooltip: null, // 当前要绘制在 canvas 上的气泡内容
+  _chartCtx: null,      // 缓存的 2d 上下文（气泡重绘用）
+  _chartW: 0,           // 缓存的画布逻辑宽高
+  _chartH: 0,
 
   onLoad() {
     const today = new Date()
@@ -260,22 +263,114 @@ Page({
         canvas.height = H * dpr
         ctx.scale(dpr, dpr)
 
-        // 清空命中检测数据
-        this._chartDots = []
-        this._chartBars = []
+        // 缓存画布节点与上下文，点击后重绘气泡时无需再次异步查询
+        this._canvasNode = canvas
+        this._chartCtx = ctx
+        this._chartW = W
+        this._chartH = H
 
-        // 按刻度分派渲染
-        const scale = this.data.chartScale
-        if (scale === 'hour') {
-          this.renderTimelineChart(ctx, W, H, Date.now() - 3 * 3600000, 3)
-        } else if (scale === 'day') {
-          this.renderTimelineChart(ctx, W, H, this._todayStart, 24)
-        } else if (scale === 'week') {
-          this.renderAggregateChart(ctx, W, H, 7)
-        } else if (scale === 'month') {
-          this.renderAggregateChart(ctx, W, H, 30)
-        }
+        // 数据/尺寸变化后重新绘制，旧的点击气泡一并清除
+        this._activeTooltip = null
+
+        this.renderChart(ctx, W, H)
       })
+  },
+
+  /**
+   * 按当前刻度渲染图表；若存在点击气泡，最后绘制在 canvas 内
+   * （画布内绘制可避免原生 canvas 遮挡普通 view 导致的 tooltip 不显示问题）
+   */
+  renderChart(ctx, W, H) {
+    // 清空命中检测数据
+    this._chartDots = []
+    this._chartBars = []
+
+    const scale = this.data.chartScale
+    if (scale === 'hour') {
+      this.renderTimelineChart(ctx, W, H, Date.now() - 3 * 3600000, 3)
+    } else if (scale === 'day') {
+      this.renderTimelineChart(ctx, W, H, this._todayStart, 24)
+    } else if (scale === 'week') {
+      this.renderAggregateChart(ctx, W, H, 7)
+    } else if (scale === 'month') {
+      this.renderAggregateChart(ctx, W, H, 30)
+    }
+
+    if (this._activeTooltip) {
+      this.drawTooltip(ctx, W, H, this._activeTooltip)
+    }
+  },
+
+  /**
+   * 在 canvas 上绘制节点详情气泡（自动避让上下/左右边缘，全部落在画布内）
+   */
+  drawTooltip(ctx, W, H, tip) {
+    const icon = tip.icon || ''
+    const title = tip.title || ''
+    const sub = tip.sub || ''
+
+    const gap = 8        // 气泡与节点的间距
+    const padX = 12
+    const padY = 8
+    const lineGap = 2
+
+    ctx.font = 'bold 12px sans-serif'
+    const titleW = ctx.measureText(title).width
+    ctx.font = '10px sans-serif'
+    const subW = sub ? ctx.measureText(sub).width : 0
+    ctx.font = '14px sans-serif'
+    const iconW = ctx.measureText(icon).width || 14
+
+    const textW = Math.max(titleW, subW)
+    const boxW = Math.min(W - 8, padX * 2 + iconW + 6 + textW)
+    const titleH = 14
+    const subH = sub ? 11 : 0
+    const boxH = padY * 2 + titleH + (sub ? subH + lineGap : 0)
+
+    // 水平方向：气泡中心尽量对准节点，同时保证不超出画布
+    const centerX = Math.min(Math.max(tip.x, boxW / 2 + 4), W - boxW / 2 - 4)
+    const boxX = centerX - boxW / 2
+
+    // 垂直方向：优先显示在节点上方，上方空间不足时改到下方
+    const above = tip.y - boxH - gap >= 0
+    const boxY = above ? tip.y - boxH - gap : tip.y + gap
+    const arrowY = above ? boxY + boxH + 1 : boxY - 1
+
+    ctx.save()
+
+    // 指向节点的小箭头（菱形）
+    ctx.fillStyle = 'rgba(61, 48, 39, 0.95)'
+    ctx.beginPath()
+    ctx.moveTo(centerX, arrowY - 4)
+    ctx.lineTo(centerX + 4, arrowY)
+    ctx.lineTo(centerX, arrowY + 4)
+    ctx.lineTo(centerX - 4, arrowY)
+    ctx.closePath()
+    ctx.fill()
+
+    // 气泡主体
+    this.roundRect(ctx, boxX, boxY, boxW, boxH, 8)
+    ctx.fill()
+
+    // 内容：图标 + 标题（+ 副标题）
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    const textX = boxX + padX
+    const titleY = boxY + padY + titleH / 2
+
+    ctx.font = '14px sans-serif'
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fillText(icon, textX, titleY)
+
+    ctx.font = 'bold 12px sans-serif'
+    ctx.fillText(title, textX + iconW + 6, titleY)
+    if (sub) {
+      ctx.font = '10px sans-serif'
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'
+      ctx.fillText(sub, textX + iconW + 6, titleY + titleH / 2 + lineGap + 5)
+    }
+
+    ctx.restore()
   },
 
   /* ============================================
@@ -585,26 +680,56 @@ Page({
      图表点击：命中检测 → 显示详情气泡
      ============================================ */
   onChartTap(e) {
-    let pageX, pageY
-    if (e.detail && e.detail.x !== undefined) {
-      pageX = e.detail.x; pageY = e.detail.y
-    } else if (e.changedTouches && e.changedTouches[0]) {
-      pageX = e.changedTouches[0].clientX; pageY = e.changedTouches[0].clientY
-    } else { return }
+    // 不同基础库/机型上 tap 事件坐标来源不一致，收集多种解释统一做命中检测：
+    // 1) changedTouches.clientX/Y —— 视口坐标（普通 Touch 对象）；
+    // 2) changedTouches.x/y —— 部分机型 canvas 事件直接携带 canvas 相对坐标（CanvasTouch）；
+    // 3) e.detail.x/y —— 页面文档坐标。
+    const candidates = []
+    const touch = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0])
+    if (touch && typeof touch.clientX === 'number') {
+      candidates.push({ x: touch.clientX, y: touch.clientY, local: false })
+    }
+    if (touch && typeof touch.x === 'number') {
+      candidates.push({ x: touch.x, y: touch.y, local: true })
+    }
+    if (e.detail && typeof e.detail.x === 'number') {
+      candidates.push({ x: e.detail.x, y: e.detail.y, local: false })
+    }
+    if (!candidates.length) return
 
     // 异步查询 canvas 当前位置（避免 _canvasRect 过期）
     const query = wx.createSelectorQuery().in(this)
     query.select('#timelineChart').fields({ size: true, rect: true }).exec((res) => {
       if (!res || !res[0]) return
       const rect = res[0]
-      let touchX = pageX - rect.left
-      let touchY = pageY - rect.top
-      // 坐标系自动修正：如果偏移太大说明 e.detail 已是 canvas 相对坐标
-      if (touchX < -50 || touchX > rect.width + 50) { touchX = pageX; touchY = pageY }
-      this._performHitTest(touchX, touchY)
+
+      for (const c of candidates) {
+        // local 为 true 表示坐标已是相对于 canvas 的，无需再减去 rect.left/top
+        const touchX = c.local ? c.x : c.x - rect.left
+        const touchY = c.local ? c.y : c.y - rect.top
+        // 只有 X/Y 都落在 canvas 附近，这个坐标系解释才成立
+        if (touchX < -30 || touchX > rect.width + 30) continue
+        if (touchY < -30 || touchY > rect.height + 30) continue
+        if (this._performHitTest(touchX, touchY)) return
+      }
+      // 所有候选坐标都未命中：清除气泡并重绘
+      this._clearTooltip()
     })
   },
 
+  /**
+   * 清除当前气泡并重绘画布
+   */
+  _clearTooltip() {
+    this._activeTooltip = null
+    if (this._chartCtx && this._chartW && this._chartH) {
+      this.renderChart(this._chartCtx, this._chartW, this._chartH)
+    }
+  },
+
+  /**
+   * 命中检测，返回是否命中
+   */
   _performHitTest(touchX, touchY) {
     let hit = null
     let hitType = null
@@ -629,15 +754,35 @@ Page({
       }
     }
 
-    if (!hit) { this.setData({ tooltip: null }); return }
+    if (!hit) { this._clearTooltip(); return false }
     const tooltip = this.buildTooltip(hit, hitType)
-    if (tooltip) this.setData({ tooltip })
+    if (tooltip) {
+      this._activeTooltip = tooltip
+      // 气泡直接绘制在 canvas 上，命中后立即重绘即可展示
+      if (this._chartCtx && this._chartW && this._chartH) {
+        this.renderChart(this._chartCtx, this._chartW, this._chartH)
+      }
+      return true
+    }
+    this._clearTooltip()
+    return false
   },
 
   /**
    * 根据命中对象构建气泡数据
    */
   buildTooltip(hit, hitType) {
+    const tooltip = this._buildTooltipContent(hit, hitType)
+    if (!tooltip) return null
+
+    // 先粗略钳制 x（drawTooltip 绘制时会再次按气泡实际宽度精确避让边缘）
+    const canvasW = (this._canvasRect && this._canvasRect.width) || 320
+    const margin = 80
+    tooltip.x = Math.min(Math.max(tooltip.x, margin), canvasW - margin)
+    return tooltip
+  },
+
+  _buildTooltipContent(hit, hitType) {
     // 智能定位：近顶部（y<50）显示在下方，否则上方
     const pos = (hit.y < 50) ? 'below' : 'above'
 
@@ -679,7 +824,12 @@ Page({
     const scale = e.currentTarget.dataset.scale
     if (scale === this.data.chartScale) return
 
-    this.setData({ chartScale: scale, tooltip: null })
+    this.setData({ chartScale: scale })
+    // 立即清除旧气泡并重绘，避免切换刻度后残留上一次的提示
+    this._activeTooltip = null
+    if (this._chartCtx && this._chartW && this._chartH) {
+      this.renderChart(this._chartCtx, this._chartW, this._chartH)
+    }
     // 重新加载数据（周/月需要更多天数）+ 重绘
     this.loadData()
   },
