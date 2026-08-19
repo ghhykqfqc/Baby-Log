@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- 盖子 -->
+  <path d="M40 36 L80 36" fill="none" stroke="#E8554E" stroke-width="5" stroke-linecap="round"/>
+  <!-- 提手 -->
+  <path d="M52 36 L52 28 Q52 24 56 24 L64 24 Q68 24 68 28 L68 36" fill="none" stroke="#E8554E" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 桶身 -->
+  <path d="M38 36 L42 100 Q42 106 48 106 L72 106 Q78 106 78 100 L82 36" fill="none" stroke="#E8554E" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 桶内分隔线 -->
+  <line x1="52" y1="50" x2="52" y2="92" stroke="#E8554E" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="68" y1="50" x2="68" y2="92" stroke="#E8554E" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/>
+</svg>

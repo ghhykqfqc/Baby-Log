@@ -342,6 +342,8 @@ Page({
 
   /* ============================================
      主题 2：幽默调皮风
+     布局：顶部条带 → 头像 → 三栏「业绩勋章」墙 → 金句 → 页脚
+     每条业绩用「左图标圆 + 中标签+后缀 + 右数值」三段式，避免文字重叠
      ============================================ */
   async drawFunnyTheme(ctx, W, H) {
     // 背景：明亮活泼
@@ -374,32 +376,27 @@ Page({
       this.drawBabyWithBottle(ctx, centerX, 150, 46)
     }
 
-    // ===== KPI 数据列表 =====
-    let y = 246
-    const lineH = 46
-
-    // 干饭王
-    this.drawKPILine(ctx, padding, y, W - padding * 2, '🍼', '干饭王',
-      `${this.data.summary.feedCount} 顿`, '嗝~', '#E89B5F')
-    y += lineH
-
-    // 睡眠 KPI
+    // ===== 业绩勋章墙（三行，每行三段式） =====
     const sleepHours = Math.floor(this.data.summary.sleepDuration / 60) || 0
     const awakeTimes = Math.max(0, Math.floor(this.data.summary.feedCount / 3))
-    this.drawKPILine(ctx, padding, y, W - padding * 2, '😴', '睡眠KPI',
-      `${sleepHours} 小时`, `其实醒了${awakeTimes}次`, '#8B7AAA')
-    y += lineH
+    const medals = [
+      { icon: '🍼', title: '干饭王',  value: `${this.data.summary.feedCount}`,  unit: '顿',  suffix: '嗝~',          color: '#E89B5F', bg: '#FCE8D6' },
+      { icon: '😴', title: '睡眠KPI', value: `${sleepHours}`,                   unit: '小时', suffix: `醒了${awakeTimes}次`, color: '#8B7AAA', bg: '#EDE6F5' },
+      { icon: '🧷', title: '清洁工',  value: `${this.data.summary.diaperCount}`, unit: '次',  suffix: '辛苦啦',       color: '#7AAFA8', bg: '#E2EFED' }
+    ]
 
-    // 清洁工
-    this.drawKPILine(ctx, padding, y, W - padding * 2, '🧷', '清洁工',
-      `${this.data.summary.diaperCount} 次`, '辛苦奶奶啦', '#7AAFA8')
+    let y = 232
+    medals.forEach((m) => {
+      this.drawMedalRow(ctx, padding, y, W - padding * 2, m)
+      y += 52
+    })
 
     // ===== 底部金句 =====
     ctx.textAlign = 'center'
     ctx.fillStyle = '#3D3027'
     ctx.font = 'bold 16px sans-serif'
-    ctx.fillText('虽然偶尔哭闹', centerX, 398)
-    ctx.fillText('但依然是全家人的开心果 ✨', centerX, 424)
+    ctx.fillText('虽然偶尔哭闹', centerX, 404)
+    ctx.fillText('但依然是全家人的开心果 ✨', centerX, 428)
 
     // ===== 页脚 =====
     await this.drawFooter(ctx, W, H, {
@@ -409,37 +406,79 @@ Page({
   },
 
   /**
-   * 绘制 KPI 单行（幽默风）
+   * 绘制单行业绩勋章（幽默风专用）
+   * 三段式：[左] 圆形图标徽章  [中] 称号 + 吐槽后缀（上下两行）  [右] 大数值 + 单位
+   * 所有文字位置基于实测宽度定位，不硬编码偏移，彻底避免重叠
    */
-  drawKPILine(ctx, x, y, w, icon, label, value, suffix, color) {
-    // 背景卡片
+  drawMedalRow(ctx, x, y, w, m) {
+    const cardH = 44
+    const cardY = y - cardH / 2
+
+    // 1. 卡片底
     ctx.fillStyle = '#FFFFFF'
-    this.roundRect(ctx, x, y - 18, w, 40, 12)
+    this.roundRect(ctx, x, cardY, w, cardH, 14)
     ctx.fill()
     ctx.strokeStyle = '#F0E8DE'
     ctx.lineWidth = 1
     ctx.stroke()
 
+    // 2. 左侧圆形图标徽章（带主题色浅底）
+    const badgeR = 15
+    const badgeCx = x + 22
+    const badgeCy = y
+    ctx.fillStyle = m.bg
+    ctx.beginPath()
+    ctx.arc(badgeCx, badgeCy, badgeR, 0, 2 * Math.PI)
+    ctx.fill()
+    ctx.font = '17px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(m.icon, badgeCx, badgeCy + 1)
+
+    // 3. 右侧大数值区（数字 + 单位，作为整体右对齐贴卡片右边；单位紧跟数字后）
     ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = m.color
+    ctx.font = 'bold 22px sans-serif'
+    const valText = m.value
+    const valW = ctx.measureText(valText).width
 
-    // 图标
-    ctx.font = '18px sans-serif'
-    ctx.fillText(icon, x + 12, y + 6)
-
-    // 标签
-    ctx.fillStyle = '#8B7D6E'
-    ctx.font = '13px sans-serif'
-    ctx.fillText(label, x + 40, y + 6)
-
-    // 数值（大字突出）
-    ctx.fillStyle = color
-    ctx.font = 'bold 18px sans-serif'
-    ctx.fillText(value, x + 115, y + 6)
-
-    // 后缀
-    ctx.fillStyle = '#B5A795'
     ctx.font = '11px sans-serif'
-    ctx.fillText(suffix, x + 115 + ctx.measureText(value).width + 8, y + 6)
+    const unitText = m.unit
+    const unitW = ctx.measureText(unitText).width
+
+    const groupW = valW + unitW + 2            // 数字与单位间距 2px
+    const groupRight = x + w - 12              // 整体右边界
+    const valX = groupRight - groupW           // 数字左端
+    const unitX = valX + valW + 2              // 单位左端（紧跟数字后）
+
+    ctx.font = 'bold 22px sans-serif'
+    ctx.fillText(valText, valX, y + 2)
+    ctx.font = '11px sans-serif'
+    ctx.fillText(unitText, unitX, y + 2)
+
+    // 4. 中间称号 + 吐槽（左侧从徽章右边开始，右侧让出数值区，绝不重叠）
+    const textLeft = badgeCx + badgeR + 10
+    const textRight = valX - 14  // 数值区左侧再留 14px 间距
+    const textMaxW = Math.max(60, textRight - textLeft)
+
+    // 称号（粗体）
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = '#3D3027'
+    ctx.font = 'bold 14px sans-serif'
+    ctx.fillText(m.title, textLeft, y - 2)
+
+    // 吐槽后缀（小字，在称号下方，淡色）
+    ctx.fillStyle = '#B5A795'
+    ctx.font = '10px sans-serif'
+    // 限制后缀宽度，过长截断
+    let suffix = m.suffix
+    while (ctx.measureText(suffix).width > textMaxW && suffix.length > 1) {
+      suffix = suffix.slice(0, -1)
+    }
+    if (suffix !== m.suffix) suffix = suffix.slice(0, -1) + '…'
+    ctx.fillText(suffix, textLeft, y + 13)
   },
 
   /* ============================================

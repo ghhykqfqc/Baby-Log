@@ -44,7 +44,6 @@
       <view class="metric-label">体重</view>
       <view class="metric-delta {{latest.weightDeltaClass}}">{{latest.weightDeltaText}}</view>
     </view>
-    <view class="metric-date" wx:if="{{latest.measureDate}}">更新于 {{latest.measureDate}}</view>
   </view>
 
   <!-- 无数据时的占位卡 -->
@@ -65,6 +64,8 @@
       </view>
     </view>
     <canvas type="2d" id="growthChart" class="growth-chart"></canvas>
+    <!-- 更新日期：曲线图右下方空白区，复用原 metric-date 字体样式 -->
+    <view class="chart-update" wx:if="{{latest.measureDate}}">更新于 {{latest.measureDate}}</view>
   </view>
 
   <!-- 空状态 -->

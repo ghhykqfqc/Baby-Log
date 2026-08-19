@@ -21,9 +21,9 @@
         </view>
       </view>
 
-      <!-- 右侧直接可见的删除按钮（替代隐藏式左滑） -->
+      <!-- 右侧垃圾桶删除按钮（带确认提示防误触） -->
       <view class="del-btn" catchtap="handleDelete" hover-class="del-btn-hover" hover-stay-time="80">
-        <view class="del-icon">✕</view>
+        <image class="del-icon" src="/images/icons/trash.svg" mode="aspectFit"></image>
       </view>
     </view>
   </view>
