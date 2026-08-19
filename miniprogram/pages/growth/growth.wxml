@@ -1,4 +1,4 @@
-<!-- pages/growth/growth.wxml - 成长日志（简约大气版） -->
+<!-- pages/growth/growth.wxml - 成长日志（瘦身版：焦点数据 + 曲线，历史移独立页） -->
 <view class="page-growth">
 
   <!-- ========== 宝宝档案 ========== -->
@@ -19,8 +19,14 @@
     </view>
   </view>
 
-  <!-- ========== 最新数据（焦点区） ========== -->
+  <!-- ========== 最新数据（焦点区，带历史入口按钮） ========== -->
   <view class="metric-card" wx:if="{{!loading && latest}}">
+    <!-- 右上角历史入口：小巧胶囊按钮 -->
+    <view class="history-entry" wx:if="{{records.length > 0}}" bindtap="goHistory" hover-class="history-entry-hover">
+      <text class="history-entry-icon">📋</text>
+      <text class="history-entry-text">历史 {{records.length}}</text>
+    </view>
+
     <view class="metric-col">
       <view class="metric-num-row">
         <text class="metric-num">{{latest.height || '--'}}</text>
@@ -48,8 +54,9 @@
     <view class="metric-empty-sub">定格身高与体重的起点，见证每一次长大</view>
   </view>
 
-  <!-- ========== 生长曲线 ========== -->
-  <view class="chart-card" wx:if="{{hasRecords}}">
+  <!-- ========== 生长曲线 ==========
+       弹窗打开期间卸载 canvas：部分真机同层渲染失效，canvas 会浮在弹层之上 -->
+  <view class="chart-card" wx:if="{{hasRecords && !showForm}}">
     <view class="chart-head">
       <view class="chart-title">生长曲线</view>
       <view class="chart-tabs">
@@ -58,32 +65,6 @@
       </view>
     </view>
     <canvas type="2d" id="growthChart" class="growth-chart"></canvas>
-  </view>
-
-  <!-- ========== 历史记录 ========== -->
-  <view class="history" wx:if="{{hasRecords}}">
-    <view class="history-head">
-      <text class="history-title">历史记录</text>
-      <text class="history-count">{{records.length}} 次</text>
-    </view>
-    <view
-      class="history-item"
-      wx:for="{{records}}"
-      wx:key="_id"
-      data-id="{{item._id}}"
-      bindlongpress="onDeleteRecord"
-      hover-class="history-item-hover"
-    >
-      <view class="history-date">
-        <view class="history-day">{{item.displayDate}}</view>
-        <view class="history-age">{{item.monthAgeText}}</view>
-      </view>
-      <view class="history-values">
-        <text class="history-value" wx:if="{{item.height}}">{{item.height}}<text class="history-unit">cm</text></text>
-        <text class="history-value" wx:if="{{item.weight}}">{{item.weight}}<text class="history-unit">kg</text></text>
-      </view>
-    </view>
-    <view class="delete-tip">长按记录可删除</view>
   </view>
 
   <!-- 空状态 -->

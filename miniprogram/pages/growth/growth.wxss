@@ -1,4 +1,4 @@
-/* pages/growth/growth.wxss - 成长日志（简约大气版） */
+/* pages/growth/growth.wxss - 成长日志（瘦身版：焦点数据 + 曲线） */
 
 .page-growth {
   min-height: 100vh;
@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8rpx 4rpx 32rpx;
+  padding: 4rpx 4rpx 24rpx;
 }
 
 .profile-left {
@@ -22,15 +22,15 @@
 }
 
 .profile-avatar {
-  width: 88rpx;
-  height: 88rpx;
+  width: 80rpx;
+  height: 80rpx;
   border-radius: 50%;
   background: var(--color-primary-light);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48rpx;
-  margin-right: 24rpx;
+  font-size: 44rpx;
+  margin-right: 20rpx;
   flex-shrink: 0;
   overflow: hidden;
   transition: transform 0.15s ease;
@@ -59,14 +59,14 @@
 }
 
 .profile-name {
-  font-size: 36rpx;
+  font-size: 32rpx;
   font-weight: 600;
   color: var(--color-text-primary);
   line-height: 1.2;
 }
 
 .profile-meta {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: var(--color-text-secondary);
   margin-top: 6rpx;
 }
@@ -75,7 +75,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12rpx 24rpx;
+  padding: 10rpx 22rpx;
   background: var(--color-primary-bg);
   border-radius: 20rpx;
   flex-shrink: 0;
@@ -83,7 +83,7 @@
 }
 
 .age-text {
-  font-size: 34rpx;
+  font-size: 30rpx;
   font-weight: 700;
   color: var(--color-primary-dark);
   line-height: 1;
@@ -100,11 +100,42 @@
 .metric-card {
   position: relative;
   background: var(--color-bg-card);
-  border-radius: 36rpx;
-  padding: 48rpx 32rpx 40rpx;
-  margin-bottom: 24rpx;
+  border-radius: 32rpx;
+  padding: 36rpx 32rpx 32rpx;
+  margin-bottom: 20rpx;
   box-shadow: 0 8rpx 32rpx rgba(180, 150, 110, 0.10);
   display: flex;
+}
+
+/* 历史入口按钮（右上角胶囊，小巧不抢焦点） */
+.history-entry {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 8rpx 18rpx;
+  background: var(--color-primary-bg);
+  border-radius: 24rpx;
+  transition: transform 0.15s ease, background 0.2s ease;
+  z-index: 2;
+}
+
+.history-entry-hover {
+  transform: scale(0.94);
+  background: var(--color-primary-light);
+}
+
+.history-entry-icon {
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.history-entry-text {
+  font-size: 22rpx;
+  color: var(--color-primary-dark);
+  font-weight: 500;
 }
 
 .metric-col {
@@ -128,7 +159,7 @@
 }
 
 .metric-num {
-  font-size: 88rpx;
+  font-size: 76rpx;
   font-weight: 200;
   color: var(--color-text-primary);
   line-height: 1;
@@ -137,15 +168,15 @@
 }
 
 .metric-unit {
-  font-size: 28rpx;
+  font-size: 26rpx;
   color: var(--color-text-secondary);
   font-weight: 500;
 }
 
 .metric-label {
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: var(--color-text-secondary);
-  margin-top: 12rpx;
+  margin-top: 10rpx;
 }
 
 .metric-delta {
@@ -169,7 +200,7 @@
 
 .metric-date {
   position: absolute;
-  bottom: 16rpx;
+  bottom: 14rpx;
   right: 28rpx;
   font-size: 20rpx;
   color: var(--color-text-hint);
@@ -180,16 +211,16 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 64rpx 32rpx;
+  padding: 56rpx 32rpx;
 }
 
 .metric-empty-icon {
-  font-size: 72rpx;
-  margin-bottom: 20rpx;
+  font-size: 64rpx;
+  margin-bottom: 18rpx;
 }
 
 .metric-empty-title {
-  font-size: 32rpx;
+  font-size: 30rpx;
   color: var(--color-text-primary);
   font-weight: 500;
   margin-bottom: 8rpx;
@@ -204,9 +235,9 @@
 /* ===== 生长曲线卡 ===== */
 .chart-card {
   background: var(--color-bg-card);
-  border-radius: 36rpx;
-  padding: 32rpx 24rpx 24rpx;
-  margin-bottom: 24rpx;
+  border-radius: 32rpx;
+  padding: 24rpx 20rpx 20rpx;
+  margin-bottom: 20rpx;
   box-shadow: 0 8rpx 32rpx rgba(180, 150, 110, 0.08);
 }
 
@@ -214,11 +245,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8rpx 16rpx;
+  padding: 0 8rpx 14rpx;
 }
 
 .chart-title {
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 600;
   color: var(--color-text-primary);
 }
@@ -231,8 +262,8 @@
 }
 
 .chart-tab {
-  padding: 10rpx 28rpx;
-  font-size: 24rpx;
+  padding: 8rpx 24rpx;
+  font-size: 22rpx;
   color: var(--color-text-secondary);
   border-radius: 20rpx;
   transition: all 0.25s ease;
@@ -247,92 +278,7 @@
 
 .growth-chart {
   width: 100%;
-  height: 380rpx;
-}
-
-/* ===== 历史记录 ===== */
-.history {
-  margin-top: 8rpx;
-}
-
-.history-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 0 8rpx 20rpx;
-}
-
-.history-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.history-count {
-  font-size: 22rpx;
-  color: var(--color-text-hint);
-}
-
-.history-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--color-bg-card);
-  border-radius: 24rpx;
-  padding: 28rpx 32rpx;
-  margin-bottom: 12rpx;
-  box-shadow: 0 2rpx 12rpx rgba(180, 150, 110, 0.06);
-  transition: transform 0.15s ease;
-}
-
-.history-item-hover {
-  transform: scale(0.98);
-  background: #FAF6F0;
-}
-
-.history-date {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.history-day {
-  font-size: 28rpx;
-  color: var(--color-text-primary);
-  font-weight: 500;
-}
-
-.history-age {
-  font-size: 22rpx;
-  color: var(--color-text-hint);
-  margin-top: 4rpx;
-}
-
-.history-values {
-  display: flex;
-  gap: 24rpx;
-}
-
-.history-value {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.history-unit {
-  font-size: 20rpx;
-  color: var(--color-text-secondary);
-  font-weight: 400;
-  margin-left: 2rpx;
-}
-
-.delete-tip {
-  text-align: center;
-  font-size: 20rpx;
-  color: var(--color-text-hint);
-  margin-top: 24rpx;
-  opacity: 0.7;
+  height: 340rpx;
 }
 
 /* 空状态 */
@@ -373,9 +319,13 @@
 /* ===== 录入弹层 ===== */
 .sheet-mask {
   position: fixed;
-  inset: 0;
+  /* 不用 inset 简写：部分安卓 WebView（X5 内核 < Chromium 87）不支持，会导致 fixed 失效、弹层被 tabBar 遮挡 */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.45);
-  z-index: 9999;            /* 必须高于自定义 tabBar 的 1000，否则底部被遮盖 */
+  z-index: 10000;           /* 必须高于自定义 tabBar 的 1000，否则底部被遮盖 */
   display: flex;
   align-items: flex-end;
   animation: maskIn 0.25s ease;

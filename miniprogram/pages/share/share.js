@@ -1,11 +1,7 @@
-// pages/share/share.js - 每日小结分享卡片（3 套主题 + Canvas 修复）
+// pages/share/share.js - 每日小结分享卡片（3 套主题 + 头像 + 底部页脚布局）
 const app = getApp()
 const { call } = require('../../utils/request')
 const { minutesToText, toMs } = require('../../utils/time')
-
-// 设计稿基准尺寸（逻辑像素）
-const DESIGN_W = 375
-const DESIGN_H = 667
 
 Page({
   data: {
@@ -38,6 +34,9 @@ Page({
   _canvasNode: null,
   _ctx: null,
   _dpr: 1,
+  _avatarPath: '',   // 宝宝头像本地临时路径（空 = 未上传，回退简笔笑脸）
+  _avatarImg: null,  // 已加载进 canvas 的头像 Image 对象
+  _qrPath: '',       // 小程序码缓存（避免每次重绘都调云函数）
 
   onLoad() {
     const today = new Date()
@@ -55,11 +54,14 @@ Page({
   async loadSummary() {
     this.setData({ loading: true })
 
-    // 先尝试本地缓存
+    // 宝宝昵称
     const babyInfo = wx.getStorageSync('babyInfo')
     if (babyInfo && babyInfo.name) {
       this.setData({ babyName: babyInfo.name })
     }
+
+    // 宝宝头像（优先云端，失败回退默认笑脸）
+    this._avatarPath = await this.prepareAvatarPath()
 
     // 优先尝试云端（云环境就绪且在线时）
     if (app.globalData.isOnline && app.globalData.cloudReady) {
@@ -98,6 +100,37 @@ Page({
   },
 
   /**
+   * 准备宝宝头像的本地可绘制路径
+   * cloud fileID → 云端下载；http(s) → downloadFile；本地路径直接用
+   * 任何失败都返回空串（绘制时回退默认笑脸）
+   */
+  async prepareAvatarPath() {
+    try {
+      const babyInfo = wx.getStorageSync('babyInfo') || {}
+      const avatar = babyInfo.avatar
+      if (!avatar) return ''
+
+      if (avatar.startsWith('cloud://')) {
+        if (!app.globalData.cloudReady) return ''
+        const res = await wx.cloud.downloadFile({ fileID: avatar })
+        return res.tempFilePath || ''
+      }
+
+      if (/^https?:\/\//.test(avatar)) {
+        const res = await new Promise((resolve, reject) => {
+          wx.downloadFile({ url: avatar, success: resolve, fail: reject })
+        })
+        return res.tempFilePath || ''
+      }
+
+      return avatar // 本地临时路径
+    } catch (err) {
+      console.warn('头像加载失败，使用默认笑脸:', (err && err.message) || err)
+      return ''
+    }
+  },
+
+  /**
    * 从本地缓存加载数据
    */
   loadFromCache() {
@@ -131,7 +164,7 @@ Page({
   },
 
   /**
-   * ===== Canvas 初始化（修复空白核心） =====
+   * ===== Canvas 初始化 =====
    */
   async initAndDraw() {
     return new Promise((resolve) => {
@@ -161,6 +194,16 @@ Page({
           this._ctx = ctx
           this._dpr = dpr
 
+          // 预加载宝宝头像（无头像时保持 null，绘制时回退笑脸）
+          this._avatarImg = null
+          if (this._avatarPath) {
+            try {
+              const img = canvas.createImage()
+              await new Promise((r) => { img.onload = r; img.onerror = r; img.src = this._avatarPath })
+              if (img.width && img.height) this._avatarImg = img
+            } catch (e) { /* 忽略，回退笑脸 */ }
+          }
+
           // 绘制
           await this.drawCard(ctx, displayW, displayH)
 
@@ -172,27 +215,38 @@ Page({
 
   /**
    * 根据当前主题绘制卡片
+   * 统一以设计稿基准（300×533）坐标绘制，再整体等比缩放，
+   * 保证不同屏宽下排版一致，正文与页脚二维码互不遮挡
    */
   async drawCard(ctx, W, H) {
     const theme = this.data.currentTheme
-    // 清空画布
+    // 清空画布（设备坐标）
     ctx.clearRect(0, 0, W, H)
+
+    const DW = 300  // 设计稿宽度（600rpx @375pt 屏幕）
+    const DH = 533  // 设计稿高度（1066rpx @375pt 屏幕）
+
+    ctx.save()
+    ctx.scale(W / DW, H / DH)
 
     switch (theme) {
       case 'warm':
-        await this.drawWarmTheme(ctx, W, H)
+        await this.drawWarmTheme(ctx, DW, DH)
         break
       case 'funny':
-        await this.drawFunnyTheme(ctx, W, H)
+        await this.drawFunnyTheme(ctx, DW, DH)
         break
       case 'simple':
-        await this.drawSimpleTheme(ctx, W, H)
+        await this.drawSimpleTheme(ctx, DW, DH)
         break
     }
+
+    ctx.restore()
   },
 
   /* ============================================
      主题 1：暖心治愈风
+     布局：标题 → 头像/笑脸 → 数据三行 → 爱心分隔 → 金句 → 页脚（码右下角）
      ============================================ */
   async drawWarmTheme(ctx, W, H) {
     // 背景：奶咖色渐变
@@ -215,24 +269,26 @@ Page({
     ctx.textAlign = 'center'
     ctx.fillStyle = '#3D3027'
     ctx.font = 'bold 24px sans-serif'
-    ctx.fillText(`☀️ ${this.data.babyName}的元气一天`, centerX, 60)
+    ctx.fillText(`☀️ ${this.data.babyName}的元气一天`, centerX, 54)
 
     // 副标题
     ctx.fillStyle = '#B5A795'
     ctx.font = '13px sans-serif'
-    ctx.fillText(`${this.data.todayLabel} ${this.data.weekdayText}`, centerX, 84)
+    ctx.fillText(`${this.data.todayLabel} ${this.data.weekdayText}`, centerX, 78)
 
-    // 中间插图区（绘制简笔宝宝）
-    this.drawBabyIllustration(ctx, centerX, 170, 60)
+    // 中间插图区：宝宝头像（未上传时回退简笔笑脸）
+    if (!this.drawBabyPhoto(ctx, centerX, 152, 50)) {
+      this.drawBabyIllustration(ctx, centerX, 152, 50)
+    }
 
     // ===== 正文数据 =====
-    let y = 280
+    let y = 262
     const lineH = 38
 
     ctx.textAlign = 'left'
     ctx.fillStyle = '#5D4F3F'
 
-    // 第一行：喝奶 + 小觉
+    // 第一行：喝奶
     ctx.font = 'bold 18px sans-serif'
     ctx.fillText(`今天喝了`, padding, y)
     ctx.fillStyle = '#E89B5F'
@@ -266,29 +322,22 @@ Page({
     ctx.fillText(`次尿布，全是黄金便 💩`, padding + 45 + ctx.measureText(diaperText).width + 6, y)
 
     // ===== 分隔小爱心 =====
-    y += 50
     ctx.textAlign = 'center'
     ctx.fillStyle = '#D4B896'
     ctx.font = '16px sans-serif'
-    ctx.fillText('♡ ─────── ♡', centerX, y)
+    ctx.fillText('♡ ─────── ♡', centerX, 384)
 
     // ===== 底部金句 =====
-    y += 40
     ctx.fillStyle = '#3D3027'
     ctx.font = 'bold 17px sans-serif'
-    ctx.textAlign = 'center'
-    this.drawWrappedText(ctx, '你是爸爸妈妈在这个世界上', centerX, y, W - 56, 24)
-    y += 28
-    this.drawWrappedText(ctx, '捡到的最好的礼物 🎁', centerX, y, W - 56, 24)
+    this.drawWrappedText(ctx, '你是爸爸妈妈在这个世界上', centerX, 412, W - 56, 24)
+    this.drawWrappedText(ctx, '捡到的最好的礼物 🎁', centerX, 436, W - 56, 24)
 
-    // ===== 底部小程序码 =====
-    await this.drawQRCode(ctx, centerX, H - 110, 70)
-
-    // 最底部小字
-    ctx.fillStyle = '#B5A795'
-    ctx.font = '11px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('记录于「秒记宝宝」小程序', centerX, H - 20)
+    // ===== 页脚（分隔线 + 小程序码右下角 + 品牌文案左侧） =====
+    await this.drawFooter(ctx, W, H, {
+      dividerColor: 'rgba(212, 184, 150, 0.35)',
+      brandColor: '#5D4F3F'
+    })
   },
 
   /* ============================================
@@ -320,12 +369,14 @@ Page({
     ctx.font = '12px sans-serif'
     ctx.fillText(`${this.data.todayLabel}`, centerX, 78)
 
-    // 中间插图：拿着奶瓶的宝宝
-    this.drawBabyWithBottle(ctx, centerX, 170, 50)
+    // 中间插图：宝宝头像（未上传时回退拿奶瓶的简笔宝宝）
+    if (!this.drawBabyPhoto(ctx, centerX, 150, 46)) {
+      this.drawBabyWithBottle(ctx, centerX, 150, 46)
+    }
 
     // ===== KPI 数据列表 =====
-    let y = 270
-    const lineH = 48
+    let y = 246
+    const lineH = 46
 
     // 干饭王
     this.drawKPILine(ctx, padding, y, W - padding * 2, '🍼', '干饭王',
@@ -342,23 +393,19 @@ Page({
     // 清洁工
     this.drawKPILine(ctx, padding, y, W - padding * 2, '🧷', '清洁工',
       `${this.data.summary.diaperCount} 次`, '辛苦奶奶啦', '#7AAFA8')
-    y += lineH + 10
 
     // ===== 底部金句 =====
     ctx.textAlign = 'center'
     ctx.fillStyle = '#3D3027'
     ctx.font = 'bold 16px sans-serif'
-    ctx.fillText('虽然偶尔哭闹', centerX, y)
-    y += 26
-    ctx.fillText('但依然是全家人的开心果 ✨', centerX, y)
+    ctx.fillText('虽然偶尔哭闹', centerX, 398)
+    ctx.fillText('但依然是全家人的开心果 ✨', centerX, 424)
 
-    // ===== 小程序码 =====
-    await this.drawQRCode(ctx, centerX, H - 110, 70)
-
-    ctx.fillStyle = '#B5A795'
-    ctx.font = '11px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('记录于「秒记宝宝」小程序', centerX, H - 20)
+    // ===== 页脚 =====
+    await this.drawFooter(ctx, W, H, {
+      dividerColor: '#F0E8DE',
+      brandColor: '#3D3027'
+    })
   },
 
   /**
@@ -414,67 +461,61 @@ Page({
     ctx.textAlign = 'center'
     ctx.fillStyle = '#3D3027'
     ctx.font = 'bold 32px sans-serif'
-    ctx.fillText(`${this.data.babyName}今天很好！`, centerX, 80)
+    ctx.fillText(`${this.data.babyName}今天很好！`, centerX, 66)
 
     ctx.fillStyle = '#8B7D6E'
     ctx.font = '16px sans-serif'
-    ctx.fillText(`${this.data.todayLabel}`, centerX, 110)
+    ctx.fillText(`${this.data.todayLabel}`, centerX, 96)
 
     // 分隔线
     ctx.strokeStyle = '#D4B896'
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(padding, 140)
-    ctx.lineTo(W - padding, 140)
+    ctx.moveTo(padding, 122)
+    ctx.lineTo(W - padding, 122)
     ctx.stroke()
 
     // ===== 大号图标 + 数字 =====
-    const itemH = 120
+    const itemH = 102
     const items = [
       { icon: '🍼', label: '吃了', value: `${this.data.summary.feedCount} 次`, color: '#E89B5F' },
       { icon: '😴', label: '睡了', value: `${Math.floor(this.data.summary.sleepDuration / 60) || 0} 小时`, color: '#8B7AAA' },
       { icon: '💩', label: '便便', value: `${this.data.summary.diaperCount} 次换洗`, color: '#7AAFA8' }
     ]
 
-    let y = 180
+    let y = 156
     items.forEach((item, i) => {
       const rowY = y + i * itemH
 
       // 图标（超大）
       ctx.textAlign = 'center'
       ctx.font = '40px sans-serif'
-      ctx.fillText(item.icon, padding + 30, rowY + 10)
+      ctx.fillText(item.icon, padding + 30, rowY + 12)
 
       // 标签
       ctx.textAlign = 'left'
       ctx.fillStyle = '#5D4F3F'
       ctx.font = 'bold 20px sans-serif'
-      ctx.fillText(item.label, padding + 70, rowY - 5)
+      ctx.fillText(item.label, padding + 70, rowY - 6)
 
       // 数值（大号加粗，老年人友好）
       ctx.fillStyle = item.color
       ctx.font = 'bold 28px sans-serif'
-      ctx.fillText(item.value, padding + 70, rowY + 28)
+      ctx.fillText(item.value, padding + 70, rowY + 30)
     })
 
     // ===== 底部大号文字 =====
-    const bottomY = y + items.length * itemH + 10
     ctx.textAlign = 'center'
     ctx.fillStyle = '#3D3027'
     ctx.font = 'bold 22px sans-serif'
-    ctx.fillText('别担心，一切顺利', centerX, bottomY)
+    ctx.fillText('别担心，一切顺利', centerX, 424)
 
-    ctx.fillStyle = '#D4B896'
-    ctx.font = '16px sans-serif'
-    ctx.fillText('—— 秒记宝宝', centerX, bottomY + 30)
-
-    // ===== 小程序码 =====
-    await this.drawQRCode(ctx, centerX, H - 110, 70)
-
-    ctx.fillStyle = '#B5A795'
-    ctx.font = '11px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText('扫码查看详细记录', centerX, H - 20)
+    // ===== 页脚（品牌信息由页脚统一呈现） =====
+    await this.drawFooter(ctx, W, H, {
+      dividerColor: '#F0E8DE',
+      brandColor: '#3D3027',
+      hint: '长按识别小程序码'
+    })
   },
 
   /* ============================================
@@ -482,7 +523,78 @@ Page({
      ============================================ */
 
   /**
-   * 绘制简笔宝宝（治愈风插图）
+   * 绘制页脚：分隔线 + 小程序码（右下角）+ 品牌文案（左侧）
+   * 小程序码固定在右下角，绝不遮挡正文；左侧文字与码同行排布
+   */
+  async drawFooter(ctx, W, H, opts = {}) {
+    const pad = 28
+    const qrSize = 56
+
+    // 分隔线（在二维码区域上方，留出安全间距）
+    ctx.strokeStyle = opts.dividerColor || '#F0E8DE'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(pad, H - 82)
+    ctx.lineTo(W - pad, H - 82)
+    ctx.stroke()
+
+    // 小程序码：右下角，白底圆角卡片包裹
+    const qrCx = W - pad - qrSize / 2
+    const qrCy = H - 14 - qrSize / 2
+    await this.drawQRCode(ctx, qrCx, qrCy, qrSize)
+
+    // 左侧品牌文案（与二维码垂直居中对齐）
+    ctx.textAlign = 'left'
+    ctx.fillStyle = opts.brandColor || '#3D3027'
+    ctx.font = 'bold 15px sans-serif'
+    ctx.fillText('秒记宝宝', pad, H - 46)
+
+    ctx.fillStyle = '#B5A795'
+    ctx.font = '10px sans-serif'
+    ctx.fillText(opts.hint || '长按识别小程序码 · 记录宝宝每一天', pad, H - 27)
+  },
+
+  /**
+   * 绘制宝宝头像（圆形裁剪 + 装饰描边）
+   * @returns {Boolean} true=已绘制头像；false=无头像，由调用方绘制默认笑脸
+   */
+  drawBabyPhoto(ctx, cx, cy, radius) {
+    const img = this._avatarImg
+    if (!img) return false
+
+    ctx.save()
+    // 圆形裁剪
+    ctx.beginPath()
+    ctx.arc(cx, cy, radius, 0, 2 * Math.PI)
+    ctx.closePath()
+    ctx.clip()
+
+    // 兜底底色 + cover 模式绘制（居中裁切，避免拉伸变形）
+    ctx.fillStyle = '#F5EBDD'
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2)
+    const scale = Math.max((radius * 2) / img.width, (radius * 2) / img.height)
+    const dw = img.width * scale
+    const dh = img.height * scale
+    ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh)
+    ctx.restore()
+
+    // 白色描边 + 淡奶咖外环（取消裁剪后绘制，保证描边完整）
+    ctx.beginPath()
+    ctx.arc(cx, cy, radius + 2, 0, 2 * Math.PI)
+    ctx.strokeStyle = '#FFFFFF'
+    ctx.lineWidth = 4
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(cx, cy, radius + 5, 0, 2 * Math.PI)
+    ctx.strokeStyle = 'rgba(212, 184, 150, 0.4)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    return true
+  },
+
+  /**
+   * 绘制简笔宝宝（治愈风插图，头像未上传时的默认笑脸）
    */
   drawBabyIllustration(ctx, cx, cy, size) {
     // 脸
@@ -520,7 +632,7 @@ Page({
   },
 
   /**
-   * 绘制拿奶瓶的宝宝（幽默风插图）
+   * 绘制拿奶瓶的宝宝（幽默风插图，头像未上传时的默认笑脸）
    */
   drawBabyWithBottle(ctx, cx, cy, size) {
     // 头
@@ -565,42 +677,52 @@ Page({
   },
 
   /**
-   * 绘制小程序码（带降级占位）
+   * 绘制小程序码（固定右下角页脚位置，带缓存与降级占位）
    */
   async drawQRCode(ctx, cx, cy, size) {
     try {
       if (!app.globalData.isOnline) throw new Error('离线状态')
 
-      const result = await wx.cloud.callFunction({
-        name: 'getMiniProgramCode',
-        data: {
-          page: 'pages/index/index',
-          scene: `baby_${app.globalData.babyId || 'default'}`
-        }
-      })
+      // 缓存小程序码临时路径，避免切换主题重复调云函数
+      let tempPath = this._qrPath
+      if (!tempPath) {
+        const result = await wx.cloud.callFunction({
+          name: 'getMiniProgramCode',
+          data: {
+            page: 'pages/index/index',
+            scene: `baby_${app.globalData.babyId || 'default'}`
+          }
+        })
 
-      if (result.result && result.result.fileID) {
-        const fileRes = await wx.cloud.downloadFile({ fileID: result.result.fileID })
-        if (this._canvasNode && fileRes.tempFilePath) {
-          const img = this._canvasNode.createImage()
-          await new Promise((resolve) => {
-            img.onload = resolve
-            img.onerror = resolve
-            img.src = fileRes.tempFilePath
-          })
-          // 白底
-          ctx.fillStyle = '#FFFFFF'
-          this.roundRect(ctx, cx - size / 2 - 6, cy - size / 2 - 6, size + 12, size + 12, 8)
-          ctx.fill()
-          ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size)
-          return
+        if (result.result && result.result.fileID) {
+          const fileRes = await wx.cloud.downloadFile({ fileID: result.result.fileID })
+          tempPath = fileRes.tempFilePath
         }
+        if (!tempPath) throw new Error('无小程序码')
+        this._qrPath = tempPath
       }
-      throw new Error('无 fileID')
+
+      if (this._canvasNode) {
+        const img = this._canvasNode.createImage()
+        await new Promise((resolve) => {
+          img.onload = resolve
+          img.onerror = resolve
+          img.src = tempPath
+        })
+        if (!img.width) throw new Error('小程序码图片加载失败')
+
+        // 白底卡片
+        ctx.fillStyle = '#FFFFFF'
+        this.roundRect(ctx, cx - size / 2 - 5, cy - size / 2 - 5, size + 10, size + 10, 10)
+        ctx.fill()
+        ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size)
+        return
+      }
+      throw new Error('画布未就绪')
     } catch (err) {
-      // 降级：绘制占位框
+      // 降级：绘制占位框（同样固定在右下角，不遮挡正文）
       ctx.fillStyle = '#F5EBDD'
-      this.roundRect(ctx, cx - size / 2, cy - size / 2, size, size, 8)
+      this.roundRect(ctx, cx - size / 2 - 5, cy - size / 2 - 5, size + 10, size + 10, 10)
       ctx.fill()
       ctx.strokeStyle = '#D4B896'
       ctx.lineWidth = 1.5

@@ -226,9 +226,25 @@ Page({
 
   hideForm() {
     this.setData({ showForm: false, focusHeight: false, focusWeight: false })
+    // canvas 因 wx:if 被卸载过，节点重建后需重绘曲线
+    this.redrawChartSoon()
+  },
+
+  /**
+   * 延迟重绘曲线图（等 wx:if 重建 canvas 节点）
+   */
+  redrawChartSoon() {
+    setTimeout(() => this.drawChart(), 120)
   },
 
   noop() {},
+
+  /**
+   * 跳转到历史记录页（独立页：滚动 + 分页加载）
+   */
+  goHistory() {
+    wx.navigateTo({ url: '/pages/history/history' })
+  },
 
   /**
    * 跳转到宝宝资料页
@@ -271,44 +287,14 @@ Page({
 
       this.setData({ showForm: false, 'formData.height': '', 'formData.weight': '' })
       await this.loadData()
+      // canvas 重建后确保曲线重绘（loadData 内部 50ms 可能早于节点就绪）
+      this.redrawChartSoon()
       wx.showToast({ title: '已保存', icon: 'success' })
     } catch (err) {
       wx.showToast({ title: '保存失败，请重试', icon: 'none' })
     } finally {
       this.setData({ submitting: false })
     }
-  },
-
-  /**
-   * 长按删除记录
-   */
-  onDeleteRecord(e) {
-    const id = e.currentTarget.dataset.id
-    if (!id) return
-
-    wx.showModal({
-      title: '删除这条记录？',
-      content: '删除后不可恢复',
-      confirmText: '删除',
-      confirmColor: '#E8554E',
-      success: async (res) => {
-        if (!res.confirm) return
-        wx.showLoading({ title: '删除中...' })
-        try {
-          if (!String(id).startsWith('local_')) {
-            await call('deleteGrowthData', { id })
-          }
-          const records = this.data.records.filter((r) => r._id !== id)
-          storage.set(storage.CACHE_KEYS.GROWTH_DATA, records)
-          this.applyRecords(records)
-          wx.showToast({ title: '已删除', icon: 'success' })
-        } catch (err) {
-          wx.showToast({ title: '删除失败', icon: 'none' })
-        } finally {
-          wx.hideLoading()
-        }
-      }
-    })
   },
 
   // ===== 图表 =====

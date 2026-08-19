@@ -4,5 +4,5 @@
     "empty-state": "../../components/empty-state/empty-state"
   },
   "navigationBarTitleText": "今日时光轴",
-  "enablePullDownRefresh": true
+  "disableScroll": true
 }

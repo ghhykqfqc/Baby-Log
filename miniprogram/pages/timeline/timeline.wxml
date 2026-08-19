@@ -1,61 +1,99 @@
-<!-- pages/timeline/timeline.wxml - 时光轴（预测卡 + 删除重构） -->
+<!-- pages/timeline/timeline.wxml - 时光轴（固定头部 + 列表区滚动 + 分页加载） -->
 <view class="page-timeline">
-  <!-- 日期标题 -->
-  <view class="date-header">
-    <view class="date-title">{{todayLabel}}</view>
-  </view>
+  <!-- ========== 固定头部区（不随列表滚动） ========== -->
+  <view class="fixed-header">
+    <!-- 日期标题 -->
+    <view class="date-header">
+      <view class="date-title">{{todayLabel}}</view>
+    </view>
 
-  <!-- ========== 三栏智能预测卡 ========== -->
-  <view class="predict-card" wx:if="{{!loading && hasRecords && hasPrediction}}">
-    <view class="predict-col {{item.overdue ? 'overdue' : ''}}" wx:for="{{predictList}}" wx:key="key" data-key="{{item.key}}">
-      <view class="predict-icon">{{item.icon}}</view>
-      <view class="predict-label">{{item.label}}</view>
-      <view class="predict-time {{item.overdue ? 'predict-time-overdue' : ''}}" wx:if="{{item.available}}">{{item.predictedText}}</view>
-      <view class="predict-time predict-time-empty" wx:else>{{item.predictedText}}</view>
-      <view class="predict-countdown" wx:if="{{item.available}}">{{item.countdownText}}</view>
+    <!-- 三栏智能预测卡 -->
+    <view class="predict-card" wx:if="{{!loading && hasRecords && hasPrediction}}">
+      <view class="predict-col {{item.overdue ? 'overdue' : ''}}" wx:for="{{predictList}}" wx:key="key" data-key="{{item.key}}">
+        <view class="predict-icon">{{item.icon}}</view>
+        <view class="predict-label">{{item.label}}</view>
+        <view class="predict-time {{item.overdue ? 'predict-time-overdue' : ''}}" wx:if="{{item.available}}">{{item.predictedText}}</view>
+        <view class="predict-time predict-time-empty" wx:else>{{item.predictedText}}</view>
+        <view class="predict-countdown" wx:if="{{item.available}}">{{item.countdownText}}</view>
+      </view>
+    </view>
+
+    <!-- 当日小结 -->
+    <view class="summary-bar" wx:if="{{hasRecords}}">
+      <view class="summary-item">
+        <text class="num">{{summary.feedCount}}</text>
+        <text class="label">喂奶</text>
+      </view>
+      <view class="divider"></view>
+      <view class="summary-item">
+        <text class="num">{{summary.diaperCount}}</text>
+        <text class="label">换尿布</text>
+      </view>
+      <view class="divider"></view>
+      <view class="summary-item">
+        <text class="num">{{summary.sleepDurationText}}</text>
+        <text class="label">睡眠</text>
+      </view>
     </view>
   </view>
 
-  <!-- 当日小结 -->
-  <view class="summary-bar" wx:if="{{hasRecords}}">
-    <view class="summary-item">
-      <text class="num">{{summary.feedCount}}</text>
-      <text class="label">喂奶</text>
+  <!-- ========== 中间滚动列表区（分页加载更早的记录） ========== -->
+  <scroll-view
+    class="list-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-default-style="black"
+    refresher-background="#FAF6F0"
+    refresher-triggered="{{refresherTriggered}}"
+    bindrefresherrefresh="onRefresherRefresh"
+    bindscrolltolower="onLoadMore"
+    lower-threshold="120"
+  >
+    <!-- 首次加载中 -->
+    <view class="list-loading" wx:if="{{loading && records.length === 0}}">
+      <view class="list-loading-text">加载中…</view>
     </view>
-    <view class="divider"></view>
-    <view class="summary-item">
-      <text class="num">{{summary.diaperCount}}</text>
-      <text class="label">换尿布</text>
-    </view>
-    <view class="divider"></view>
-    <view class="summary-item">
-      <text class="num">{{summary.sleepDurationText}}</text>
-      <text class="label">睡眠</text>
-    </view>
-  </view>
 
-  <!-- 空状态 -->
-  <empty-state
-    wx:if="{{!loading && records.length === 0}}"
-    icon="🌱"
-    title="今天还没有记录哦"
-    subtitle="去首页点击按钮，记录宝宝的第一条作息"
-  />
-
-  <!-- 时光轴列表 -->
-  <view class="timeline-list" wx:if="{{records.length > 0}}">
-    <timeline-card
-      wx:for="{{records}}"
-      wx:key="_id"
-      record="{{item}}"
-      index="{{index}}"
-      binddelete="handleDelete"
+    <!-- 空状态 -->
+    <empty-state
+      wx:if="{{!loading && records.length === 0}}"
+      icon="🌱"
+      title="今天还没有记录哦"
+      subtitle="去首页点击按钮，记录宝宝的第一条作息"
     />
-  </view>
 
-  <!-- 底部分享按钮 -->
-  <view class="bottom-bar safe-bottom" wx:if="{{records.length > 0}}">
-    <view class="share-btn" bindtap="goShareCard">
+    <!-- 按日期分组的时光轴列表 -->
+    <block wx:for="{{groups}}" wx:key="key" wx:for-item="group">
+      <view class="date-group-label">
+        <view class="group-line"></view>
+        <view class="group-text">{{group.label}}</view>
+        <view class="group-line"></view>
+      </view>
+      <timeline-card
+        wx:for="{{group.records}}"
+        wx:key="_id"
+        record="{{item}}"
+        index="{{index}}"
+        binddelete="handleDelete"
+      />
+    </block>
+
+    <!-- 分页加载状态 -->
+    <view class="list-footer" wx:if="{{records.length > 0}}">
+      <view class="footer-text" wx:if="{{isLoadingMore}}">加载中…</view>
+      <view class="footer-text footer-end" wx:elif="{{noMore}}">— 最多展示近{{maxDays}}天 —</view>
+      <view class="footer-text footer-hint" wx:else>上拉查看更早的记录</view>
+    </view>
+
+    <!-- 底部留白，保证最后一条不被固定按钮贴住 -->
+    <view class="scroll-tail"></view>
+  </scroll-view>
+
+  <!-- ========== 底部固定分享按钮（位于自定义 tabBar 之上） ========== -->
+  <view class="bottom-bar">
+    <view class="share-btn" bindtap="goShareCard" hover-class="share-btn-hover" hover-stay-time="80">
       <text>📸 生成分享卡片</text>
     </view>
   </view>

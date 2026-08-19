@@ -1,0 +1,73 @@
+<!-- pages/history/history.wxml - 成长历史记录（顶部统计 + 纵向滚动 + 分页加载） -->
+<view class="page-history">
+  <!-- ===== 顶部统计卡（固定） ===== -->
+  <view class="stat-bar">
+    <view class="stat-item">
+      <text class="stat-num">{{records.length}}</text>
+      <text class="stat-label">总记录</text>
+    </view>
+    <view class="stat-divider"></view>
+    <view class="stat-item">
+      <text class="stat-num">{{latestHeight || '--'}}</text>
+      <text class="stat-label">身高 cm</text>
+    </view>
+    <view class="stat-divider"></view>
+    <view class="stat-item">
+      <text class="stat-num">{{latestWeight || '--'}}</text>
+      <text class="stat-label">体重 kg</text>
+    </view>
+  </view>
+
+  <!-- ===== 列表滚动区 ===== -->
+  <scroll-view
+    class="list-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    bindscrolltolower="onLoadMore"
+    lower-threshold="120"
+  >
+    <!-- 加载中 -->
+    <view class="list-loading" wx:if="{{loading && records.length === 0}}">
+      <view class="loading-text">加载中…</view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="list-empty" wx:if="{{!loading && records.length === 0}}">
+      <view class="empty-icon">📈</view>
+      <view class="empty-title">还没有成长记录</view>
+      <view class="empty-sub">去成长页点击 ＋ 记录第一条吧</view>
+    </view>
+
+    <!-- 列表（倒序，最新在最上） -->
+    <view
+      class="history-item"
+      wx:for="{{visibleRecords}}"
+      wx:key="_id"
+      data-id="{{item._id}}"
+      bindlongpress="onDeleteRecord"
+      hover-class="history-item-hover"
+    >
+      <view class="history-date">
+        <view class="history-day">{{item.displayDate}}</view>
+        <view class="history-age">{{item.monthAgeText}}</view>
+      </view>
+      <view class="history-values">
+        <text class="history-value" wx:if="{{item.height}}">{{item.height}}<text class="history-unit">cm</text></text>
+        <text class="history-value history-value-miss" wx:else>—</text>
+        <text class="history-value" wx:if="{{item.weight}}">{{item.weight}}<text class="history-unit">kg</text></text>
+        <text class="history-value history-value-miss" wx:else>—</text>
+      </view>
+    </view>
+
+    <!-- 分页加载状态 -->
+    <view class="list-footer" wx:if="{{records.length > 0}}">
+      <view class="footer-text" wx:if="{{isLoadingMore}}">加载中…</view>
+      <view class="footer-text footer-end" wx:elif="{{noMore}}">— 已全部加载 —</view>
+      <view class="footer-text footer-hint" wx:else>上拉加载更多</view>
+    </view>
+
+    <view class="list-tip" wx:if="{{records.length > 0}}">长按记录可删除</view>
+    <view class="scroll-tail"></view>
+  </scroll-view>
+</view>

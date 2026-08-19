@@ -3,5 +3,6 @@
     "record-button": "../../components/record-button/record-button"
   },
   "navigationStyle": "default",
-  "navigationBarTitleText": "秒记宝宝"
+  "navigationBarTitleText": "秒记宝宝",
+  "disableScroll": true
 }

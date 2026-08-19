@@ -3,6 +3,7 @@
     "pages/index/index",
     "pages/timeline/timeline",
     "pages/growth/growth",
+    "pages/history/history",
     "pages/profile/profile",
     "pages/share/share"
   ],
