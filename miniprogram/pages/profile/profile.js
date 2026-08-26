@@ -4,9 +4,13 @@ const storage = require('../../utils/storage')
 
 Page({
   data: {
+    babyId: '',          // 当前编辑宝宝的 ID（编辑模式时有值，新建时为空）
+    babyCode: '',        // 宝宝密码（编辑时可改）
     babyName: '',
     avatarUrl: '',        // 已确认的头像（本地临时路径或 cloud fileID）
     originalAvatar: '',   // 进入页面时的原头像（取消时恢复用）
+    birthDate: '',
+    gender: '',
     submitting: false,
 
     // 裁剪相关
@@ -41,24 +45,55 @@ Page({
     } catch (e) {}
 
     // 优先用 URL 参数指定的 babyId；否则用当前宝宝
-    // 当从首页"编辑某宝宝"按钮跳转过来时，会带 babyId
-    this._targetBabyId = options.babyId || app.globalData.babyId || ''
+    const targetBabyId = options.babyId || app.globalData.babyId || ''
 
-    // 读取目标宝宝资料：优先匹配 babies 列表中的对应项
+    // 从 babies 列表中查找对应宝宝的完整资料
     const babies = app.globalData.babies || []
-    const matched = this._targetBabyId ? babies.find(b => b.babyId === this._targetBabyId) : null
-    const babyInfo = matched || storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+    const matched = targetBabyId ? babies.find(b => b.babyId === targetBabyId) : null
+    const babyInfo = matched || app.globalData.babyInfo || storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+
     this.setData({
+      babyId: targetBabyId,
+      babyCode: babyInfo.babyCode || '',
       babyName: babyInfo.name || '',
       avatarUrl: babyInfo.avatar || '',
-      originalAvatar: babyInfo.avatar || ''
+      originalAvatar: babyInfo.avatar || '',
+      birthDate: babyInfo.birthDate || '',
+      gender: babyInfo.gender || ''
     })
+
+    // 设置导航栏标题
+    wx.setNavigationBarTitle({ title: targetBabyId ? '编辑宝宝' : '新建宝宝' })
   },
 
   noop() {},
 
   onNameInput(e) {
     this.setData({ babyName: e.detail.value })
+  },
+
+  onBirthChange(e) {
+    this.setData({ birthDate: e.detail.value })
+  },
+
+  onGenderTap(e) {
+    const tapped = e.currentTarget.dataset.gender
+    // 再次点击相同性别则取消选择
+    this.setData({ gender: this.data.gender === tapped ? '' : tapped })
+  },
+
+  onCodeInput(e) {
+    // 仅保留数字，最多 6 位
+    const code = String(e.detail.value || '').replace(/\D/g, '').slice(0, 6)
+    this.setData({ babyCode: code })
+  },
+
+  copyBabyId() {
+    if (!this.data.babyId) return
+    wx.setClipboardData({
+      data: this.data.babyId,
+      success: () => wx.showToast({ title: '已复制 ID', icon: 'success' })
+    })
   },
 
   /**
@@ -245,72 +280,128 @@ Page({
   },
 
   /**
-   * 保存：上传头像（如有）+ 更新本地缓存 + 云端同步
+   * 保存：新建宝宝（无 babyId）或更新已有宝宝（有 babyId）
+   * - 无 babyId：调 createBaby 云函数生成 babyId + babyCode，并把当前用户设为 parent
+   * - 有 babyId：调 saveBabyInfo 更新资料，若 babyCode 变更则同步更新密码
    */
   async save() {
-    const { babyName, avatarUrl, originalAvatar } = this.data
+    const { babyId, babyCode, babyName, avatarUrl, originalAvatar, birthDate, gender } = this.data
     const trimmed = (babyName || '').trim()
     if (!trimmed) {
       wx.showToast({ title: '请填写昵称', icon: 'none' })
       return
     }
+    // 编辑模式下密码必须是 6 位
+    if (babyId && babyCode && String(babyCode).length !== 6) {
+      wx.showToast({ title: '宝宝密码需 6 位数字', icon: 'none' })
+      return
+    }
+    if (!app.globalData.cloudReady) {
+      wx.showToast({ title: '云环境不可用', icon: 'none' })
+      return
+    }
 
     this.setData({ submitting: true })
+    wx.showLoading({ title: '保存中...', mask: true })
 
+    // 1. 上传头像（若是本地临时文件）
     let finalAvatar = avatarUrl
     try {
-      // 如果头像是新的本地临时文件（非 cloud fileID、非 http URL、与原头像不同），上传到云存储
-      const isLocalTemp = avatarUrl && avatarUrl.startsWith('http://tmp') || (avatarUrl && avatarUrl.startsWith('wxfile://')) || (avatarUrl && avatarUrl !== originalAvatar && !avatarUrl.startsWith('cloud://'))
-      if (isLocalTemp && app.globalData.cloudReady) {
-        const targetId = this._targetBabyId || app.globalData.babyId || 'default'
-        const cloudPath = `avatars/${targetId}/${Date.now()}.png`
-        const uploadRes = await wx.cloud.uploadFile({
-          cloudPath,
+      const isLocalTemp = avatarUrl && (
+        avatarUrl.startsWith('http://tmp') ||
+        avatarUrl.startsWith('wxfile://') ||
+        avatarUrl.startsWith('walrus://') ||
+        !avatarUrl.startsWith('cloud://')
+      )
+      const isChanged = avatarUrl !== originalAvatar
+      if (isLocalTemp && isChanged) {
+        const ts = Date.now()
+        const tmpId = babyId || 'new'
+        const upRes = await wx.cloud.uploadFile({
+          cloudPath: `avatars/${tmpId}/${ts}.png`,
           filePath: avatarUrl
         })
-        if (uploadRes && uploadRes.fileID) {
-          finalAvatar = uploadRes.fileID
-        }
+        if (upRes && upRes.fileID) finalAvatar = upRes.fileID
       }
     } catch (err) {
       console.warn('头像上传失败，使用本地路径:', err)
-      // 上传失败仍保存本地路径，离线可用
     }
 
-    const targetBabyId = this._targetBabyId || app.globalData.babyId || 'default'
+    try {
+      if (!babyId) {
+        // ===== 场景 A：新建宝宝 =====
+        const res = await wx.cloud.callFunction({
+          name: 'createBaby',
+          data: {
+            name: trimmed,
+            avatar: finalAvatar,
+            birthDate,
+            gender
+          }
+        })
+        if (!res.result || res.result.code !== 0) {
+          throw new Error((res.result && res.result.message) || '创建失败')
+        }
+        const newBaby = res.result.data
+        // 刷新宝宝列表 + 设为当前宝宝
+        await app.refreshBabies()
+        app.setCurrentBaby(newBaby)
 
-    // 更新本地缓存（仅当编辑的是当前宝宝时才更新全局缓存）
-    const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
-    const updated = { ...babyInfo, name: trimmed, avatar: finalAvatar }
-    storage.set(storage.CACHE_KEYS.BABY_INFO, updated)
-    app.globalData.babyInfo = updated
-
-    // 同步到云端（best-effort）
-    if (app.globalData.cloudReady) {
-      try {
+        wx.hideLoading()
+        // 展示创建成功 + ID/密码（用户可复制分享给家人）
+        wx.showModal({
+          title: '🎉 宝宝已创建',
+          content: `宝宝 ID：${newBaby.babyId}\n加入密码：${newBaby.babyCode}\n\n请把 ID 和密码分享给家人，他们就能一起记录啦！`,
+          confirmText: '复制',
+          showCancel: false,
+          success: (r) => {
+            if (r.confirm) {
+              wx.setClipboardData({
+                data: `宝宝 ID：${newBaby.babyId}\n加入密码：${newBaby.babyCode}`
+              })
+            }
+          }
+        })
+      } else {
+        // ===== 场景 B：更新已有宝宝 =====
         const { call } = require('../../utils/request')
         await call('saveBabyInfo', {
-          babyId: targetBabyId,
+          babyId,
           name: trimmed,
           avatar: finalAvatar,
-          birthDate: babyInfo.birthDate || '',
-          gender: babyInfo.gender || ''
+          birthDate,
+          gender,
+          babyCode: babyCode || undefined  // 仅显式传入才更新密码
         })
-        // 刷新 babies 列表（编辑非当前宝宝时也保持列表最新）
-        app.refreshBabies().catch(() => {})
-      } catch (err) {
-        console.warn('云端保存宝宝资料失败（本地已保存）:', err && err.message)
+        // 刷新 babies 列表
+        const babies = await app.refreshBabies()
+        // 若编辑的是当前宝宝，同步更新 globalData.babyInfo
+        if (app.globalData.babyId === babyId) {
+          const updated = babies.find(b => b.babyId === babyId) || {
+            babyId, name: trimmed, avatar: finalAvatar, birthDate, gender, babyCode
+          }
+          app.setCurrentBaby(updated)
+        }
+        wx.hideLoading()
+        wx.showToast({ title: '已保存', icon: 'success' })
       }
+
+      // 通知其他页面刷新
+      app.eventBus.emit('recordsUpdated')
+
+      setTimeout(() => {
+        wx.navigateBack({ delta: 1 })
+      }, 800)
+    } catch (err) {
+      console.error('保存宝宝资料失败:', err)
+      wx.hideLoading()
+      wx.showModal({
+        title: babyId ? '保存失败' : '创建失败',
+        content: (err && err.message) || '请稍后重试',
+        showCancel: false
+      })
+    } finally {
+      this.setData({ submitting: false })
     }
-
-    this.setData({ submitting: false })
-    wx.showToast({ title: '已保存', icon: 'success' })
-
-    // 通知首页刷新
-    app.eventBus.emit('recordsUpdated')
-
-    setTimeout(() => {
-      wx.navigateBack({ delta: 1 })
-    }, 600)
   }
 })

@@ -241,3 +241,123 @@
   width: 256rpx;
   height: 256rpx;
 }
+/* ============================================
+   新增：页面标题 / ID 区 / 性别选择
+   ============================================ */
+.page-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: var(--color-text-primary, #3A2E22);
+  text-align: center;
+  padding: 8rpx 0 24rpx;
+}
+
+.id-block {
+  background: #FBF5EB;
+  border-radius: 24rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.id-row {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 0;
+}
+
+.id-label {
+  width: 140rpx;
+  font-size: 26rpx;
+  color: var(--color-text-secondary, #8C7A66);
+  flex-shrink: 0;
+}
+
+.id-value {
+  flex: 1;
+  font-size: 32rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: var(--color-text-primary, #3A2E22);
+  font-family: monospace;
+}
+
+.id-input {
+  flex: 1;
+  font-size: 34rpx;
+  font-weight: 600;
+  letter-spacing: 8rpx;
+  color: var(--color-text-primary, #3A2E22);
+  font-family: monospace;
+  background: #FFFFFF;
+  border-radius: 16rpx;
+  padding: 12rpx 20rpx;
+  height: 60rpx;
+  box-sizing: border-box;
+}
+
+.id-copy-btn {
+  margin-left: 16rpx;
+  padding: 8rpx 20rpx;
+  background: var(--color-primary, #D4B896);
+  color: #FFFFFF;
+  font-size: 22rpx;
+  border-radius: 24rpx;
+  flex-shrink: 0;
+}
+
+.id-tip {
+  font-size: 22rpx;
+  color: var(--color-text-hint, #B5A795);
+  line-height: 1.6;
+  margin-top: 8rpx;
+  padding-bottom: 8rpx;
+}
+
+/* 性别选择 */
+.gender-row {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 12rpx;
+}
+
+.gender-opt {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 24rpx;
+  background: var(--color-bg-card, #FFFFFF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: var(--color-text-secondary, #8C7A66);
+  border: 2rpx solid transparent;
+}
+
+.gender-opt.active {
+  background: var(--color-primary, #D4B896);
+  color: #FFFFFF;
+  border-color: var(--color-primary, #D4B896);
+}
+
+/* picker 字段样式 */
+.form-field-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-text {
+  font-size: 30rpx;
+  color: var(--color-text-primary, #3A2E22);
+}
+
+.form-arrow {
+  font-size: 36rpx;
+  color: var(--color-text-hint, #B5A795);
+}
+
+/* 保存按钮禁用态 */
+.save-btn-disabled {
+  background: #DCD2C2 !important;
+  box-shadow: none !important;
+}

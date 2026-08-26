@@ -1,5 +1,8 @@
-<!-- pages/profile/profile.wxml - 宝宝资料（自定义头像+昵称，含裁剪） -->
+<!-- pages/profile/profile.wxml - 宝宝资料编辑（完整字段：头像、昵称、生日、性别、宝宝密码） -->
 <view class="page-profile">
+
+  <!-- 页面标题（区分新建/编辑） -->
+  <view class="page-title">{{babyId ? '编辑宝宝' : '新建宝宝'}}</view>
 
   <!-- ===== 头像预览（点击选图） ===== -->
   <view class="avatar-block" bindtap="chooseAvatar" hover-class="avatar-tap" hover-stay-time="80">
@@ -18,7 +21,24 @@
     <view class="avatar-tip">点击更换头像</view>
   </view>
 
-  <!-- ===== 昵称输入 ===== -->
+  <!-- ===== 宝宝 ID 与密码（仅编辑已有宝宝时显示） ===== -->
+  <view class="id-block" wx:if="{{babyId}}">
+    <view class="id-row">
+      <text class="id-label">宝宝 ID</text>
+      <text class="id-value" selectable="{{true}}" user-select="{{true}}">{{babyId}}</text>
+      <view class="id-copy-btn" bindtap="copyBabyId" hover-class="btn-hover">复制</view>
+    </view>
+    <view class="id-tip">把这个 ID 和宝宝密码分享给家人，他们就能加入并一起记录啦</view>
+
+    <view class="id-row">
+      <text class="id-label">宝宝密码</text>
+      <input class="id-input" type="number" password="{{true}}" maxlength="6"
+        placeholder="6 位数字" value="{{babyCode}}" bindinput="onCodeInput" />
+    </view>
+    <view class="id-tip">修改密码后保存生效，家人加入时需输入新密码</view>
+  </view>
+
+  <!-- ===== 表单字段 ===== -->
   <view class="form-block">
     <view class="form-label">昵称</view>
     <view class="form-field">
@@ -36,10 +56,28 @@
     </view>
   </view>
 
+  <view class="form-block">
+    <view class="form-label">生日</view>
+    <picker mode="date" value="{{birthDate}}" bindchange="onBirthChange">
+      <view class="form-field form-field-picker">
+        <text class="form-text {{birthDate ? '' : 'form-placeholder'}}">{{birthDate || '请选择生日'}}</text>
+        <text class="form-arrow">›</text>
+      </view>
+    </picker>
+  </view>
+
+  <view class="form-block">
+    <view class="form-label">性别</view>
+    <view class="gender-row">
+      <view class="gender-opt {{gender === 'male' ? 'active' : ''}}" data-gender="male" bindtap="onGenderTap" hover-class="btn-hover">👦 男</view>
+      <view class="gender-opt {{gender === 'female' ? 'active' : ''}}" data-gender="female" bindtap="onGenderTap" hover-class="btn-hover">👧 女</view>
+    </view>
+  </view>
+
   <!-- ===== 保存按钮 ===== -->
   <view class="save-btn-wrap">
     <view
-      class="save-btn {{submitting ? 'save-btn-loading' : ''}}"
+      class="save-btn {{(!babyName || submitting) ? 'save-btn-disabled' : ''}}"
       bindtap="save"
       hover-class="btn-hover"
     >

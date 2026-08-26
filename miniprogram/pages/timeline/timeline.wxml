@@ -2,6 +2,19 @@
 <view class="page-timeline">
   <!-- ========== 固定头部区 ========== -->
   <view class="fixed-header">
+    <!-- 宝宝档案条（头像+昵称+月龄），点击跳转到宝宝管理 -->
+    <view class="baby-bar" bindtap="goBabyManage" hover-class="baby-bar-hover" hover-stay-time="80">
+      <view class="baby-bar-avatar">
+        <image wx:if="{{babyInfo.avatar}}" class="baby-bar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
+        <view wx:else class="baby-bar-emoji">👶</view>
+      </view>
+      <view class="baby-bar-info">
+        <view class="baby-bar-name">{{babyInfo.name || '宝宝'}}</view>
+        <view class="baby-bar-meta">{{babyInfo.age || babyInfo.birthDate || '未设置生日'}}</view>
+      </view>
+      <view class="baby-bar-arrow">›</view>
+    </view>
+
     <!-- 日期标题 + 记录入口 -->
     <view class="date-header">
       <view class="date-title">{{todayLabel}}</view>

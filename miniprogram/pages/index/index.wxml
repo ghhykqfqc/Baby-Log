@@ -39,32 +39,16 @@
   <!-- ===== 页面内容层 ===== -->
   <view class="content-layer">
 
-    <!-- 顶部用户信息条（当前登录微信用户） -->
-    <view class="user-bar">
-      <view class="user-info" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
-        <image wx:if="{{userInfo.avatarUrl}}" class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
-        <view wx:else class="user-avatar user-avatar-default">👤</view>
-        <view class="user-text">
-          <view class="user-nickname">{{userInfo.nickName || '未登录'}}</view>
-          <view class="user-tip">点击管理宝宝</view>
-        </view>
+    <!-- 顶部用户信息条：仅显示当前登录用户头像与昵称，点击进入宝宝管理面板 -->
+    <view class="user-bar" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
+      <image wx:if="{{userInfo.avatarUrl}}" class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
+      <view wx:else class="user-avatar user-avatar-default">👤</view>
+      <view class="user-text">
+        <view class="user-nickname">{{userInfo.nickName || '未登录'}}</view>
+        <view class="user-tip">{{babies.length > 0 ? ('宝宝：' + (babyInfo.name || '未命名') + (babies.length > 1 ? ' · 共' + babies.length + '个' : '')) : '点击添加宝宝'}}</view>
       </view>
       <view class="weather-chip" wx:if="{{weatherText}}">{{weatherText}}</view>
       <view class="date-badge" wx:else>{{todayText}}</view>
-    </view>
-
-    <!-- 当前宝宝信息卡片（点击切换 / 编辑） -->
-    <view class="header" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
-      <view class="baby-avatar">
-        <image wx:if="{{babyInfo.avatar}}" class="avatar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
-        <view wx:else class="avatar-emoji">👶</view>
-        <view class="baby-switch-icon" wx:if="{{babies.length > 1}}">🔁</view>
-      </view>
-      <view class="baby-info">
-        <view class="baby-name">{{babyInfo.name || '点此添加宝宝'}}</view>
-        <view class="baby-meta">{{babyInfo.age || babyInfo.birthDate || '点击设置宝宝信息'}}</view>
-      </view>
-      <view class="baby-id-chip" wx:if="{{babyInfo.babyId}}">ID: {{babyInfo.babyId}}</view>
     </view>
 
     <!-- 网络状态提示 -->
@@ -88,8 +72,23 @@
       </view>
     </view>
 
-    <!-- ===== 宝宝封面相册（横板轮播） ===== -->
-    <view class="album">
+    <!-- ===== 宝宝信息条 + 封面相册（合并为一个卡片，简约美观） ===== -->
+    <view class="album-block">
+      <!-- 当前宝宝信息条：头像 + 昵称 + 月龄/生日，点击进入宝宝管理面板 -->
+      <view class="baby-strip" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
+        <view class="baby-strip-avatar">
+          <image wx:if="{{babyInfo.avatar}}" class="baby-strip-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
+          <view wx:else class="baby-strip-emoji">👶</view>
+          <view class="baby-strip-switch" wx:if="{{babies.length > 1}}">🔁</view>
+        </view>
+        <view class="baby-strip-info">
+          <view class="baby-strip-name">{{babyInfo.name || '点此添加宝宝'}}</view>
+          <view class="baby-strip-meta">{{babyInfo.age || babyInfo.birthDate || '点击设置宝宝信息'}}</view>
+        </view>
+      </view>
+
+      <!-- 相册区 -->
+      <view class="album">
       <swiper
         wx:if="{{albumPhotos.length > 0}}"
         class="album-swiper"
@@ -121,6 +120,8 @@
         <view class="album-add-text">为宝宝添加封面相册</view>
         <view class="album-add-sub">记录每一个可爱瞬间</view>
       </view>
+    </view>
+    <!-- ===== /宝宝信息条 + 相册 ===== -->
     </view>
 
     <!-- ===== 记录控件：三卡一行（单击记录时间点，长按填写详情） ===== -->

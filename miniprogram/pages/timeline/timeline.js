@@ -9,6 +9,7 @@ Page({
   data: {
     loading: true,
     todayLabel: '',
+    babyInfo: {},         // 当前宝宝信息
     hasRecords: false,
     hasChartData: false,   // 是否有任何记录（控制图表显示，比 hasRecords 更宽松）
     predictList: [],
@@ -39,6 +40,7 @@ Page({
     this.setData({ todayLabel: `${today.getMonth() + 1}月${today.getDate()}日` })
     // 监听宝宝切换，自动刷新
     app.eventBus.on('babySwitched', this._onBabySwitched = () => {
+      this.setData({ babyInfo: app.globalData.babyInfo || {} })
       this.loadData()
     })
   },
@@ -49,7 +51,16 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/timeline/timeline')
     }
+    // 同步当前宝宝信息到视图
+    this.setData({ babyInfo: app.globalData.babyInfo || {} })
     this.loadData()
+  },
+
+  /**
+   * 跳转到首页宝宝管理（时光轴页是 tabBar，只能 switchTab 到首页）
+   */
+  goBabyManage() {
+    wx.switchTab({ url: '/pages/index/index' })
   },
 
   onHide() {
