@@ -83,14 +83,25 @@ exports.main = async (event, context) => {
   }
 
   return safeDb(async () => {
-    // 权限校验：当前用户是否对该宝宝有写入权限
-    const memberRes = await db.collection('family_members').where({
+    // 权限校验：当前用户是否为该宝宝的成员（baby_members 关系）
+    // 注意：历史版本误用 family_members（旧集合名），导致非 default 宝宝校验永远失败无法入库。
+    // 统一使用 baby_members（与 createBaby/joinBaby/listBabies/saveBabyInfo 一致）。
+    const memberRes = await db.collection('baby_members').where({
       babyId,
-      openid: OPENID,
-      role: 'parent'
+      openid: OPENID
     }).count()
 
-    if (memberRes.total === 0 && babyId !== 'default') {
+    // 兼容历史：非成员但 babyId 还挂在旧的 family_members 下（老数据），放行一次
+    let isMember = memberRes.total > 0
+    if (!isMember && babyId !== 'default') {
+      const legacyRes = await db.collection('family_members').where({
+        babyId,
+        openid: OPENID
+      }).count()
+      isMember = legacyRes.total > 0
+    }
+
+    if (!isMember && babyId !== 'default') {
       return { code: 403, message: '无写入权限' }
     }
 
@@ -103,5 +114,5 @@ exports.main = async (event, context) => {
         ...record
       }
     }
-  }, FALLBACK, ['family_members', 'records'])
+  }, FALLBACK, ['baby_members', 'family_members', 'records'])
 }

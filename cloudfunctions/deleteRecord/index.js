@@ -63,19 +63,29 @@ exports.main = async (event, context) => {
 
     const record = recordRes.data
 
-    // 校验权限：仅记录创建者或父母角色可删除
-    const memberRes = await db.collection('family_members').where({
+    // 校验权限：仅记录创建者或该宝宝的成员（parent/family）可删除
+    // 注意：统一使用 baby_members（历史版本误用 family_members 导致成员校验失败）
+    let isMember = false
+    const memberRes = await db.collection('baby_members').where({
       babyId: record.babyId,
-      openid: OPENID,
-      role: 'parent'
+      openid: OPENID
     }).count()
+    isMember = memberRes.total > 0
+    if (!isMember) {
+      // 兼容旧数据：family_members 老集合
+      const legacyRes = await db.collection('family_members').where({
+        babyId: record.babyId,
+        openid: OPENID
+      }).count()
+      isMember = legacyRes.total > 0
+    }
 
-    if (record.userId !== OPENID && memberRes.total === 0) {
+    if (record.userId !== OPENID && !isMember) {
       return { code: 403, message: '无删除权限' }
     }
 
     await db.collection('records').doc(id).remove()
 
     return { code: 0, data: { id } }
-  }, FALLBACK, ['records', 'family_members'])
+  }, FALLBACK, ['records', 'baby_members', 'family_members'])
 }
