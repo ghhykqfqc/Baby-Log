@@ -84,7 +84,27 @@ Page({
     joinBabyId: '',
     joinBabyCode: '',
     newBabyId: '',
-    newBabyCode: ''
+    newBabyCode: '',
+    // 照片编辑面板
+    showPhotoEditSheet: false,
+    currentAlbumIndex: 0,        // 当前 swiper 索引
+    photoEditCurrent: {          // 当前编辑的照片 { src, tag, id }
+      src: '',
+      tag: '',
+      id: ''
+    },
+    // 上传裁剪（固定 4:3 裁剪框）
+    showUploadCropper: false,
+    uploadRawPath: '',          // 待裁剪原图
+    cropStageSize: 300,         // 裁剪舞台边长（px，onLoad 计算）
+    cropImgW: 0, cropImgH: 0,   // 图片显示尺寸
+    cropImgX: 0, cropImgY: 0,   // 图片在舞台位置
+    cropBoxW: 300,              // 裁剪框宽（4:3 → 宽 = 舞台宽）
+    cropBoxH: 225,              // 裁剪框高（舞台 * 0.75）
+    touchStartX: 0, touchStartY: 0,
+    touchStartImgX: 0, touchStartImgY: 0,
+    // 上传标签选择（默认当前宝宝昵称）
+    uploadTag: ''                // 标签 = 宝宝昵称
   },
 
   _timer: null,
@@ -97,6 +117,16 @@ Page({
     app.eventBus.on('babySwitched', this.onBabySwitched.bind(this))
     this.updateTodayText()
     this.restoreSleepState()
+    // 初始化上传裁剪舞台尺寸（4:3 裁剪框）
+    try {
+      const sys = wx.getSystemInfoSync()
+      const stage = Math.min(320, Math.floor(sys.windowWidth * 0.9))
+      this.setData({
+        cropStageSize: stage,
+        cropBoxW: stage,
+        cropBoxH: Math.floor(stage * 0.75)
+      })
+    } catch (e) {}
   },
 
   onShow() {
@@ -235,7 +265,7 @@ Page({
   },
 
   /**
-   * 上传照片到相册
+   * 上传照片到相册：先选图 → 固定 4:3 裁剪 → 选择标签 → 上传
    */
   addAlbumPhoto() {
     const remain = ALBUM_MAX - this.data.albumPhotos.length
@@ -244,61 +274,280 @@ Page({
       return
     }
     wx.chooseMedia({
-      count: remain,
+      count: 1,
       mediaType: ['image'],
       sourceType: ['album', 'camera'],
       sizeType: ['compressed'],
-      success: async (res) => {
-        const files = (res.tempFiles || []).map(f => f.tempFilePath).filter(Boolean)
-        if (!files.length) return
-
-        wx.showLoading({ title: '添加中...' })
-        const babyId = app.globalData.babyId || 'default'
-        const uploaded = []
-
-        for (let i = 0; i < files.length; i++) {
-          const path = files[i]
-          // 云可用：上传换取永久 fileID；否则退化为本地临时路径
-          if (app.globalData.cloudReady) {
-            try {
-              const up = await wx.cloud.uploadFile({
-                cloudPath: `album/${babyId}/${Date.now()}_${i}.jpg`,
-                filePath: path
-              })
-              uploaded.push({ id: up.fileID, src: up.fileID })
-              continue
-            } catch (err) {
-              console.warn('相册照片上传失败，暂用本地路径:', (err && err.errMsg) || err)
-            }
-          }
-          uploaded.push({ id: `local_${Date.now()}_${i}`, src: path })
-        }
-
-        const albumPhotos = this.data.albumPhotos.concat(uploaded).slice(0, ALBUM_MAX)
-        storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, albumPhotos)
-        this.setData({ albumPhotos })
-
-        // 云端持久化（babies.albumPhotos），失败不影响本地使用
-        if (app.globalData.cloudReady) {
-          try {
-            await call('saveBabyInfo', {
-              babyId,
-              albumPhotos: albumPhotos.map(p => p.src)
-            })
-          } catch (err) {
-            console.warn('相册云端保存失败:', (err && err.message) || err)
-          }
-        }
-
-        wx.hideLoading()
-        wx.showToast({ title: '已添加', icon: 'success' })
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0]
+        if (!file || !file.tempFilePath) return
+        this.openUploadCropper(file.tempFilePath)
       },
       fail: () => {}
     })
   },
 
   /**
-   * 长按删除相册照片
+   * 打开上传裁剪（固定 4:3 裁剪框）
+   */
+  openUploadCropper(path) {
+    // 默认标签 = 当前宝宝昵称
+    const defaultTag = (app.globalData.babyInfo && app.globalData.babyInfo.name) || ''
+    wx.getImageInfo({
+      src: path,
+      success: (info) => {
+        const stage = this.data.cropStageSize
+        // 图片完整放入舞台内，等比缩放
+        let w = info.width, h = info.height
+        if (w > stage || h > stage) {
+          const ratio = Math.min(stage / w, stage / h)
+          w = Math.floor(w * ratio)
+          h = Math.floor(h * ratio)
+        }
+        this.setData({
+          showUploadCropper: true,
+          uploadRawPath: path,
+          uploadTag: defaultTag,
+          cropImgW: w, cropImgH: h,
+          cropImgX: Math.floor((stage - w) / 2),
+          cropImgY: Math.floor((stage - h) / 2)
+        })
+      },
+      fail: () => {
+        // 取不到信息时用默认舞台大小
+        this.setData({
+          showUploadCropper: true,
+          uploadRawPath: path,
+          uploadTag: defaultTag,
+          cropImgW: 200, cropImgH: 200,
+          cropImgX: 50, cropImgY: 50
+        })
+      }
+    })
+  },
+
+  // ===== 上传裁剪触摸 =====
+  onCropUpTouchStart(e) {
+    if (e.touches.length === 1) {
+      this.setData({
+        touchStartX: e.touches[0].clientX,
+        touchStartY: e.touches[0].clientY,
+        touchStartImgX: this.data.cropImgX,
+        touchStartImgY: this.data.cropImgY
+      })
+    }
+  },
+
+  onCropUpTouchMove(e) {
+    if (e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - this.data.touchStartX
+    const dy = e.touches[0].clientY - this.data.touchStartY
+    this.setData({
+      cropImgX: this.data.touchStartImgX + dx,
+      cropImgY: this.data.touchStartImgY + dy
+    })
+  },
+
+  onCropUpTouchEnd() {},
+
+  cancelUploadCropper() {
+    this.setData({ showUploadCropper: false, uploadRawPath: '' })
+  },
+
+  /**
+   * 确认裁剪：用页面内隐藏 canvas 导出 4:3 图片
+   * 若处于"替换照片"模式（_replaceMode=true）则替换当前照片，否则新增
+   */
+  confirmUploadCropper() {
+    const { uploadRawPath, cropImgW, cropImgH, cropImgX, cropImgY, cropBoxW, cropBoxH, cropStageSize, uploadTag } = this.data
+
+    const query = wx.createSelectorQuery()
+    query.select('#uploadCropCanvas')
+      .fields({ node: true })
+      .exec((res) => {
+        // 降级：无 canvas 时直接用原图继续
+        if (!res || !res[0] || !res[0].node) {
+          this.afterCropped(uploadRawPath, uploadTag)
+          return
+        }
+
+        const canvas = res[0].node
+        const ctx = canvas.getContext('2d')
+        const outputW = 800, outputH = 600   // 4:3 输出
+        canvas.width = outputW
+        canvas.height = outputH
+
+        const img = canvas.createImage()
+        img.onload = () => {
+          // 把裁剪框映射回原图坐标（裁剪框居于舞台中央）
+          const ratioX = img.width / cropImgW
+          const ratioY = img.height / cropImgH
+          const cropLeft = (cropStageSize - cropBoxW) / 2
+          const cropTop = (cropStageSize - cropBoxH) / 2
+          const sx = (cropLeft - cropImgX) * ratioX
+          const sy = (cropTop - cropImgY) * ratioY
+          const sw = cropBoxW * ratioX
+          const sh = cropBoxH * ratioY
+
+          ctx.clearRect(0, 0, outputW, outputH)
+          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outputW, outputH)
+
+          wx.canvasToTempFilePath({
+            canvas,
+            x: 0, y: 0,
+            width: outputW,
+            height: outputH,
+            destWidth: outputW,
+            destHeight: outputH,
+            fileType: 'jpg',
+            quality: 0.9,
+            success: (r) => {
+              this.afterCropped(r.tempFilePath, uploadTag)
+            },
+            fail: () => {
+              this.afterCropped(uploadRawPath, uploadTag)
+            }
+          })
+        }
+        img.onerror = () => {
+          this.afterCropped(uploadRawPath, uploadTag)
+        }
+        img.src = uploadRawPath
+      })
+  },
+
+  /**
+   * 裁剪完成后分发：新增 or 替换
+   */
+  async afterCropped(croppedPath, tag) {
+    if (this._replaceMode) {
+      // 替换模式：上传新图并替换当前照片
+      await this.doReplacePhoto(croppedPath, tag)
+    } else {
+      // 新增模式：上传并追加
+      await this.closeModalCropperAndUpload(croppedPath, tag)
+    }
+  },
+
+  /**
+   * 执行"替换当前照片"：上传新图 → 替换 albumPhotos 中对应项
+   */
+  async doReplacePhoto(croppedPath, tag) {
+    const { photoEditCurrent, albumPhotos } = this.data
+    this._replaceMode = false
+    this.setData({ showUploadCropper: false, uploadRawPath: '' })
+
+    wx.showLoading({ title: '替换中...' })
+    const babyId = app.globalData.babyId || 'default'
+    let finalSrc = croppedPath
+    let finalId = `local_${Date.now()}`
+
+    if (app.globalData.cloudReady) {
+      try {
+        const up = await wx.cloud.uploadFile({
+          cloudPath: `album/${babyId}/${Date.now()}_r.jpg`,
+          filePath: croppedPath
+        })
+        if (up && up.fileID) {
+          finalSrc = up.fileID
+          finalId = up.fileID
+        }
+      } catch (err) {
+        console.warn('替换照片上传失败，暂用本地路径:', (err && err.errMsg) || err)
+      }
+    }
+
+    // 更新对应照片
+    const index = albumPhotos.findIndex(p => p.id === photoEditCurrent.id)
+    const finalTag = tag || photoEditCurrent.tag || ''
+    const updated = albumPhotos.slice()
+    if (index >= 0) {
+      // 删除旧云文件
+      if (String(updated[index].id).startsWith('cloud://')) {
+        wx.cloud.deleteFile({ fileList: [updated[index].id] }).catch(() => {})
+      }
+      updated[index] = { ...updated[index], src: finalSrc, id: finalId, tag: finalTag }
+    } else {
+      updated.push({ id: finalId, src: finalSrc, tag: finalTag })
+    }
+
+    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, updated)
+    this.setData({ albumPhotos: updated })
+
+    if (app.globalData.cloudReady) {
+      try {
+        await call('saveBabyInfo', {
+          babyId,
+          albumPhotos: updated.map(p => p.src)
+        })
+      } catch (err) {
+        console.warn('相册云端更新失败:', (err && err.message) || err)
+      }
+    }
+    wx.hideLoading()
+    wx.showToast({ title: '已替换', icon: 'success' })
+  },
+
+  /**
+   * 关闭裁剪面板并执行上传（带标签）—— 新增模式
+   */
+  async closeModalCropperAndUpload(croppedPath, tag) {
+    this.setData({ showUploadCropper: false, uploadRawPath: '' })
+
+    wx.showLoading({ title: '添加中...' })
+    const babyId = app.globalData.babyId || 'default'
+    let uploaded = null
+
+    // 云可用：上传换取永久 fileID；否则退化为本地临时路径
+    if (app.globalData.cloudReady) {
+      try {
+        const up = await wx.cloud.uploadFile({
+          cloudPath: `album/${babyId}/${Date.now()}.jpg`,
+          filePath: croppedPath
+        })
+        if (up && up.fileID) {
+          uploaded = { id: up.fileID, src: up.fileID }
+        }
+      } catch (err) {
+        console.warn('相册照片上传失败，暂用本地路径:', (err && err.errMsg) || err)
+      }
+    }
+    if (!uploaded) {
+      uploaded = { id: `local_${Date.now()}`, src: croppedPath }
+    }
+
+    // 标签：默认当前宝宝昵称（已由 openUploadCropper 设置），或用户选择的其他宝宝昵称
+    uploaded.tag = tag || (app.globalData.babyInfo && app.globalData.babyInfo.name) || ''
+
+    const albumPhotos = this.data.albumPhotos.concat([uploaded]).slice(0, ALBUM_MAX)
+    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, albumPhotos)
+    this.setData({ albumPhotos })
+
+    // 云端持久化（babies.albumPhotos），失败不影响本地使用
+    if (app.globalData.cloudReady) {
+      try {
+        await call('saveBabyInfo', {
+          babyId,
+          albumPhotos: albumPhotos.map(p => p.src)
+        })
+      } catch (err) {
+        console.warn('相册云端保存失败:', (err && err.message) || err)
+      }
+    }
+
+    wx.hideLoading()
+    wx.showToast({ title: '已添加', icon: 'success' })
+  },
+
+  /**
+   * 上传动画裁剪标签选择
+   */
+  selectUploadTag(e) {
+    this.setData({ uploadTag: e.currentTarget.dataset.tag })
+  },
+
+  /**
+   * 长按删除相册照片（保留，编辑面板内也有删除入口）
    */
   async removeAlbumPhoto(e) {
     const index = Number(e.currentTarget.dataset.index)
@@ -330,6 +579,160 @@ Page({
         console.warn('相册云端更新失败:', (err && err.message) || err)
       }
     }
+  },
+
+  // ============================================
+  // 照片编辑面板（替换 / 标签 / 删除）
+  // ============================================
+
+  /**
+   * swiper 滑动时记录当前索引
+   */
+  onAlbumChange(e) {
+    this.setData({ currentAlbumIndex: e.detail.current })
+  },
+
+  /**
+   * 点击右上角编辑按钮（✏️）：打开编辑面板
+   */
+  showPhotoEdit() {
+    const { albumPhotos, currentAlbumIndex } = this.data
+    const current = albumPhotos[currentAlbumIndex] || albumPhotos[0]
+    if (!current) return
+    this.setData({
+      showPhotoEditSheet: true,
+      currentAlbumIndex,
+      photoEditCurrent: {
+        id: current.id,
+        src: current.src,
+        tag: current.tag || (app.globalData.babyInfo && app.globalData.babyInfo.name) || ''
+      }
+    })
+  },
+
+  hidePhotoEdit() {
+    this.setData({ showPhotoEditSheet: false })
+  },
+
+  /**
+   * 选择标签（宝宝昵称）
+   */
+  selectPhotoTag(e) {
+    this.setData({ 'photoEditCurrent.tag': e.currentTarget.dataset.tag })
+  },
+
+  /**
+   * 替换当前照片：重新选图 → 裁剪 → 替换
+   */
+  replaceCurrentPhoto() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      sourceType: ['album', 'camera'],
+      sizeType: ['compressed'],
+      success: (res) => {
+        const file = res.tempFiles && res.tempFiles[0]
+        if (!file || !file.tempFilePath) return
+        // 关闭编辑面板，进入替换模式的裁剪
+        this.hidePhotoEdit()
+        // 记住进入替换模式（裁剪确认后走替换逻辑而非新增）
+        this._replaceMode = true
+        // 记住当前的编辑目标（doReplacePhoto 用）
+        this.setData({
+          uploadRawPath: file.tempFilePath,
+          showUploadCropper: true,
+          uploadTag: this.data.photoEditCurrent.tag || '',
+          cropImgW: 200, cropImgH: 200,
+          cropImgX: 50, cropImgY: 50
+        })
+        wx.getImageInfo({
+          src: file.tempFilePath,
+          success: (info) => {
+            const stage = this.data.cropStageSize
+            let w = info.width, h = info.height
+            if (w > stage || h > stage) {
+              const ratio = Math.min(stage / w, stage / h)
+              w = Math.floor(w * ratio)
+              h = Math.floor(h * ratio)
+            }
+            this.setData({
+              cropImgW: w, cropImgH: h,
+              cropImgX: Math.floor((stage - w) / 2),
+              cropImgY: Math.floor((stage - h) / 2)
+            })
+          },
+          fail: () => {}
+        })
+      },
+      fail: () => {}
+    })
+  },
+
+  /**
+   * 删除当前照片
+   */
+  deleteCurrentPhoto() {
+    const { albumPhotos, currentAlbumIndex, photoEditCurrent } = this.data
+    const index = albumPhotos.findIndex(p => p.id === photoEditCurrent.id)
+    if (index < 0) return
+
+    wx.showModal({
+      title: '删除照片',
+      content: '确定从相册删除这张照片吗？',
+      confirmColor: '#E8554E',
+      success: (r) => {
+        if (!r.confirm) return
+        const target = albumPhotos[index]
+        const filtered = albumPhotos.filter((_, i) => i !== index)
+        storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, filtered)
+        this.setData({
+          albumPhotos: filtered,
+          showPhotoEditSheet: false,
+          currentAlbumIndex: Math.max(0, index - 1)
+        })
+        if (app.globalData.cloudReady) {
+          if (String(target.id).startsWith('cloud://')) {
+            wx.cloud.deleteFile({ fileList: [target.id] }).catch(() => {})
+          }
+          call('saveBabyInfo', {
+            babyId: app.globalData.babyId || 'default',
+            albumPhotos: filtered.map(p => p.src)
+          }).catch(() => {})
+        }
+      }
+    })
+  },
+
+  /**
+   * 保存照片编辑（标签变更 / 新图替换）
+   */
+  savePhotoEdit() {
+    const { albumPhotos, photoEditCurrent } = this.data
+    const index = albumPhotos.findIndex(p => p.id === photoEditCurrent.id)
+    if (index < 0) return
+
+    const updated = albumPhotos.map((p, i) => {
+      if (i === index) {
+        return {
+          ...p,
+          tag: photoEditCurrent.tag || '',
+          src: photoEditCurrent.src || p.src,
+          id: photoEditCurrent.id || p.id
+        }
+      }
+      return p
+    })
+
+    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, updated)
+    this.setData({ albumPhotos: updated, showPhotoEditSheet: false })
+
+    if (app.globalData.cloudReady) {
+      call('saveBabyInfo', {
+        babyId: app.globalData.babyId || 'default',
+        albumPhotos: updated.map(p => p.src)
+      }).catch(() => {})
+    }
+    wx.showToast({ title: '已保存', icon: 'success' })
   },
 
   // ============================================

@@ -39,16 +39,33 @@
   <!-- ===== 页面内容层 ===== -->
   <view class="content-layer">
 
-    <!-- 顶部用户信息条：仅显示当前登录用户头像与昵称，点击进入宝宝管理面板 -->
-    <view class="user-bar" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
-      <image wx:if="{{userInfo.avatarUrl}}" class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
-      <view wx:else class="user-avatar user-avatar-default">👤</view>
-      <view class="user-text">
-        <view class="user-nickname">{{userInfo.nickName || '未登录'}}</view>
-        <view class="user-tip">{{babies.length > 0 ? ('宝宝：' + (babyInfo.name || '未命名') + (babies.length > 1 ? ' · 共' + babies.length + '个' : '')) : '点击添加宝宝'}}</view>
+    <!-- ========== 顶部统一信息条 ==========
+         左：当前用户头像 + "昵称 · 共N个宝宝"
+         右下："宝宝：XXX ▾" 切换入口（点击打开宝宝管理面板）
+         最右：天气/日期胶囊
+    -->
+    <view class="top-bar">
+      <view class="top-bar-left" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
+        <image wx:if="{{userInfo.avatarUrl}}" class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
+        <view wx:else class="user-avatar user-avatar-default">👤</view>
+        <view class="user-text">
+          <view class="user-nickname-row">
+            <text class="user-nickname">{{userInfo.nickName || '未登录'}}</text>
+            <text class="user-count" wx:if="{{babies.length > 0}}">· 共{{babies.length}}个宝宝</text>
+          </view>
+          <view class="baby-switch-row">
+            <text class="baby-switch-label">宝宝：</text>
+            <text class="baby-switch-name">{{babyInfo.name || '点此添加'}}</text>
+            <view class="baby-switch-trigger">
+              <text class="baby-switch-arrow">▾</text>
+            </view>
+          </view>
+        </view>
       </view>
-      <view class="weather-chip" wx:if="{{weatherText}}">{{weatherText}}</view>
-      <view class="date-badge" wx:else>{{todayText}}</view>
+      <view class="top-bar-right">
+        <view class="weather-chip" wx:if="{{weatherText}}">{{weatherText}}</view>
+        <view class="date-badge" wx:else>{{todayText}}</view>
+      </view>
     </view>
 
     <!-- 网络状态提示 -->
@@ -72,23 +89,9 @@
       </view>
     </view>
 
-    <!-- ===== 宝宝信息条 + 封面相册（合并为一个卡片，简约美观） ===== -->
-    <view class="album-block">
-      <!-- 当前宝宝信息条：头像 + 昵称 + 月龄/生日，点击进入宝宝管理面板 -->
-      <view class="baby-strip" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
-        <view class="baby-strip-avatar">
-          <image wx:if="{{babyInfo.avatar}}" class="baby-strip-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
-          <view wx:else class="baby-strip-emoji">👶</view>
-          <view class="baby-strip-switch" wx:if="{{babies.length > 1}}">🔁</view>
-        </view>
-        <view class="baby-strip-info">
-          <view class="baby-strip-name">{{babyInfo.name || '点此添加宝宝'}}</view>
-          <view class="baby-strip-meta">{{babyInfo.age || babyInfo.birthDate || '点击设置宝宝信息'}}</view>
-        </view>
-      </view>
-
-      <!-- 相册区 -->
-      <view class="album">
+    <!-- ========== 封面相册（4:3 比例，右上角编辑控件） ========== -->
+    <view class="album-card">
+      <!-- 相册主区 -->
       <swiper
         wx:if="{{albumPhotos.length > 0}}"
         class="album-swiper"
@@ -98,10 +101,15 @@
         autoplay="{{albumPhotos.length > 1}}"
         interval="4000"
         circular="{{albumPhotos.length > 1}}"
+        bindchange="onAlbumChange"
       >
         <swiper-item wx:for="{{albumPhotos}}" wx:key="id">
           <view class="album-item" longpress="removeAlbumPhoto" data-index="{{index}}">
             <image class="album-img" src="{{item.src}}" mode="aspectFill" lazy-load="{{true}}"></image>
+            <!-- 照片标签：左下角胶囊，显示该照片所属宝宝昵称 -->
+            <view class="photo-tag" wx:if="{{item.tag}}">
+              <text class="photo-tag-text">{{item.tag}}</text>
+            </view>
           </view>
         </swiper-item>
         <!-- 上传入口：不足 9 张时显示 -->
@@ -120,8 +128,11 @@
         <view class="album-add-text">为宝宝添加封面相册</view>
         <view class="album-add-sub">记录每一个可爱瞬间</view>
       </view>
-    </view>
-    <!-- ===== /宝宝信息条 + 相册 ===== -->
+
+      <!-- 右上角编辑控件：替换当前照片 + 修改标签 -->
+      <view class="album-edit-fab" wx:if="{{albumPhotos.length > 0}}" catchtap="showPhotoEdit" hover-class="fab-hover">
+        <text class="fab-icon">✏️</text>
+      </view>
     </view>
 
     <!-- ===== 记录控件：三卡一行（单击记录时间点，长按填写详情） ===== -->
@@ -241,6 +252,114 @@
         <view class="duration-item" data-minutes="480" bindtap="selectDuration" hover-class="duration-item-hover">8小时</view>
       </view>
       <view class="sleep-cancel-link" bindtap="hideSleepSheet">取消</view>
+    </view>
+  </view>
+
+  <!-- ========== 上传 / 替换照片裁剪面板（固定 4:3 裁剪框 + 标签选择） ========== -->
+  <view class="sheet-mask photo-crop-mask" wx:if="{{showUploadCropper}}" bindtap="cancelUploadCropper" catchtouchmove="noop">
+    <view class="photo-crop-panel" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="photo-crop-title">裁剪照片</view>
+      <view class="photo-crop-sub">拖动图片调整位置，裁切后自动保存为 4:3 封面</view>
+
+      <!-- 裁剪舞台 -->
+      <view
+        class="photo-crop-stage"
+        style="width: {{cropStageSize}}px; height: {{cropBoxH}}px;"
+        bindtouchstart="onCropUpTouchStart"
+        bindtouchmove="onCropUpTouchMove"
+        bindtouchend="onCropUpTouchEnd"
+      >
+        <image
+          class="photo-crop-img"
+          src="{{uploadRawPath}}"
+          style="width: {{cropImgW}}px; height: {{cropImgH}}px; left: {{cropImgX}}px; top: {{cropImgY}}px;"
+          mode="scaleToFill"
+        ></image>
+        <!-- 固定裁剪框（4:3）：中心区域高亮，外部遮罩 -->
+        <view class="photo-crop-frame"></view>
+        <!-- 网格线（参考） -->
+        <view class="photo-crop-grid-v"></view>
+        <view class="photo-crop-grid-h"></view>
+      </view>
+      <view class="photo-crop-tip">拖动调整位置</view>
+
+      <!-- 标签选择：默认当前宝宝昵称，可切换其他宝宝 -->
+      <view class="photo-edit-section">
+        <view class="photo-edit-label">照片标签</view>
+        <view class="tag-options">
+          <view
+            class="tag-option {{uploadTag === item.name ? 'active' : ''}}"
+            wx:for="{{babies}}" wx:key="babyId"
+            data-tag="{{item.name}}"
+            bindtap="selectUploadTag"
+            hover-class="btn-hover"
+          >{{item.name || '未命名'}}</view>
+          <view
+            class="tag-option {{uploadTag === '' ? 'active' : ''}}"
+            data-tag=""
+            bindtap="selectUploadTag"
+            hover-class="btn-hover"
+          >无标签</view>
+        </view>
+      </view>
+
+      <view class="photo-crop-actions">
+        <view class="photo-crop-cancel" bindtap="cancelUploadCropper" hover-class="btn-hover">取消</view>
+        <view class="photo-crop-confirm" bindtap="confirmUploadCropper" hover-class="btn-hover">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 上传裁剪导出用隐藏 canvas -->
+  <canvas type="2d" id="uploadCropCanvas" class="crop-canvas-hidden"></canvas>
+
+  <!-- ========== 照片编辑面板（替换照片 + 修改标签 + 删除） ========== -->
+  <view class="sheet-mask photo-edit-mask" wx:if="{{showPhotoEditSheet}}" bindtap="hidePhotoEdit" catchtouchmove="noop">
+    <view class="photo-edit-panel" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="photo-edit-title">编辑照片</view>
+
+      <!-- 当前照片预览 -->
+      <view class="photo-edit-preview" wx:if="{{photoEditCurrent.src}}">
+        <image class="photo-edit-img" src="{{photoEditCurrent.src}}" mode="aspectFill"></image>
+        <view class="photo-edit-pos">{{currentAlbumIndex + 1}} / {{albumPhotos.length}}</view>
+      </view>
+
+      <!-- 标签选择：默认当前宝宝昵称，可选择其他宝宝 -->
+      <view class="photo-edit-section">
+        <view class="photo-edit-label">照片标签</view>
+        <view class="tag-options">
+          <view
+            class="tag-option {{photoEditCurrent.tag === item.name ? 'active' : ''}}"
+            wx:for="{{babies}}" wx:key="babyId"
+            data-tag="{{item.name}}"
+            bindtap="selectPhotoTag"
+            hover-class="btn-hover"
+          >{{item.name || '未命名'}}</view>
+          <view
+            class="tag-option {{photoEditCurrent.tag === '' ? 'active' : ''}}"
+            data-tag=""
+            bindtap="selectPhotoTag"
+            hover-class="btn-hover"
+          >无标签</view>
+        </view>
+      </view>
+
+      <!-- 操作按钮 -->
+      <view class="photo-edit-actions">
+        <view class="photo-edit-btn" bindtap="replaceCurrentPhoto" hover-class="btn-hover">
+          <view class="action-icon">🖼</view>
+          <view>替换照片</view>
+        </view>
+        <view class="photo-edit-btn photo-edit-btn-danger" bindtap="deleteCurrentPhoto" hover-class="btn-hover">
+          <view class="action-icon">🗑</view>
+          <view>删除</view>
+        </view>
+      </view>
+
+      <view class="photo-edit-save" bindtap="savePhotoEdit" hover-class="btn-hover">完成</view>
+      <view class="sleep-cancel-link" bindtap="hidePhotoEdit">取消</view>
     </view>
   </view>
 
