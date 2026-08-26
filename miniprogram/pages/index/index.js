@@ -48,7 +48,9 @@ Page({
     },
     // 三栏预测卡数据（对齐时光轴）
     predictList: [],
-    hasPrediction: false,
+    // 预测卡是否展示：宝宝有任一记录即常驻显示，内部各栏为「预计/数据不足」，
+    // 不再依赖 hasPrediction（只有个别类型有足够数据时才显示，导致空宝宝卡片整体消失）
+    showPredictCard: false,
     // 天气皮肤
     weatherClass: 'sunny',
     weatherText: '',
@@ -908,6 +910,7 @@ loadAlbum(babyId) {
 
   /**
    * 计算三栏预测卡（预计时间点 + 倒计时）
+   * 三栏始终生成（含「数据不足」占位）；卡片展示与否由 showPredictCard 控制
    */
   updatePredictions() {
     const detail = predictDetail(this._allRecords)
@@ -916,11 +919,12 @@ loadAlbum(babyId) {
       { key: 'diaper', ...detail.diaper },
       { key: 'sleep', ...detail.sleep }
     ]
-    const hasPrediction = predictList.some(p => p.available)
-    this.setData({ predictList, hasPrediction })
+    // 有任一类型可用预测才启动倒计时刷新；没有则清掉（三栏显示「数据不足」占位）
+    const hasAvailable = predictList.some(p => p.available)
+    this.setData({ predictList })
 
     this.stopCountdown()
-    if (hasPrediction) {
+    if (hasAvailable) {
       this._countdownTimer = setInterval(() => {
         const refreshed = predictList.map(p => {
           if (!p.available) return p
@@ -938,8 +942,19 @@ loadAlbum(babyId) {
     this._allRecords = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
 
     this.setData({ babyInfo, lastRecords })
+    // 预测卡常驻展示判定：任一类型有过记录（lastRecords 有值）就显示，
+    // 内部各栏由 predictList 决定「预计/数据不足」——全新空宝宝则不显示
+    this.setData({ showPredictCard: this.hasAnyRecord(lastRecords) })
     this.updatePredictions()
     this.updateCardTexts()
+  },
+
+  /**
+   * 是否已有任意类型记录（决定预测卡是否常驻显示）
+   */
+  hasAnyRecord(lastRecords) {
+    const src = lastRecords || this.data.lastRecords || {}
+    return !!(src.feed || src.diaper || src.sleep)
   },
 
   /**
@@ -1005,6 +1020,7 @@ loadAlbum(babyId) {
 
         this._allRecords = normalized
         this.setData({ lastRecords })
+        this.setData({ showPredictCard: this.hasAnyRecord(lastRecords) })
         this.updatePredictions()
         this.updateCardTexts()
       }

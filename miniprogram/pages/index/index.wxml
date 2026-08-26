@@ -78,8 +78,10 @@
       <text>🔧 云开发未开通，当前为离线模式。记录会保存到本地，开通云环境后自动同步。</text>
     </view>
 
-    <!-- ===== 三栏智能预测卡（对齐时光轴，适配首页奶咖色系） ===== -->
-    <view class="predict-card" wx:if="{{hasPrediction}}">
+    <!-- ===== 三栏智能预测卡（对齐时光轴，适配首页奶咖色系） =====
+         卡片本体只要宝宝有任一记录即常驻显示；内部三栏各自显示
+         「预计下次」或「数据不足」（与时光轴页 predict-card 行为一致） -->
+    <view class="predict-card" wx:if="{{showPredictCard}}">
       <view class="predict-col {{item.overdue ? 'overdue' : ''}}" wx:for="{{predictList}}" wx:key="key">
         <view class="predict-icon">{{item.icon}}</view>
         <view class="predict-label">{{item.label}}</view>
