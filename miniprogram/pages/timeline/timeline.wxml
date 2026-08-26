@@ -2,7 +2,7 @@
 <view class="page-timeline">
   <!-- ========== 固定头部区 ========== -->
   <view class="fixed-header">
-    <!-- 宝宝档案条（头像+昵称+年龄+性别），点击跳转到宝宝管理 -->
+    <!-- 宝宝档案条（头像+昵称+出生/性别+今日日期+记录入口），点击跳转到宝宝管理 -->
     <view class="baby-bar" bindtap="goBabyManage" hover-class="baby-bar-hover" hover-stay-time="80">
       <view class="baby-bar-avatar">
         <image wx:if="{{babyInfo.avatar}}" class="baby-bar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
@@ -10,24 +10,16 @@
       </view>
       <view class="baby-bar-info">
         <view class="baby-bar-name">{{babyInfo.name || '宝宝'}}</view>
-        <view class="baby-bar-meta">{{babyInfo.age || babyInfo.birthDate || '未设置生日'}}</view>
+        <view class="baby-bar-meta">{{birthLabel}}</view>
       </view>
-      <!-- 右侧档案胶囊：年龄 + 性别（替代原贴士胶囊） -->
-      <view class="baby-bar-tags">
-        <view class="baby-tag baby-tag-age" wx:if="{{babyAgeText}}">
-          <text class="baby-tag-num">{{babyAgeText}}</text>
-          <text class="baby-tag-label">年龄</text>
-        </view>
-        <view class="baby-tag baby-tag-gender" wx:if="{{babyGenderText}}">{{babyGenderText}}</view>
+      <!-- 今日日期胶囊（不单独成行，紧凑展示） -->
+      <view class="today-capsule" wx:if="{{todayLabel}}">
+        <text class="today-text">{{todayLabel}}</text>
       </view>
-    </view>
-
-    <!-- 日期标题 + 记录入口 -->
-    <view class="date-header">
-      <view class="date-title">{{todayLabel}}</view>
-      <view class="records-entry" wx:if="{{!loading && hasRecords}}" bindtap="goRecords" hover-class="records-entry-hover" hover-stay-time="80">
-        <text class="records-entry-icon">📋</text>
-        <text class="records-entry-text">记录</text>
+      <!-- 「记录」入口固定在最右侧 -->
+      <view class="record-btn" bindtap="goRecords" hover-class="record-btn-hover" hover-stay-time="80">
+        <text class="record-btn-icon">📋</text>
+        <text class="record-btn-text">记录</text>
       </view>
     </view>
 

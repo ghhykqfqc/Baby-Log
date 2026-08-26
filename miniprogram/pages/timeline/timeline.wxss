@@ -71,64 +71,54 @@
   margin-top: 4rpx;
 }
 
-/* 右侧档案胶囊：年龄 + 性别（替代原贴士胶囊） */
-.baby-bar-tags {
+/* 今日日期胶囊：不单独成行，紧凑展示在宝宝信息右侧 */
+.today-capsule {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 10rpx;
-  margin-left: 12rpx;
-}
-
-.baby-tag {
-  display: flex;
-  align-items: center;
-  border-radius: 999rpx;
-  padding: 6rpx 16rpx;
-}
-
-.baby-tag-age {
-  flex-direction: column;
-  align-items: center;
   background: rgba(255, 255, 255, 0.8);
   border: 2rpx solid rgba(212, 184, 150, 0.5);
-  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  padding: 6rpx 18rpx;
+  margin-left: 12rpx;
   box-shadow: 0 2rpx 8rpx rgba(180, 150, 110, 0.08);
 }
 
-.baby-tag-num {
-  font-size: 24rpx;
-  font-weight: 700;
+.today-text {
+  font-size: 22rpx;
+  font-weight: 600;
   color: var(--color-primary-dark);
-  line-height: 1.2;
   white-space: nowrap;
 }
 
-.baby-tag-label {
-  font-size: 16rpx;
-  color: var(--color-text-hint, #A3988A);
-  line-height: 1.2;
-}
-
-.baby-tag-gender {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: var(--color-primary-dark);
-  background: var(--color-primary-light, #F0E6D4);
-  border: 1rpx solid rgba(212, 184, 150, 0.35);
-}
-
-.date-header {
+/* 「记录」入口按钮：固定在 baby-bar 最右侧 */
+.record-btn {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8rpx 4rpx 16rpx;
+  gap: 4rpx;
+  background: var(--color-primary, #D4B896);
+  border-radius: 999rpx;
+  padding: 12rpx 26rpx;
+  margin-left: 12rpx;
+  box-shadow: 0 4rpx 14rpx rgba(180, 150, 110, 0.25);
+  transition: transform 0.15s ease, background 0.2s ease;
 }
 
-.date-title {
-  font-size: var(--font-xl);
+.record-btn-hover {
+  transform: scale(0.94);
+  background: var(--color-primary-dark, #B89A6E);
+}
+
+.record-btn-icon {
+  font-size: 24rpx;
+  line-height: 1;
+}
+
+.record-btn-text {
+  font-size: 24rpx;
+  color: #FFFFFF;
   font-weight: 600;
-  color: var(--color-text-primary);
 }
 
 /* ===== 预测卡 ===== */
@@ -247,33 +237,6 @@
   width: 1rpx;
   height: 56rpx;
   background: var(--color-divider);
-}
-
-/* 记录列表入口按钮（在日期标题行右侧） */
-.records-entry {
-  display: flex;
-  align-items: center;
-  gap: 4rpx;
-  padding: 8rpx 18rpx;
-  background: var(--color-primary-bg);
-  border-radius: 24rpx;
-  transition: transform 0.15s ease, background 0.2s ease;
-}
-
-.records-entry-hover {
-  transform: scale(0.94);
-  background: var(--color-primary-light);
-}
-
-.records-entry-icon {
-  font-size: 22rpx;
-  line-height: 1;
-}
-
-.records-entry-text {
-  font-size: 22rpx;
-  color: var(--color-primary-dark);
-  font-weight: 500;
 }
 
 /* 睡眠时段明细 */

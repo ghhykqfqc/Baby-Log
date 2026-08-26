@@ -5,9 +5,6 @@ const storage = require('../../utils/storage')
 const { formatTime, minutesToText, toMs } = require('../../utils/time')
 const { predictDetail } = require('../../utils/predict')
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
-const DAYS_PER_MONTH = 30.44
-
 Page({
   data: {
     loading: true,
@@ -24,9 +21,9 @@ Page({
       sleepDurationText: '0小时',
       sleepSessions: []
     },
-    // baby-bar 右侧档案信息（挪走后展示年龄与性别，参考成长页档案区）
-    babyAgeText: '',       // 宝宝月龄（如 8个月 / 23天 / 1岁2个月）
-    babyGenderText: ''     // 宝宝性别（男宝 / 女宝）
+    // baby-bar 档案信息（参照成长页档案区：出生日期 · 性别）
+    birthMeta: '',         // 出生信息文案，如「出生 2026-04-01 · 女宝」
+    todayLabel: '',        // 今日日期胶囊文案，如「8月27日 周四」
   },
 
   _countdownTimer: null,
@@ -43,7 +40,8 @@ Page({
 
   onLoad() {
     const today = new Date()
-    this.setData({ todayLabel: `${today.getMonth() + 1}月${today.getDate()}日` })
+    const weekNames = ['日', '一', '二', '三', '四', '五', '六']
+    this.setData({ todayLabel: `${today.getMonth() + 1}月${today.getDate()}日 周${weekNames[today.getDay()]}` })
     // 监听宝宝切换，自动刷新
     app.eventBus.on('babySwitched', this._onBabySwitched = () => {
       this.updateBabyBar()
@@ -52,40 +50,14 @@ Page({
   },
 
   /**
-   * 更新 baby-bar 右侧的宝宝年龄与性别档案信息（参考成长页档案区）
+   * 更新 baby-bar 的出生信息：出生日期 · 性别（参照成长页档案区 buildBirthLabel）
    */
   updateBabyBar() {
     const info = app.globalData.babyInfo || {}
-    const birthStr = info.birthDate
-    let ageText = ''
-    if (birthStr) {
-      const birth = new Date(String(birthStr).replace(/-/g, '/'))
-      if (!isNaN(birth.getTime())) {
-        ageText = this.getAgeText(birth)
-      }
-    }
-    let genderText = ''
-    if (info.gender) {
-      genderText = info.gender === 'male' || info.gender === 'M' ? '男宝' : '女宝'
-    }
-    this.setData({ babyAgeText: ageText, babyGenderText: genderText })
-  },
-
-  /**
-   * 获取年龄文案（按出生日期到今天）
-   * @returns {String} 如 "8个月" / "23天" / "1岁2个月"
-   */
-  getAgeText(birthDate) {
-    const now = new Date()
-    const diffMs = now.getTime() - birthDate.getTime()
-    if (diffMs <= 0) return '0天'
-    const days = Math.floor(diffMs / MS_PER_DAY)
-    if (days < 31) return `${days}天`
-    const months = Math.floor(days / DAYS_PER_MONTH)
-    if (months < 12) return `${months}个月`
-    const years = Math.floor(months / 12)
-    const remainMonths = months % 12
-    return remainMonths ? `${years}岁${remainMonths}个月` : `${years}岁`
+    const parts = []
+    if (info.birthDate) parts.push(`出生 ${info.birthDate}`)
+    if (info.gender) parts.push(info.gender === 'male' || info.gender === 'M' ? '男宝' : '女宝')
+    this.setData({ birthMeta: parts.join(' · ') || '未设置生日' })
   },
 
   onShow() {
