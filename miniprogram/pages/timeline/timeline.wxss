@@ -71,10 +71,79 @@
   margin-top: 4rpx;
 }
 
-.baby-bar-arrow {
-  font-size: 40rpx;
-  color: var(--color-text-hint, #B5A795);
-  margin-left: 8rpx;
+/* 每日育娃小贴士胶囊（替代原箭头，点击展开完整内容，右侧小复制控件） */
+.tip-capsule {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  max-width: 360rpx;
+  background: rgba(255, 255, 255, 0.75);
+  border: 2rpx solid rgba(212, 184, 150, 0.45);
+  border-radius: 999rpx;
+  padding: 8rpx 12rpx 8rpx 16rpx;
+  margin-left: 12rpx;
+  transition: all 0.15s ease;
+}
+
+.tip-capsule-hover {
+  background: rgba(212, 184, 150, 0.22);
+}
+
+.tip-capsule-icon {
+  font-size: 24rpx;
+  margin-right: 6rpx;
+  flex-shrink: 0;
+}
+
+.tip-capsule-text {
+  font-size: 20rpx;
+  color: var(--color-text-secondary, #8C7A66);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 小复制控件 */
+.tip-copy {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-left: 12rpx;
+  background: rgba(212, 184, 150, 0.28);
+  border-radius: 999rpx;
+  padding: 4rpx 12rpx;
+}
+
+.tip-copy-hover {
+  background: rgba(212, 184, 150, 0.5);
+}
+
+.tip-copy-icon {
+  font-size: 20rpx;
+  color: var(--color-text-secondary, #8A7C6A);
+  margin-right: 4rpx;
+}
+
+.tip-copy-text {
+  font-size: 20rpx;
+  color: var(--color-text-secondary, #8A7C6A);
+}
+
+/* 完整贴士展开条 */
+.daily-tip-full {
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 20rpx;
+  padding: 16rpx 20rpx;
+  margin: 0 4rpx 12rpx;
+  border-left: 6rpx solid var(--color-primary, #D4B896);
+}
+
+.daily-tip-full-text {
+  font-size: 24rpx;
+  color: var(--color-text-regular, #5C4E3E);
+  line-height: 1.6;
 }
 
 .date-header {

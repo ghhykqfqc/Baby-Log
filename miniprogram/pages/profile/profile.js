@@ -365,7 +365,7 @@ Page({
       } else {
         // ===== 场景 B：更新已有宝宝 =====
         const { call } = require('../../utils/request')
-        await call('saveBabyInfo', {
+        const saveRes = await call('saveBabyInfo', {
           babyId,
           name: trimmed,
           avatar: finalAvatar,
@@ -373,12 +373,28 @@ Page({
           gender,
           babyCode: babyCode || undefined  // 仅显式传入才更新密码
         })
+        // 若原 babyId 是 default/不存在，云函数会生成新 ID 并迁移升级；
+        // 把真实 ID 同步到本地 + 更新页面 ID 展示
+        let realBabyId = babyId
+        if (saveRes && saveRes.babyId && saveRes.babyId !== babyId) {
+          realBabyId = saveRes.babyId
+          this.setData({ babyId: realBabyId })
+          if (app.globalData.babyId === babyId) {
+            app.globalData.babyId = realBabyId
+            try { wx.setStorageSync('babyId', realBabyId) } catch (e) {}
+          }
+          // 宝宝列表里替换旧占位项（避免列表残留 default 宝宝）
+          const oldBabies = app.globalData.babies || []
+          const replaced = oldBabies.map(b => b.babyId === babyId ? { ...b, babyId: realBabyId } : b)
+          app.globalData.babies = replaced
+          try { wx.setStorageSync('babies', replaced) } catch (e) {}
+        }
         // 刷新 babies 列表
         const babies = await app.refreshBabies()
         // 若编辑的是当前宝宝，同步更新 globalData.babyInfo
-        if (app.globalData.babyId === babyId) {
-          const updated = babies.find(b => b.babyId === babyId) || {
-            babyId, name: trimmed, avatar: finalAvatar, birthDate, gender, babyCode
+        if (app.globalData.babyId === realBabyId) {
+          const updated = babies.find(b => b.babyId === realBabyId) || {
+            babyId: realBabyId, name: trimmed, avatar: finalAvatar, birthDate, gender, babyCode
           }
           app.setCurrentBaby(updated)
         }

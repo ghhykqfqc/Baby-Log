@@ -12,7 +12,20 @@
         <view class="baby-bar-name">{{babyInfo.name || '宝宝'}}</view>
         <view class="baby-bar-meta">{{babyInfo.age || babyInfo.birthDate || '未设置生日'}}</view>
       </view>
-      <view class="baby-bar-arrow">›</view>
+      <!-- 每日育娃小贴士（点击展开完整内容 + 小复制控件） -->
+      <view class="tip-capsule" catchtap="showDailyTip" hover-class="tip-capsule-hover" hover-stay-time="60">
+        <text class="tip-capsule-icon">💡</text>
+        <text class="tip-capsule-text">{{dailyTipShort}}</text>
+        <view class="tip-copy" catchtap="copyDailyTip" hover-class="tip-copy-hover">
+          <text class="tip-copy-icon">⧉</text>
+          <text class="tip-copy-text">复制</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 每日小贴士完整内容条（默认收合，点击展开） -->
+    <view class="daily-tip-full" wx:if="{{showTipFull}}">
+      <text class="daily-tip-full-text">{{dailyTipFull}}</text>
     </view>
 
     <!-- 日期标题 + 记录入口 -->

@@ -15,7 +15,9 @@ Page({
     ageText: null,       // 当前月龄 { num, unit }
     birthLabel: '',      // 出生信息文案
     hasRecords: false,
-    loading: true,
+    showSkeleton: true,      // 首屏骨架占位（有缓存/云端数据即消失）
+    heightAnimText: '--',    // 身高数值动画显示文本
+    weightAnimText: '--',    // 体重数值动画显示文本
     showForm: false,
     submitting: false,
     formData: {
@@ -51,6 +53,8 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/growth/growth')
     }
+    // 每次进入页面都重播数值动画
+    this._lastAnimEnd = null
     this.loadData()
   },
 
@@ -82,6 +86,11 @@ Page({
     const cached = storage.get(storage.CACHE_KEYS.GROWTH_DATA) || []
     const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
     this.setData({ babyInfo })
+
+    // 有缓存 → 立即渲染数据卡并结束骨架，不等云端（卡片首先出现，图表随后）
+    if (cached.length > 0) {
+      this.setData({ showSkeleton: false })
+    }
     this.applyRecords(cached)
 
     try {
@@ -94,9 +103,9 @@ Page({
       }
     } catch (err) {
       console.warn('拉取成长数据失败，使用本地缓存:', (err && err.message) || (err && err.errMsg) || err)
-    } finally {
-      this.setData({ loading: false })
     }
+    // 无论云端成功与否，都结束骨架屏
+    this.setData({ showSkeleton: false })
   },
 
   /**
@@ -132,6 +141,11 @@ Page({
       hasRecords: decorated.length > 0
     })
 
+    // 数据就绪后启动数值动画（从“上一条/起始”滚到最新值）
+    if (decorated.length > 0) {
+      this.animateNumbers(latest)
+    }
+
     if (decorated.length > 0) {
       // 等待 canvas 节点就绪
       setTimeout(() => this.drawChart(), 50)
@@ -148,6 +162,8 @@ Page({
       ...last,
       heightDelta: null,
       weightDelta: null,
+      heightPrev: null,   // 上一次身高（动画起点）
+      weightPrev: null,   // 上一次体重（动画起点）
       heightDeltaText: '首次记录',
       weightDeltaText: '首次记录',
       heightDeltaClass: '',
@@ -157,6 +173,7 @@ Page({
     // 身高增幅
     for (let i = records.length - 2; i >= 0; i--) {
       if (records[i].height) {
+        latest.heightPrev = this.round1(records[i].height)
         latest.heightDelta = this.round1(last.height - records[i].height)
         break
       }
@@ -164,6 +181,7 @@ Page({
     // 体重增幅
     for (let i = records.length - 2; i >= 0; i--) {
       if (records[i].weight) {
+        latest.weightPrev = this.round1(records[i].weight)
         latest.weightDelta = this.round1(last.weight - records[i].weight)
         break
       }
@@ -174,6 +192,54 @@ Page({
     latest.heightDeltaClass = this.deltaClass(latest.heightDelta)
     latest.weightDeltaClass = this.deltaClass(latest.weightDelta)
     return latest
+  },
+
+  /**
+   * 数字滚动动画：身高/体重数值从“上一条记录值”平滑滚动到最新值
+   * - 首次记录：从 0 滚到最新值
+   * - 已有上一条：从上一次数值滚到最新值
+   * - 仅动画数字部分，保留一位小数
+   * 注意：小程序 JS 环境（JSCore）没有全局 requestAnimationFrame，
+   *       改用 setTimeout 16ms 定时驱动（≈60fps），零依赖
+   */
+  animateNumbers(latest) {
+    if (!latest) return
+    this._animToken = (this._animToken || 0) + 1
+    const token = this._animToken
+    const prevEnd = this._lastAnimEnd || {}
+    this._lastAnimEnd = { height: latest.height, weight: latest.weight }
+
+    const run = (startValue, endValue, setField) => {
+      if (endValue === undefined || endValue === null || Number.isNaN(Number(endValue))) {
+        this.setData({ [setField]: '--' })
+        return
+      }
+      const end = Number(endValue)
+      const fieldKey = setField === 'heightAnimText' ? 'height' : 'weight'
+      // 目标值与上次动画结束时一致（如云端返回相同数据）→ 直接落定，避免重复滚动
+      if (prevEnd[fieldKey] === end) {
+        this.setData({ [setField]: end.toFixed(1) })
+        return
+      }
+      const start = (startValue === undefined || startValue === null) ? 0 : Number(startValue)
+      const t0 = Date.now()
+      const durationMs = 700
+
+      // 递归 setTimeout 驱动（替代不可用的小程序无 rAF）
+      const frame = () => {
+        // 新的动画已启动，放弃旧的
+        if (token !== this._animToken) return
+        const p = Math.min(1, (Date.now() - t0) / durationMs)
+        const eased = 1 - Math.pow(1 - p, 3) // easeOutCubic
+        const val = start + (end - start) * eased
+        this.setData({ [setField]: val.toFixed(1) })
+        if (p < 1) setTimeout(frame, 16)
+      }
+      frame()
+    }
+
+    run(latest.heightPrev, latest.height, 'heightAnimText')
+    run(latest.weightPrev, latest.weight, 'weightAnimText')
   },
 
   formatDelta(delta, unit) {

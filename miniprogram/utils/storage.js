@@ -79,6 +79,15 @@ const removeTodayRecord = (recordId) => {
   set(CACHE_KEYS.TODAY_RECORDS, filtered)
 }
 
+/**
+ * 获取某宝宝的相册存储键（按 babyId 隔离，避免多宝宝相册串数据）
+ * 兼容旧版本的无后缀全局键：读取时自动迁移
+ */
+function albumKey(babyId) {
+  const id = babyId || 'default'
+  return `albumPhotos_${id}`
+}
+
 module.exports = {
   CACHE_KEYS,
   get,
@@ -87,5 +96,6 @@ module.exports = {
   updateLastRecord,
   getLastRecords,
   appendTodayRecord,
-  removeTodayRecord
+  removeTodayRecord,
+  albumKey
 }

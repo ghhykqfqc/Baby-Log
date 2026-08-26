@@ -1,0 +1,9 @@
+{
+  "name": "deleteBaby",
+  "version": "1.0.0",
+  "description": "删除宝宝及关联记录",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

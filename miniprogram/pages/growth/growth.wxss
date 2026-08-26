@@ -198,6 +198,32 @@
   background: rgba(232, 85, 78, 0.08);
 }
 
+/* ===== 首屏骨架屏 ===== */
+.skeleton-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.skel-num {
+  width: 200rpx;
+  height: 96rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(90deg, #F0E9DF 25%, #F8F2E9 50%, #F0E9DF 75%);
+  background-size: 400% 100%;
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skelShimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+/* 数字滚动动画：让数值文本更平滑 */
+.metric-num {
+  transition: none;
+}
+
 /* 无数据占位卡 */
 .metric-empty {
   display: flex;

@@ -20,7 +20,14 @@
   </view>
 
   <!-- ========== 最新数据（焦点区，带历史入口按钮） ========== -->
-  <view class="metric-card" wx:if="{{!loading && latest}}">
+  <!-- 骨架占位：首屏无缓存时先用骨架卡占位，避免布局跳动 -->
+  <view class="metric-card skeleton-card" wx:if="{{showSkeleton}}">
+    <view class="skel skel-num"></view>
+    <view class="metric-divider"></view>
+    <view class="skel skel-num"></view>
+  </view>
+
+  <view class="metric-card" wx:elif="{{latest}}">
     <!-- 右上角历史入口：小巧胶囊按钮 -->
     <view class="history-entry" wx:if="{{records.length > 0}}" bindtap="goHistory" hover-class="history-entry-hover">
       <text class="history-entry-icon">📋</text>
@@ -29,7 +36,7 @@
 
     <view class="metric-col">
       <view class="metric-num-row">
-        <text class="metric-num">{{latest.height || '--'}}</text>
+        <text class="metric-num">{{heightAnimText}}</text>
         <text class="metric-unit">cm</text>
       </view>
       <view class="metric-label">身高</view>
@@ -38,7 +45,7 @@
     <view class="metric-divider"></view>
     <view class="metric-col">
       <view class="metric-num-row">
-        <text class="metric-num">{{latest.weight || '--'}}</text>
+        <text class="metric-num">{{weightAnimText}}</text>
         <text class="metric-unit">kg</text>
       </view>
       <view class="metric-label">体重</view>
@@ -47,7 +54,7 @@
   </view>
 
   <!-- 无数据时的占位卡 -->
-  <view class="metric-card metric-empty" wx:if="{{!loading && !latest}}">
+  <view class="metric-card metric-empty" wx:if="{{!showSkeleton && !latest}}">
     <view class="metric-empty-icon">📏</view>
     <view class="metric-empty-title">记录第一次成长</view>
     <view class="metric-empty-sub">定格身高与体重的起点，见证每一次长大</view>
@@ -69,7 +76,7 @@
   </view>
 
   <!-- 空状态 -->
-  <view class="empty-wrap" wx:if="{{!loading && !hasRecords}}">
+  <view class="empty-wrap" wx:if="{{!showSkeleton && !hasRecords}}">
     <empty-state icon="📈" title="还没有成长记录" subtitle="点击右下角按钮，记录宝宝的身高体重" />
   </view>
 

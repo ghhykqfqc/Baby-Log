@@ -288,13 +288,16 @@
       <view class="photo-edit-section">
         <view class="photo-edit-label">照片标签</view>
         <view class="tag-options">
+          <!-- 直接显示宝宝昵称；当前宝宝默认选中（由 uploadTag 初始值决定）。
+               wx:if 过滤无昵称的宝宝，避免空选项（「无标签」已兜底） -->
           <view
-            class="tag-option {{uploadTag === item.name ? 'active' : ''}}"
+            class="tag-option {{uploadTag === (item.name || '') ? 'active' : ''}}"
             wx:for="{{babies}}" wx:key="babyId"
+            wx:if="{{item.name}}"
             data-tag="{{item.name}}"
             bindtap="selectUploadTag"
             hover-class="btn-hover"
-          >{{item.name || '未命名'}}</view>
+          >{{item.name}}</view>
           <view
             class="tag-option {{uploadTag === '' ? 'active' : ''}}"
             data-tag=""
@@ -330,13 +333,16 @@
       <view class="photo-edit-section">
         <view class="photo-edit-label">照片标签</view>
         <view class="tag-options">
+          <!-- 直接显示宝宝昵称；当前宝宝默认选中（由 photoEditCurrent.tag 初始值决定）。
+               wx:if 过滤无昵称的宝宝，避免空选项（「无标签」已兜底） -->
           <view
-            class="tag-option {{photoEditCurrent.tag === item.name ? 'active' : ''}}"
+            class="tag-option {{photoEditCurrent.tag === (item.name || '') ? 'active' : ''}}"
             wx:for="{{babies}}" wx:key="babyId"
+            wx:if="{{item.name}}"
             data-tag="{{item.name}}"
             bindtap="selectPhotoTag"
             hover-class="btn-hover"
-          >{{item.name || '未命名'}}</view>
+          >{{item.name}}</view>
           <view
             class="tag-option {{photoEditCurrent.tag === '' ? 'active' : ''}}"
             data-tag=""
@@ -385,7 +391,10 @@
             <view class="baby-item-id">ID: {{item.babyId}}</view>
           </view>
           <view class="baby-item-check" wx:if="{{item.babyId === currentBabyId}}">✓</view>
-          <view class="baby-item-edit" wx:else data-baby-id="{{item.babyId}}" catchtap="editBaby">编辑</view>
+          <!-- 所有宝宝（含当前打勾的）都可编辑 -->
+          <view class="baby-item-edit" data-baby-id="{{item.babyId}}" catchtap="editBaby">编辑</view>
+          <!-- 仅创建者（管理员主账号）可见删除按钮，防止家庭成员误删 -->
+          <view class="baby-item-delete" wx:if="{{item.isOwner}}" data-baby-id="{{item.babyId}}" data-name="{{item.name || ''}}" catchtap="deleteBaby">删除</view>
         </view>
 
         <!-- 占位提示 -->

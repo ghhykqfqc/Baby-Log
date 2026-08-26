@@ -5,6 +5,23 @@ const storage = require('../../utils/storage')
 const { formatTime, minutesToText, toMs } = require('../../utils/time')
 const { predictDetail } = require('../../utils/predict')
 
+// ===== 每日育娃小贴士库（按日期取模轮换，温柔有用的育儿知识点） =====
+const DAILY_TIPS = [
+  { short: '辅食从单一食材开始，观察3天', full: '初次添加辅食建议从单一食材（如高铁米粉）开始，每次只添加一种新食物，观察 2-3 天，确认无过敏反应后再尝试下一种。' },
+  { short: '宝宝清醒信号：揉眼、打哈欠',  full: '当宝宝开始揉眼睛、打哈欠、目光发直时，就是困了。此时应尽快安排入睡，错过窗口期反而更难睡着。' },
+  { short: '喂奶后记得拍嗝',  full: '每次喂奶后竖抱宝宝 10-15 分钟，轻拍后背帮助排出胃里的空气，能有效减少吐奶和胀气，拍出嗝后再放下。' },
+  { short: '爬行期清空地面低矮物',  full: '宝宝学爬后活动范围迅速变大，地面上的小物件、电线、桌角都要处理好，给宝宝一个安全探索的空间。' },
+  { short: '多和宝宝说话，语言黄金期',  full: '从出生起就要多与宝宝说话，哪怕他听不懂。词汇刺激是语言发展的基础，每天读绘本、唱歌、交流都很重要。' },
+  { short: '发热时优先观察精神状态',  full: '宝宝发热时，先看精神状态：吃奶、玩耍正常则先物理降温观察；若精神差、嗜睡、高热不退或小于 3 个月发热，请及时就医。' },
+  { short: '洗澡水温 37℃ 左右',  full: '宝宝洗澡水温略高于体温即可（37-38℃），不能用大人的手感判断，先用手肘试温，全程托稳头颈。' },
+  { short: '按时体检，别错过疫苗',  full: '按儿保时间表定期体检，监测身高体重与发育里程碑；疫苗按本接种，打疫苗后观察半小时再离开。' },
+  { short: '出生 6 个月内纯母乳喂养',  full: '世卫组织建议 0-6 个月纯母乳喂养，6 个月后继续母乳并适时添加辅食。母乳是宝宝最好的口粮。' },
+  { short: '宝宝哭闹先排除基本需求',  full: '新手妈妈别慌：哭闹先依次排查「饿、困、尿布湿、热、胀气」。常见原因逐个排除，多数时候宝宝很快就安静了。' },
+  { short: '多趴是前庭与手臂锻炼',  full: '清醒时多让宝宝趴着（tummy time），有助于颈背肌、手眼协调和前庭发育，也是后续爬行的基础，从每天 1-2 分钟开始。' },
+  { short: '哭闹≠一定是饿了',  full: '哭闹有多种原因：饥饿、困倦、尿布、过热、受惊等。先观察喂养表与屎尿布，别一哭就喂，避免过度喂养。' }
+]
+const TIP_SHORT_LEN = 10   // 短文案最多显示字符数（加上「每日育娃小贴士：」前缀后仍能容纳）
+
 Page({
   data: {
     loading: true,
@@ -20,7 +37,11 @@ Page({
       diaperCount: 0,
       sleepDurationText: '0小时',
       sleepSessions: []
-    }
+    },
+    // 每日育娃小贴士
+    showTipFull: false,    // 是否展开完整贴士
+    dailyTipShort: '',     // 胶囊里的短文案
+    dailyTipFull: ''       // 完整的贴士内容
   },
 
   _countdownTimer: null,
@@ -38,10 +59,49 @@ Page({
   onLoad() {
     const today = new Date()
     this.setData({ todayLabel: `${today.getMonth() + 1}月${today.getDate()}日` })
+    // 载入今日小贴士
+    this.initDailyTip()
     // 监听宝宝切换，自动刷新
     app.eventBus.on('babySwitched', this._onBabySwitched = () => {
       this.setData({ babyInfo: app.globalData.babyInfo || {} })
       this.loadData()
+    })
+  },
+
+  /**
+   * 按日期取模选择当天小贴士（每天换一条）
+   * 标题（缩略）与完整文案统一带“每日育娃小贴士”标识
+   */
+  initDailyTip() {
+    const now = new Date()
+    const dayIndex = now.getFullYear() * 1000 + now.getMonth() * 50 + now.getDate()
+    const tip = DAILY_TIPS[dayIndex % DAILY_TIPS.length]
+    const body = tip.short.length > TIP_SHORT_LEN ? tip.short.slice(0, TIP_SHORT_LEN) + '…' : tip.short
+    this.setData({
+      // 胶囊缩略文案：每日育娃小贴士：xxx...
+      dailyTipShort: `每日育娃小贴士：${body}`,
+      // 完整贴士：正文末尾追加品牌尾注（与正文间只换一行）
+      dailyTipFull: `${tip.full}\n--「每日育娃小贴士」`,
+      showTipFull: false
+    })
+  },
+
+  /**
+   * 展开/收起完整贴士
+   */
+  showDailyTip() {
+    this.setData({ showTipFull: !this.data.showTipFull })
+  },
+
+  /**
+   * 复制今日贴士到剪贴板（复制完整正文 + 尾注）
+   */
+  copyDailyTip() {
+    const tip = this.data.dailyTipFull || this.data.dailyTipShort
+    if (!tip) return
+    wx.setClipboardData({
+      data: tip,
+      success: () => wx.showToast({ title: '已复制', icon: 'success' })
     })
   },
 

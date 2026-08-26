@@ -1073,6 +1073,15 @@
   margin-left: 12rpx;
 }
 
+.baby-item-delete {
+  font-size: 24rpx;
+  color: #E8554E;
+  background: #FBE9E7;
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  margin-left: 12rpx;
+}
+
 .baby-empty {
   text-align: center;
   color: var(--color-text-hint);

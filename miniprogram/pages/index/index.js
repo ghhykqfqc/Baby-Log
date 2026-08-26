@@ -146,11 +146,21 @@ Page({
       this.fetchCloudData()
       // 异步刷新宝宝列表（不阻塞渲染）
       app.refreshBabies().then(babies => {
-        this.setData({ babies, currentBabyId: app.globalData.babyId })
+        // 自愈：补齐当前宝宝的空昵称（见 syncGlobalToView）
+        const healed = (babies || []).map(b => {
+          if (!b.name && b.babyId === app.globalData.babyId && app.globalData.babyInfo && app.globalData.babyInfo.name) {
+            return { ...b, name: app.globalData.babyInfo.name }
+          }
+          return b
+        })
+        this.setData({ babies: healed, currentBabyId: app.globalData.babyId })
         // 如果当前没有选中宝宝且有宝宝列表，自动选中第一个
-        if (!app.globalData.babyId && babies.length > 0) {
-          app.setCurrentBaby(babies[0])
+        if (!app.globalData.babyId && healed.length > 0) {
+          app.setCurrentBaby(healed[0])
         }
+        // 云端自愈：如果当前宝宝在 babies 里 name 为空但在 babyInfo 里有名字，
+        // 说明历史 bug 曾把云端 name 清空，静默修复一次（避免换设备后仍显示未命名）
+        this.healBabyNameIfNeeded()
       }).catch(() => {})
     }
     this._timer = setInterval(() => this.updateCardTexts(), 30000)
@@ -159,11 +169,24 @@ Page({
 
   /**
    * 把 globalData 中的 userInfo/babies/babyInfo 同步到视图
+   * 数据自愈：若 babies 中当前宝宝的 name 为空（历史 bug 曾把云端 name 清空），
+   * 用 babyInfo.name 补上，保证列表/标签/管理面板显示正确昵称
    */
   syncGlobalToView() {
+    const babies = (app.globalData.babies || []).map(b => {
+      if (!b.name && b.babyId === app.globalData.babyId && app.globalData.babyInfo && app.globalData.babyInfo.name) {
+        return { ...b, name: app.globalData.babyInfo.name }
+      }
+      return b
+    })
+    // 若补齐过，回写 globalData，让全局状态保持一致
+    if (JSON.stringify(babies) !== JSON.stringify(app.globalData.babies || [])) {
+      app.globalData.babies = babies
+      try { wx.setStorageSync('babies', babies) } catch (e) {}
+    }
     this.setData({
       userInfo: app.globalData.userInfo || {},
-      babies: app.globalData.babies || [],
+      babies,
       babyInfo: app.globalData.babyInfo || {},
       currentBabyId: app.globalData.babyId || ''
     })
@@ -259,8 +282,9 @@ Page({
   // 宝宝封面相册
   // ============================================
 
-  loadAlbum() {
-    const album = storage.get(storage.CACHE_KEYS.ALBUM_PHOTOS) || []
+loadAlbum(babyId) {
+    const key = storage.albumKey(babyId || app.globalData.babyId || 'default')
+    const album = storage.get(key) || []
     this.setData({ albumPhotos: album })
   },
 
@@ -288,11 +312,80 @@ Page({
   },
 
   /**
+   * 获取当前宝宝昵称（多级兜底，防止缓存被历史 bug 清空后取到空名）
+   * 优先级：babies 列表 → globalData.babyInfo → 本地缓存 babyInfo
+   */
+  getCurrentBabyName() {
+    const babies = app.globalData.babies || []
+    const current = babies.find(b => b.babyId === app.globalData.babyId)
+    if (current && current.name) return current.name
+    if (app.globalData.babyInfo && app.globalData.babyInfo.name) return app.globalData.babyInfo.name
+    const cached = storage.get(storage.CACHE_KEYS.BABY_INFO)
+    return (cached && cached.name) || ''
+  },
+
+  /**
+   * 云端自愈：若当前宝宝在 babies 列表里 name 为空、但本地 babyInfo 有名字
+   * （历史 bug：保存相册时 saveBabyInfo 把云端 name 清空），用本地名字静默修复云端一条，
+   * 每宝宝只修复一次（_healedBabyId 去重），保证换设备/清缓存后仍显示正确昵称
+   */
+  healBabyNameIfNeeded() {
+    const babyId = app.globalData.babyId
+    if (!babyId || this._healedBabyId === babyId || !app.globalData.cloudReady) return
+    const current = (app.globalData.babies || []).find(b => b.babyId === babyId)
+    const localName = (app.globalData.babyInfo && app.globalData.babyInfo.name) || ''
+    // 仅在「 babies 里确实为空 / 缺失，但本地有名字」时修复
+    if ((!current || !current.name) && localName) {
+      this._healedBabyId = babyId
+      call('saveBabyInfo', { babyId, name: localName }).then((data) => {
+        this._absorbNewBabyId(data)
+        app.refreshBabies().then(() => this.syncGlobalToView()).catch(() => {})
+      }).catch(() => { this._healedBabyId = '' })
+    }
+  },
+
+  /**
+   * 吸收 saveBabyInfo 返回的（可能）新 babyId：
+   * 历史版本可能有 babyId='default' 或云端不存在的 ID，云函数会自动生成新 ID 并返回。
+   * 这里把真实 ID 同步到 globalData + 本地缓存，保证后续记录写入正确的宝宝名下
+   */
+  _absorbNewBabyId(data) {
+    if (!data || !data.babyId) return
+    if (data.babyId === app.globalData.babyId) return
+    // 仅当返回了新 ID 且原 id 是 default/占位时才吸收，防止异常跳变
+    const oldId = app.globalData.babyId
+    if (oldId && oldId !== 'default' && !data.wasDefaultPlaceholder) return
+    app.globalData.babyId = data.babyId
+    app.globalData.babyInfo = { ...(app.globalData.babyInfo || {}), ...data }
+    try {
+      wx.setStorageSync('babyId', data.babyId)
+      wx.setStorageSync('babyInfo', app.globalData.babyInfo)
+    } catch (e) {}
+    // 宝宝列表里也替换
+    const babies = (app.globalData.babies || []).map(b => b.babyId === oldId ? { ...b, ...data } : b)
+    app.globalData.babies = babies
+    try { wx.setStorageSync('babies', babies) } catch (e) {}
+    // 相册缓存迁移：旧 default 键 → 新 ID 键（照片标签仍可用）
+    if (oldId && oldId !== data.babyId) {
+      try {
+        const oldKey = storage.albumKey(oldId)
+        const newKey = storage.albumKey(data.babyId)
+        const oldAlbum = storage.get(oldKey)
+        if (Array.isArray(oldAlbum) && oldAlbum.length > 0 && !storage.get(newKey)) {
+          storage.set(newKey, oldAlbum)
+        }
+        storage.remove(oldKey)
+      } catch (e) {}
+    }
+    this.syncGlobalToView()
+  },
+
+  /**
    * 打开上传裁剪（固定 4:3 裁剪框）
    */
   openUploadCropper(path) {
-    // 默认标签 = 当前宝宝昵称
-    const defaultTag = (app.globalData.babyInfo && app.globalData.babyInfo.name) || ''
+    // 默认标签 = 当前宝宝昵称（多级兜底取真实名字）
+    const defaultTag = this.getCurrentBabyName()
     wx.getImageInfo({
       src: path,
       success: (info) => {
@@ -471,15 +564,16 @@ Page({
       updated.push({ id: finalId, src: finalSrc, tag: finalTag })
     }
 
-    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, updated)
+    storage.set(storage.albumKey(babyId || app.globalData.babyId), updated)
     this.setData({ albumPhotos: updated })
 
     if (app.globalData.cloudReady) {
       try {
         await call('saveBabyInfo', {
           babyId,
+          name: this.getCurrentBabyName(),
           albumPhotos: updated.map(p => p.src)
-        })
+        }).then((data) => this._absorbNewBabyId(data))
       } catch (err) {
         console.warn('相册云端更新失败:', (err && err.message) || err)
       }
@@ -517,10 +611,10 @@ Page({
     }
 
     // 标签：默认当前宝宝昵称（已由 openUploadCropper 设置），或用户选择的其他宝宝昵称
-    uploaded.tag = tag || (app.globalData.babyInfo && app.globalData.babyInfo.name) || ''
+    uploaded.tag = tag || this.getCurrentBabyName()
 
     const albumPhotos = this.data.albumPhotos.concat([uploaded]).slice(0, ALBUM_MAX)
-    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, albumPhotos)
+    storage.set(storage.albumKey(babyId || app.globalData.babyId), albumPhotos)
     this.setData({ albumPhotos })
 
     // 云端持久化（babies.albumPhotos），失败不影响本地使用
@@ -528,8 +622,9 @@ Page({
       try {
         await call('saveBabyInfo', {
           babyId,
+          name: this.getCurrentBabyName(),
           albumPhotos: albumPhotos.map(p => p.src)
-        })
+        }).then((data) => this._absorbNewBabyId(data))
       } catch (err) {
         console.warn('相册云端保存失败:', (err && err.message) || err)
       }
@@ -562,7 +657,7 @@ Page({
     if (!confirm) return
 
     const albumPhotos = this.data.albumPhotos.filter((_, i) => i !== index)
-    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, albumPhotos)
+    storage.set(storage.albumKey(app.globalData.babyId), albumPhotos)
     this.setData({ albumPhotos })
 
     // 删除云文件 + 更新云端相册列表
@@ -573,8 +668,9 @@ Page({
       try {
         await call('saveBabyInfo', {
           babyId: app.globalData.babyId || 'default',
+          name: this.getCurrentBabyName(),
           albumPhotos: albumPhotos.map(p => p.src)
-        })
+        }).then((data) => this._absorbNewBabyId(data))
       } catch (err) {
         console.warn('相册云端更新失败:', (err && err.message) || err)
       }
@@ -605,7 +701,7 @@ Page({
       photoEditCurrent: {
         id: current.id,
         src: current.src,
-        tag: current.tag || (app.globalData.babyInfo && app.globalData.babyInfo.name) || ''
+        tag: current.tag || this.getCurrentBabyName()
       }
     })
   },
@@ -684,7 +780,7 @@ Page({
         if (!r.confirm) return
         const target = albumPhotos[index]
         const filtered = albumPhotos.filter((_, i) => i !== index)
-        storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, filtered)
+        storage.set(storage.albumKey(app.globalData.babyId), filtered)
         this.setData({
           albumPhotos: filtered,
           showPhotoEditSheet: false,
@@ -696,8 +792,9 @@ Page({
           }
           call('saveBabyInfo', {
             babyId: app.globalData.babyId || 'default',
+            name: this.getCurrentBabyName(),
             albumPhotos: filtered.map(p => p.src)
-          }).catch(() => {})
+          }).then((data) => this._absorbNewBabyId(data)).catch(() => {})
         }
       }
     })
@@ -723,14 +820,15 @@ Page({
       return p
     })
 
-    storage.set(storage.CACHE_KEYS.ALBUM_PHOTOS, updated)
+    storage.set(storage.albumKey(app.globalData.babyId), updated)
     this.setData({ albumPhotos: updated, showPhotoEditSheet: false })
 
     if (app.globalData.cloudReady) {
       call('saveBabyInfo', {
         babyId: app.globalData.babyId || 'default',
+        name: this.getCurrentBabyName(),
         albumPhotos: updated.map(p => p.src)
-      }).catch(() => {})
+      }).then((data) => this._absorbNewBabyId(data)).catch(() => {})
     }
     wx.showToast({ title: '已保存', icon: 'success' })
   },
@@ -1250,6 +1348,75 @@ Page({
     setTimeout(() => {
       wx.navigateTo({ url: `/pages/profile/profile?babyId=${babyId}` })
     }, 200)
+  },
+
+  /**
+   * 删除宝宝：二次确认后调 deleteBaby 云函数
+   * 仅创建者（parent）可删除；删除后若为当前宝宝则自动切换到剩余第一个
+   */
+  async deleteBaby(e) {
+    const babyId = e.currentTarget.dataset.babyId
+    const babyName = e.currentTarget.dataset.name || '该宝宝'
+    if (!babyId || babyId === 'default') {
+      wx.showToast({ title: '无效宝宝', icon: 'none' })
+      return
+    }
+
+    const { confirm } = await wx.showModal({
+      title: '⚠️ 删除宝宝（管理员）',
+      content: `你正在删除「${babyName}」。\n\n此操作不可恢复：宝宝的资料、相册和 ${babyName} 的全部记录将永久删除，其他家庭成员也将无法再看到。\n\n确认删除吗？`,
+      confirmText: '确认删除',
+      confirmColor: '#E8554E',
+      cancelText: '再想想'
+    }).catch(() => ({ confirm: false }))
+    if (!confirm) return
+
+    wx.showLoading({ title: '删除中...', mask: true })
+    try {
+      if (!app.globalData.cloudReady) {
+        throw new Error('云环境不可用')
+      }
+      await call('deleteBaby', { babyId })
+      wx.hideLoading()
+
+      // 清理该宝宝的本地相册缓存（按 babyId 隔离）
+      try { storage.remove(storage.albumKey(babyId)) } catch (e) {}
+
+      // 刷新宝宝列表
+      const babies = await app.refreshBabies()
+
+      if (babyId === app.globalData.babyId) {
+        // 删除的是当前宝宝：切换到剩余第一个
+        if (babies.length > 0) {
+          app.setCurrentBaby(babies[0])
+        } else {
+          // 没有宝宝了：清空当前宝宝状态
+          app.globalData.babyId = ''
+          app.globalData.babyInfo = null
+          try {
+            wx.removeStorageSync('babyId')
+            wx.removeStorageSync('babyInfo')
+          } catch (err) {}
+          app.eventBus.emit('babySwitched', { babyId: '', babyInfo: null })
+        }
+        this.syncGlobalToView()
+        this.loadAlbum()
+        this.refreshFromCache()
+        if (app.globalData.cloudReady) this.fetchCloudData()
+      } else {
+        this.syncGlobalToView()
+      }
+
+      wx.showToast({ title: '已删除', icon: 'success' })
+      this.hideBabyPanel()
+    } catch (err) {
+      wx.hideLoading()
+      wx.showModal({
+        title: '删除失败',
+        content: (err && err.message) || '请稍后重试',
+        showCancel: false
+      })
+    }
   },
 
   // ===== 新建宝宝 =====
