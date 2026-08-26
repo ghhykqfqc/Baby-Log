@@ -3,7 +3,7 @@ const MS_PER_MIN = 60 * 1000
 
 /**
  * 基于历史记录计算平均间隔
- * @param {Array} records - 按时间正序的记录数组
+ * @param {Array} records - 记录数组（自动按时间正序）
  * @param {string} type - 记录类型
  * @returns {number|null} 平均间隔（分钟），不足2条数据返回 null
  */
@@ -21,6 +21,15 @@ const calculateAvgInterval = (records, type) => {
     if (diff > 0 && diff < 480) {
       totalDiff += diff
       count++
+    }
+  }
+
+  // 兼容边界：若只有 2 条记录且唯一间隔超过 8 小时（如早晚各一次喂奶），
+  // 直接返回该间隔，避免永远「数据不足」
+  if (count === 0 && filtered.length === 2) {
+    const singleDiff = (filtered[1].timestamp - filtered[0].timestamp) / MS_PER_MIN
+    if (singleDiff > 0 && singleDiff <= 24 * 60) {
+      return Math.round(singleDiff)
     }
   }
 

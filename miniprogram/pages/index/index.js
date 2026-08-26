@@ -908,7 +908,7 @@ loadAlbum(babyId) {
 
   /**
    * 计算三栏预测卡（预计时间点 + 倒计时）
-   * 三栏始终生成（含「数据不足」占位）；卡片展示与否由 showPredictCard 控制
+   * 三栏始终生成（含「数据不足」占位）；卡片常驻展示
    */
   updatePredictions() {
     const detail = predictDetail(this._allRecords)
@@ -934,6 +934,32 @@ loadAlbum(babyId) {
     }
   },
 
+  /**
+   * 记录操作后统一追加进预测数据源并刷新预测卡（避免依赖云端拉取）
+   * 记录已由各操作写入 todayRecords 缓存（storage.appendTodayRecord），
+   * 这里把它们并入 _allRecords 后立即重算 predictDetail
+   */
+  syncPredictionsAfterRecord() {
+    let latest = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
+    // todayRecords 可能是 { feed: [], diaper: [], sleep: [] } 或纯数组，统一取数组
+    if (latest && !Array.isArray(latest)) {
+      latest = (latest.feed || []).concat(latest.diaper || [], latest.sleep || [])
+    }
+    // 与现有 _allRecords 合并去重（按 timestamp + recordType），避免多层记录
+    const merged = this._allRecords ? this._allRecords.slice() : []
+    const seen = new Set(merged.map(r => `${r.timestamp}_${r.recordType}`))
+    ;(latest || []).forEach(r => {
+      const key = `${r.timestamp}_${r.recordType}`
+      if (!seen.has(key)) {
+        merged.push(r)
+        seen.add(key)
+      }
+    })
+    this._allRecords = merged
+    this.updatePredictions()
+  },
+
+  // 从本地缓存刷新（首屏/记录事件/切宝宝后）
   refreshFromCache() {
     const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || { name: '宝宝', age: '新生儿' }
     const lastRecords = storage.getLastRecords()
@@ -1095,6 +1121,7 @@ loadAlbum(babyId) {
     storage.updateLastRecord(RECORD_TYPES.FEED, timestamp)
     storage.appendTodayRecord({ ...record, _id: `local_${timestamp}` })
     app.eventBus.emit('recordsUpdated')
+    this.syncPredictionsAfterRecord()
     this.updateCardTexts()
 
     this.setData({ feedSuccess: true })
@@ -1145,6 +1172,7 @@ loadAlbum(babyId) {
     storage.updateLastRecord(RECORD_TYPES.DIAPER, timestamp)
     storage.appendTodayRecord({ ...record, _id: `local_${timestamp}` })
     app.eventBus.emit('recordsUpdated')
+    this.syncPredictionsAfterRecord()
     this.updateCardTexts()
 
     this.setData({ diaperSuccess: true })
@@ -1178,6 +1206,7 @@ loadAlbum(babyId) {
     storage.updateLastRecord(RECORD_TYPES.SLEEP, now)
     app.eventBus.emit('recordsUpdated')
     this.startSleepTick()
+    this.syncPredictionsAfterRecord()
     this.updateCardTexts()
 
     // 写入云端一条 duration=0 的入睡记录（结束时再补 duration）
@@ -1238,6 +1267,7 @@ loadAlbum(babyId) {
     storage.updateLastRecord(RECORD_TYPES.SLEEP, end)
     storage.appendTodayRecord({ ...record, _id: `local_${end}`, timestamp: end, duration: minutes })
     app.eventBus.emit('recordsUpdated')
+    this.syncPredictionsAfterRecord()
     this.updateCardTexts()
 
     if (app.globalData.cloudReady && app.globalData.isOnline) {
@@ -1275,6 +1305,7 @@ loadAlbum(babyId) {
     storage.updateLastRecord(RECORD_TYPES.SLEEP, end)
     storage.appendTodayRecord({ ...record, _id: `local_${end}`, timestamp: end, duration: minutes })
     app.eventBus.emit('recordsUpdated')
+    this.syncPredictionsAfterRecord()
     this.updateCardTexts()
 
     if (app.globalData.cloudReady && app.globalData.isOnline) {
@@ -1645,6 +1676,7 @@ loadAlbum(babyId) {
     storage.updateLastRecord(type, timestamp)
     storage.appendTodayRecord({ ...record, _id: `local_${timestamp}` })
     app.eventBus.emit('recordsUpdated')
+    this.syncPredictionsAfterRecord()
     this.updateCardTexts()
 
     this.setData({ [successKey]: true })
