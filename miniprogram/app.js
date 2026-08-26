@@ -234,10 +234,13 @@ App({
     if (!this.globalData.cloudReady) return ''
     try {
       const res = await wx.cloud.callFunction({ name: 'getOpenId' })
-      if (res.result && res.result.openid) {
-        this.globalData.openid = res.result.openid
-        wx.setStorageSync('openid', res.result.openid)
-        return res.result.openid
+      // getOpenId 云函数返回 { code: 0, data: { openid, appid, unionid } }
+      const result = res.result || {}
+      const openid = (result.data && result.data.openid) || result.openid || ''
+      if (openid) {
+        this.globalData.openid = openid
+        wx.setStorageSync('openid', openid)
+        return openid
       }
     } catch (err) {
       console.warn('获取 openid 失败（云环境未就绪）:', err.errMsg || err.message || '')
