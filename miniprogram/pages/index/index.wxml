@@ -39,18 +39,32 @@
   <!-- ===== 页面内容层 ===== -->
   <view class="content-layer">
 
-    <!-- 顶部宝宝信息 -->
-    <view class="header">
-      <view class="baby-avatar" bindtap="goProfile" hover-class="avatar-tap" hover-stay-time="80">
-        <image wx:if="{{babyInfo.avatar}}" class="avatar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
-        <view wx:else class="avatar-emoji">👶</view>
-      </view>
-      <view class="baby-info">
-        <view class="baby-name">{{babyInfo.name || '宝宝'}}</view>
-        <view class="baby-meta">{{babyInfo.age || '新生儿'}}</view>
+    <!-- 顶部用户信息条（当前登录微信用户） -->
+    <view class="user-bar">
+      <view class="user-info" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
+        <image wx:if="{{userInfo.avatarUrl}}" class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
+        <view wx:else class="user-avatar user-avatar-default">👤</view>
+        <view class="user-text">
+          <view class="user-nickname">{{userInfo.nickName || '未登录'}}</view>
+          <view class="user-tip">点击管理宝宝</view>
+        </view>
       </view>
       <view class="weather-chip" wx:if="{{weatherText}}">{{weatherText}}</view>
       <view class="date-badge" wx:else>{{todayText}}</view>
+    </view>
+
+    <!-- 当前宝宝信息卡片（点击切换 / 编辑） -->
+    <view class="header" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
+      <view class="baby-avatar">
+        <image wx:if="{{babyInfo.avatar}}" class="avatar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
+        <view wx:else class="avatar-emoji">👶</view>
+        <view class="baby-switch-icon" wx:if="{{babies.length > 1}}">🔁</view>
+      </view>
+      <view class="baby-info">
+        <view class="baby-name">{{babyInfo.name || '点此添加宝宝'}}</view>
+        <view class="baby-meta">{{babyInfo.age || babyInfo.birthDate || '点击设置宝宝信息'}}</view>
+      </view>
+      <view class="baby-id-chip" wx:if="{{babyInfo.babyId}}">ID: {{babyInfo.babyId}}</view>
     </view>
 
     <!-- 网络状态提示 -->
@@ -226,6 +240,114 @@
         <view class="duration-item" data-minutes="480" bindtap="selectDuration" hover-class="duration-item-hover">8小时</view>
       </view>
       <view class="sleep-cancel-link" bindtap="hideSleepSheet">取消</view>
+    </view>
+  </view>
+
+  <!-- ========== 宝宝管理面板（切换 / 新建 / 加入 / 登出） ========== -->
+  <view class="sheet-mask baby-panel-mask" wx:if="{{showBabySheet}}" bindtap="hideBabyPanel" catchtouchmove="noop">
+    <view class="baby-panel" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="baby-panel-title">我的宝宝</view>
+
+      <!-- 宝宝列表 -->
+      <view class="baby-list">
+        <view
+          class="baby-item {{item.babyId === currentBabyId ? 'active' : ''}}"
+          wx:for="{{babies}}" wx:key="babyId"
+          data-baby-id="{{item.babyId}}"
+          bindtap="switchBaby"
+          hover-class="baby-item-hover"
+        >
+          <image wx:if="{{item.avatar}}" class="baby-item-avatar" src="{{item.avatar}}" mode="aspectFill"></image>
+          <view wx:else class="baby-item-avatar baby-item-avatar-default">👶</view>
+          <view class="baby-item-info">
+            <view class="baby-item-name">{{item.name || '未命名'}}</view>
+            <view class="baby-item-id">ID: {{item.babyId}}</view>
+          </view>
+          <view class="baby-item-check" wx:if="{{item.babyId === currentBabyId}}">✓</view>
+          <view class="baby-item-edit" wx:else data-baby-id="{{item.babyId}}" catchtap="editBaby">编辑</view>
+        </view>
+
+        <!-- 占位提示 -->
+        <view class="baby-empty" wx:if="{{babies.length === 0}}">还没有宝宝，点击下方按钮添加一个吧</view>
+      </view>
+
+      <!-- 操作按钮组 -->
+      <view class="baby-actions">
+        <view class="baby-action-btn" bindtap="startCreateBaby" hover-class="btn-hover">
+          <view class="action-icon">＋</view>
+          <view>新建宝宝</view>
+        </view>
+        <view class="baby-action-btn" bindtap="startJoinBaby" hover-class="btn-hover">
+          <view class="action-icon">🔗</view>
+          <view>用 ID 加入</view>
+        </view>
+      </view>
+
+      <!-- 新建宝宝表单 -->
+      <view class="baby-form" wx:if="{{formMode === 'create'}}">
+        <view class="form-title">新建宝宝</view>
+        <view class="form-avatar-row">
+          <button class="form-avatar-btn" open-type="chooseAvatar" bind:chooseavatar="onFormChooseAvatar" hover-class="btn-hover">
+            <image wx:if="{{formAvatar}}" class="form-avatar-img" src="{{formAvatar}}" mode="aspectFill"></image>
+            <view wx:else class="form-avatar-placeholder">📷</view>
+          </button>
+          <view class="form-tip">点击选择宝宝照片</view>
+        </view>
+        <input class="form-input" placeholder="宝宝昵称" value="{{formName}}" bindinput="onFormNameInput" maxlength="20" />
+        <view class="form-row-inline">
+          <picker mode="date" value="{{formBirthDate}}" bindchange="onFormBirthChange">
+            <view class="form-picker">🎂 生日：{{formBirthDate || '请选择'}}</view>
+          </picker>
+        </view>
+        <view class="form-row-inline">
+          <view class="form-gender-label">性别：</view>
+          <view class="form-gender-options">
+            <view class="form-gender-opt {{formGender === 'male' ? 'active' : ''}}" data-gender="male" bindtap="onFormGenderTap">👦 男</view>
+            <view class="form-gender-opt {{formGender === 'female' ? 'active' : ''}}" data-gender="female" bindtap="onFormGenderTap">👧 女</view>
+          </view>
+        </view>
+        <view class="form-actions">
+          <view class="form-cancel" bindtap="cancelForm">取消</view>
+          <view class="form-submit" bindtap="submitCreateBaby" hover-class="btn-hover">创建</view>
+        </view>
+      </view>
+
+      <!-- 加入宝宝表单 -->
+      <view class="baby-form" wx:if="{{formMode === 'join'}}">
+        <view class="form-title">用宝宝 ID 加入</view>
+        <view class="form-tip-block">请向家人索要宝宝 ID 和 6 位加入密码，加入后可与家人共享宝宝记录。</view>
+        <input class="form-input" placeholder="宝宝 ID（8 位字母数字）" value="{{joinBabyId}}" bindinput="onJoinBabyIdInput" maxlength="8" />
+        <input class="form-input" placeholder="6 位加入密码" password="{{true}}" value="{{joinBabyCode}}" bindinput="onJoinBabyCodeInput" maxlength="6" type="number" />
+        <view class="form-actions">
+          <view class="form-cancel" bindtap="cancelForm">取消</view>
+          <view class="form-submit" bindtap="submitJoinBaby" hover-class="btn-hover">加入</view>
+        </view>
+      </view>
+
+      <!-- 创建成功后展示宝宝 ID 与密码 -->
+      <view class="baby-form" wx:if="{{formMode === 'success'}}">
+        <view class="form-title">🎉 宝宝已创建</view>
+        <view class="form-tip-block">把下面的 ID 和密码分享给家人，他们就可以加入并一起记录啦！</view>
+        <view class="success-row">
+          <text class="success-label">宝宝 ID：</text>
+          <text class="success-value" selectable="{{true}}" user-select="{{true}}">{{newBabyId}}</text>
+        </view>
+        <view class="success-row">
+          <text class="success-label">加入密码：</text>
+          <text class="success-value" selectable="{{true}}" user-select="{{true}}">{{newBabyCode}}</text>
+        </view>
+        <view class="form-actions">
+          <view class="form-submit form-submit-full" bindtap="copyNewBaby" hover-class="btn-hover">复制并关闭</view>
+        </view>
+      </view>
+
+      <!-- 登出按钮 -->
+      <view class="logout-row" wx:if="{{formMode === ''}}">
+        <view class="logout-btn" bindtap="handleLogout" hover-class="btn-hover">退出登录</view>
+      </view>
+
+      <view class="sleep-cancel-link" bindtap="hideBabyPanel">关闭</view>
     </view>
   </view>
 </view>

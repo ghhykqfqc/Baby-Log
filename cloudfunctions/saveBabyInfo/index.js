@@ -68,19 +68,31 @@ exports.main = async (event, context) => {
   const FALLBACK = { code: -1, message: '云端暂不可用，资料已保存到本地' }
 
   return safeDb(async () => {
-    // 查找是否已存在该 babyId 的资料
-    const existing = await db.collection('babies').where({ babyId, userId: OPENID }).limit(1).get()
+    // 校验：当前用户必须是该宝宝的成员（baby_members）或创建者
+    // 这样家庭成员共享时任何人都能修改宝宝资料
+    const memberRes = await db.collection('baby_members').where({
+      babyId, openid: OPENID
+    }).limit(1).get()
+
+    const isMember = memberRes.data && memberRes.data.length > 0
+
+    // 查找是否已存在该 babyId 的资料（不再限定 userId，支持家庭共享）
+    const existing = await db.collection('babies').where({ babyId }).limit(1).get()
 
     if (existing.data && existing.data.length > 0) {
-      // 更新
       const id = existing.data[0]._id
       await db.collection('babies').doc(id).update({ data: update })
       return { code: 0, data: { _id: id, ...update } }
+    } else if (isMember) {
+      // 通过 baby_members 关系存在但 babies 集合还没记录（理论少见）：新增
+      update.createdAt = new Date()
+      const res = await db.collection('babies').add({ data: update })
+      return { code: 0, data: { _id: res._id, ...update } }
     } else {
-      // 新增
+      // 既没 babies 记录也不是成员：按旧逻辑允许创建（兼容老版本）
       update.createdAt = new Date()
       const res = await db.collection('babies').add({ data: update })
       return { code: 0, data: { _id: res._id, ...update } }
     }
-  }, FALLBACK, ['babies'])
+  }, FALLBACK, ['babies', 'baby_members'])
 }

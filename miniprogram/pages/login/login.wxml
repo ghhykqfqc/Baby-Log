@@ -1,0 +1,41 @@
+<!-- pages/login/login.wxml -->
+<view class="login-page">
+  <!-- 顶部品牌区 -->
+  <view class="brand">
+    <view class="logo">👶</view>
+    <view class="brand-title">秒记宝宝</view>
+    <view class="brand-subtitle">极简育儿记录，一家人共同守护</view>
+  </view>
+
+  <!-- 登录卡片 -->
+  <view class="card">
+    <view class="card-title">使用前请先登录</view>
+    <view class="card-desc">授权微信头像和昵称，开启宝宝记录之旅</view>
+
+    <!-- 微信一键登录按钮（使用 open-type=chooseAvatar + nickname input） -->
+    <button class="login-btn" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar" hover-class="btn-hover">
+      <image wx:if="{{avatarUrl}}" class="login-avatar" src="{{avatarUrl}}" mode="aspectFill"></image>
+      <view wx:else class="login-avatar placeholder">📷</view>
+      <view class="login-btn-text">
+        <view class="login-btn-title">{{ avatarUrl ? '已选择头像' : '点击选择头像' }}</view>
+        <view class="login-btn-tip">使用我的微信头像</view>
+      </view>
+    </button>
+
+    <!-- 昵称输入 -->
+    <view class="nickname-row">
+      <input class="nickname-input" type="nickname" placeholder="点击输入昵称" value="{{nickName}}" bindinput="onNickInput" bindblur="onNickInput" maxlength="20" />
+    </view>
+
+    <!-- 登录按钮 -->
+    <button class="primary-btn {{(!avatarUrl || !nickName || logging) ? 'disabled' : ''}}" bindtap="handleLogin" disabled="{{logging}}">
+      <text wx:if="{{!logging}}">登录</text>
+      <text wx:else>登录中...</text>
+    </button>
+  </view>
+
+  <!-- 协议提示 -->
+  <view class="protocol">
+    登录即表示同意 <text class="protocol-link">《用户协议》</text> 和 <text class="protocol-link">《隐私政策》</text>
+  </view>
+</view>

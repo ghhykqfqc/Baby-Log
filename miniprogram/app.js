@@ -41,10 +41,11 @@ function resolveCloudEnv() {
 
 App({
   globalData: {
-    userInfo: null,
+    userInfo: null,       // 当前微信用户 { nickName, avatarUrl, openid }
     openid: '',
-    babyId: '',
-    babyInfo: null,
+    babyId: '',           // 当前选中宝宝 ID
+    babyInfo: null,       // 当前选中宝宝详情 { babyId, name, avatar, birthDate, gender }
+    babies: [],           // 当前用户可访问的所有宝宝列表
     familyRole: 'parent',
     isOnline: true,
     pendingSync: [],
@@ -92,7 +93,7 @@ App({
       }
     })
 
-    // 仅在云开发就绪时获取 openid
+    // 仅在云开发就绪时获取 openid（登录态会在首页 onShow 时二次校验）
     if (this.globalData.cloudReady) {
       this.getOpenId()
     }
@@ -100,15 +101,113 @@ App({
 
   restoreFromStorage() {
     try {
+      const openid = wx.getStorageSync('openid')
+      const userInfo = wx.getStorageSync('userInfo')
       const babyId = wx.getStorageSync('babyId')
       const babyInfo = wx.getStorageSync('babyInfo')
+      const babies = wx.getStorageSync('babies')
       const familyRole = wx.getStorageSync('familyRole')
+      if (openid) this.globalData.openid = openid
+      if (userInfo) this.globalData.userInfo = userInfo
       if (babyId) this.globalData.babyId = babyId
       if (babyInfo) this.globalData.babyInfo = babyInfo
+      if (babies) this.globalData.babies = babies
       if (familyRole) this.globalData.familyRole = familyRole
     } catch (e) {
       console.warn('恢复本地缓存失败:', e)
     }
+  },
+
+  /**
+   * 是否已登录（本地缓存中有 userInfo 即视为登录态）
+   */
+  isLoggedIn() {
+    return !!(this.globalData.userInfo && this.globalData.userInfo.openid)
+  },
+
+  /**
+   * 登录态校验：未登录则跳转登录页，调用方页面在 onShow 中调用
+   * 返回 true 表示已登录，false 表示正在跳转
+   */
+  requireLogin(redirectOnFail = true) {
+    if (this.isLoggedIn()) return true
+    if (redirectOnFail) {
+      // 避免登录页自身重复跳转
+      const pages = getCurrentPages()
+      const current = pages[pages.length - 1]
+      if (!current || current.route !== 'pages/login/login') {
+        wx.reLaunch({ url: '/pages/login/login' })
+      }
+    }
+    return false
+  },
+
+  /**
+   * 保存登录用户信息到本地与 globalData
+   */
+  saveUserInfo(userInfo) {
+    this.globalData.userInfo = userInfo
+    this.globalData.openid = userInfo.openid || ''
+    try {
+      wx.setStorageSync('userInfo', userInfo)
+      wx.setStorageSync('openid', userInfo.openid || '')
+    } catch (e) {}
+  },
+
+  /**
+   * 登出：清空用户与宝宝状态，跳回登录页
+   */
+  logout() {
+    this.globalData.userInfo = null
+    this.globalData.openid = ''
+    this.globalData.babyId = ''
+    this.globalData.babyInfo = null
+    this.globalData.babies = []
+    try {
+      wx.removeStorageSync('userInfo')
+      wx.removeStorageSync('openid')
+      wx.removeStorageSync('babyId')
+      wx.removeStorageSync('babyInfo')
+      wx.removeStorageSync('babies')
+      wx.removeStorageSync('familyRole')
+    } catch (e) {}
+    // 通知所有页面用户已切换
+    this.eventBus.emit('babySwitched', { babyId: '', babyInfo: null })
+    wx.reLaunch({ url: '/pages/login/login' })
+  },
+
+  /**
+   * 设置当前宝宝，并持久化 + 广播事件
+   */
+  setCurrentBaby(baby) {
+    if (!baby || !baby.babyId) return
+    this.globalData.babyId = baby.babyId
+    this.globalData.babyInfo = baby
+    try {
+      wx.setStorageSync('babyId', baby.babyId)
+      wx.setStorageSync('babyInfo', baby)
+    } catch (e) {}
+    // 通知所有页面重新拉取数据
+    this.eventBus.emit('babySwitched', { babyId: baby.babyId, babyInfo: baby })
+  },
+
+  /**
+   * 刷新当前用户可访问的宝宝列表（从云端）
+   */
+  async refreshBabies() {
+    if (!this.globalData.cloudReady) return []
+    try {
+      const res = await wx.cloud.callFunction({ name: 'listBabies', data: {} })
+      if (res.result && res.result.code === 0) {
+        const babies = res.result.data.babies || []
+        this.globalData.babies = babies
+        try { wx.setStorageSync('babies', babies) } catch (e) {}
+        return babies
+      }
+    } catch (err) {
+      console.warn('刷新宝宝列表失败:', err)
+    }
+    return []
   },
 
   /**

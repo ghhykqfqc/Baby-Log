@@ -39,9 +39,15 @@ Page({
       minDate: range.min,
       maxDate: range.max
     })
+    // 监听宝宝切换，自动刷新
+    app.eventBus.on('babySwitched', this._onBabySwitched = () => {
+      this.loadData()
+    })
   },
 
   onShow() {
+    // 登录态校验
+    if (!app.requireLogin()) return
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/growth/growth')
     }
@@ -50,6 +56,12 @@ Page({
 
   onPullDownRefresh() {
     this.loadData().finally(() => wx.stopPullDownRefresh())
+  },
+
+  onUnload() {
+    if (this._onBabySwitched) {
+      app.eventBus.off('babySwitched', this._onBabySwitched)
+    }
   },
 
   toDateStr(d) {

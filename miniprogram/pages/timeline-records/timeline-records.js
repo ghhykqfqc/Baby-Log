@@ -39,11 +39,23 @@ Page({
   onLoad() {
     const today = new Date()
     this.setData({ todayLabel: `${today.getMonth() + 1}月${today.getDate()}日` })
+    // 监听宝宝切换，自动刷新
+    app.eventBus.on('babySwitched', this._onBabySwitched = () => {
+      this.loadData()
+    })
   },
 
   onShow() {
+    // 登录态校验
+    if (!app.requireLogin()) return
     // 从时光轴页跳转来，或从首页记录后返回，都刷新
     this.loadData()
+  },
+
+  onUnload() {
+    if (this._onBabySwitched) {
+      app.eventBus.off('babySwitched', this._onBabySwitched)
+    }
   },
 
   /**

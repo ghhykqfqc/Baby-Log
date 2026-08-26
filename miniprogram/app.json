@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/index/index",
+    "pages/login/login",
     "pages/timeline/timeline",
     "pages/timeline-records/timeline-records",
     "pages/growth/growth",

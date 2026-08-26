@@ -36,6 +36,9 @@ const WEATHER_BG = {
 Page({
   data: {
     babyInfo: {},
+    userInfo: {},       // 当前微信用户 { nickName, avatarUrl, openid }
+    babies: [],         // 当前用户可访问的所有宝宝
+    currentBabyId: '',  // 用于面板高亮当前宝宝
     lastRecords: { feed: 0, diaper: 0, sleep: 0 },
     // 每张卡片的双行文案：elapsed（距上次）+ next（预计下次）
     cardTexts: {
@@ -70,7 +73,18 @@ Page({
     feedAmountInput: '',
     // 尿布类型弹层（长按触发）
     showDiaperSheet: false,
-    diaperTypeInput: ''
+    diaperTypeInput: '',
+    // 宝宝管理面板
+    showBabySheet: false,
+    formMode: '',         // '' | 'create' | 'join' | 'success'
+    formAvatar: '',
+    formName: '',
+    formBirthDate: '',
+    formGender: '',
+    joinBabyId: '',
+    joinBabyCode: '',
+    newBabyId: '',
+    newBabyCode: ''
   },
 
   _timer: null,
@@ -80,23 +94,61 @@ Page({
 
   onLoad() {
     app.eventBus.on('recordsUpdated', this.refreshFromCache.bind(this))
+    app.eventBus.on('babySwitched', this.onBabySwitched.bind(this))
     this.updateTodayText()
     this.restoreSleepState()
   },
 
   onShow() {
+    // 登录态校验：未登录直接跳登录页
+    if (!app.requireLogin()) return
+
     this.setData({ cloudReady: app.globalData.cloudReady })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/index/index')
     }
+    // 同步当前用户与宝宝信息到视图
+    this.syncGlobalToView()
     this.loadAlbum()
     this.refreshFromCache()
     this.loadWeather()
     if (app.globalData.cloudReady) {
       this.fetchCloudData()
+      // 异步刷新宝宝列表（不阻塞渲染）
+      app.refreshBabies().then(babies => {
+        this.setData({ babies, currentBabyId: app.globalData.babyId })
+        // 如果当前没有选中宝宝且有宝宝列表，自动选中第一个
+        if (!app.globalData.babyId && babies.length > 0) {
+          app.setCurrentBaby(babies[0])
+        }
+      }).catch(() => {})
     }
     this._timer = setInterval(() => this.updateCardTexts(), 30000)
     this.startSleepTick()
+  },
+
+  /**
+   * 把 globalData 中的 userInfo/babies/babyInfo 同步到视图
+   */
+  syncGlobalToView() {
+    this.setData({
+      userInfo: app.globalData.userInfo || {},
+      babies: app.globalData.babies || [],
+      babyInfo: app.globalData.babyInfo || {},
+      currentBabyId: app.globalData.babyId || ''
+    })
+  },
+
+  /**
+   * 收到宝宝切换事件时刷新本页
+   */
+  onBabySwitched(payload) {
+    this.syncGlobalToView()
+    this.loadAlbum()
+    this.refreshFromCache()
+    if (app.globalData.cloudReady) {
+      this.fetchCloudData()
+    }
   },
 
   onHide() {
@@ -113,6 +165,7 @@ Page({
     this.stopCountdown()
     this.stopSleepTick()
     app.eventBus.off('recordsUpdated', this.refreshFromCache)
+    app.eventBus.off('babySwitched', this.onBabySwitched)
   },
 
   updateTodayText() {
@@ -739,10 +792,263 @@ Page({
   noop() {},
 
   /**
-   * 跳转到宝宝资料页
+   * 跳转到宝宝资料页（保留供"编辑"按钮使用）
    */
   goProfile() {
     wx.navigateTo({ url: '/pages/profile/profile' })
+  },
+
+  // ============================================
+  // 宝宝管理面板
+  // ============================================
+
+  showBabyPanel() {
+    this.syncGlobalToView()
+    this.setData({ showBabySheet: true, formMode: '' })
+  },
+
+  hideBabyPanel() {
+    this.setData({
+      showBabySheet: false,
+      formMode: '',
+      formAvatar: '',
+      formName: '',
+      formBirthDate: '',
+      formGender: '',
+      joinBabyId: '',
+      joinBabyCode: ''
+    })
+  },
+
+  /**
+   * 切换宝宝
+   */
+  switchBaby(e) {
+    const babyId = e.currentTarget.dataset.babyId
+    const target = (app.globalData.babies || []).find(b => b.babyId === babyId)
+    if (!target) return
+    if (target.babyId === app.globalData.babyId) {
+      // 已是当前宝宝，关闭面板
+      this.hideBabyPanel()
+      return
+    }
+    app.setCurrentBaby(target)
+    this.syncGlobalToView()
+    wx.showToast({ title: `已切换到 ${target.name || '宝宝'}`, icon: 'none' })
+    setTimeout(() => this.hideBabyPanel(), 300)
+  },
+
+  /**
+   * 编辑宝宝：跳转到 profile 页（携带 babyId 参数由 profile 处理）
+   */
+  editBaby(e) {
+    const babyId = e.currentTarget.dataset.babyId
+    this.hideBabyPanel()
+    setTimeout(() => {
+      wx.navigateTo({ url: `/pages/profile/profile?babyId=${babyId}` })
+    }, 200)
+  },
+
+  // ===== 新建宝宝 =====
+  startCreateBaby() {
+    this.setData({
+      formMode: 'create',
+      formAvatar: '',
+      formName: '',
+      formBirthDate: '',
+      formGender: ''
+    })
+  },
+
+  onFormChooseAvatar(e) {
+    const { avatarUrl } = e.detail
+    if (avatarUrl) this.setData({ formAvatar: avatarUrl })
+  },
+
+  onFormNameInput(e) {
+    this.setData({ formName: e.detail.value })
+  },
+
+  onFormBirthChange(e) {
+    this.setData({ formBirthDate: e.detail.value })
+  },
+
+  onFormGenderTap(e) {
+    this.setData({ formGender: e.currentTarget.dataset.gender })
+  },
+
+  async submitCreateBaby() {
+    const { formAvatar, formName, formBirthDate, formGender } = this.data
+    if (!formName || !formName.trim()) {
+      wx.showToast({ title: '请填写昵称', icon: 'none' })
+      return
+    }
+    if (!app.globalData.cloudReady) {
+      wx.showToast({ title: '云环境不可用', icon: 'none' })
+      return
+    }
+
+    wx.showLoading({ title: '创建中...', mask: true })
+
+    try {
+      let finalAvatar = formAvatar
+      // 上传头像
+      if (formAvatar && !formAvatar.startsWith('cloud://')) {
+        try {
+          const ts = Date.now()
+          const upRes = await wx.cloud.uploadFile({
+            cloudPath: `avatars/${ts}.png`,
+            filePath: formAvatar
+          })
+          if (upRes && upRes.fileID) finalAvatar = upRes.fileID
+        } catch (err) {
+          console.warn('宝宝头像上传失败:', err)
+        }
+      }
+
+      const res = await wx.cloud.callFunction({
+        name: 'createBaby',
+        data: {
+          name: formName.trim(),
+          avatar: finalAvatar,
+          birthDate: formBirthDate,
+          gender: formGender
+        }
+      })
+
+      if (!res.result || res.result.code !== 0) {
+        throw new Error((res.result && res.result.message) || '创建失败')
+      }
+
+      const newBaby = res.result.data
+      // 刷新宝宝列表
+      const babies = await app.refreshBabies()
+      // 选中新创建的宝宝
+      app.setCurrentBaby(newBaby)
+      this.syncGlobalToView()
+
+      // 显示成功页（含 ID 与密码）
+      this.setData({
+        formMode: 'success',
+        newBabyId: newBaby.babyId,
+        newBabyCode: newBaby.babyCode
+      })
+      wx.hideLoading()
+    } catch (err) {
+      console.error('创建宝宝失败:', err)
+      wx.hideLoading()
+      wx.showModal({
+        title: '创建失败',
+        content: (err && err.message) || '请稍后重试',
+        showCancel: false
+      })
+    }
+  },
+
+  copyNewBaby() {
+    const { newBabyId, newBabyCode } = this.data
+    wx.setClipboardData({
+      data: `宝宝 ID：${newBabyId}\n加入密码：${newBabyCode}`,
+      success: () => {
+        wx.showToast({ title: '已复制', icon: 'success' })
+        setTimeout(() => this.hideBabyPanel(), 500)
+      }
+    })
+  },
+
+  // ===== 加入宝宝 =====
+  startJoinBaby() {
+    this.setData({
+      formMode: 'join',
+      joinBabyId: '',
+      joinBabyCode: ''
+    })
+  },
+
+  onJoinBabyIdInput(e) {
+    this.setData({ joinBabyId: (e.detail.value || '').toUpperCase().trim() })
+  },
+
+  onJoinBabyCodeInput(e) {
+    this.setData({ joinBabyCode: (e.detail.value || '').trim() })
+  },
+
+  async submitJoinBaby() {
+    const { joinBabyId, joinBabyCode } = this.data
+    if (!joinBabyId || joinBabyId.length !== 8) {
+      wx.showToast({ title: '请填写 8 位宝宝 ID', icon: 'none' })
+      return
+    }
+    if (!joinBabyCode || joinBabyCode.length !== 6) {
+      wx.showToast({ title: '请填写 6 位密码', icon: 'none' })
+      return
+    }
+    if (!app.globalData.cloudReady) {
+      wx.showToast({ title: '云环境不可用', icon: 'none' })
+      return
+    }
+
+    wx.showLoading({ title: '加入中...', mask: true })
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'joinBaby',
+        data: { babyId: joinBabyId, babyCode: joinBabyCode }
+      })
+
+      if (!res.result || res.result.code !== 0) {
+        throw new Error((res.result && res.result.message) || '加入失败')
+      }
+
+      const baby = res.result.data
+      // 刷新宝宝列表
+      const babies = await app.refreshBabies()
+      // 切换到刚加入的宝宝
+      app.setCurrentBaby(baby)
+      this.syncGlobalToView()
+
+      wx.hideLoading()
+      wx.showToast({
+        title: baby.alreadyMember ? '已是家庭成员' : `已加入 ${baby.name || '宝宝'}`,
+        icon: 'success'
+      })
+      setTimeout(() => this.hideBabyPanel(), 600)
+    } catch (err) {
+      console.error('加入宝宝失败:', err)
+      wx.hideLoading()
+      wx.showModal({
+        title: '加入失败',
+        content: (err && err.message) || '请稍后重试',
+        showCancel: false
+      })
+    }
+  },
+
+  cancelForm() {
+    this.setData({
+      formMode: '',
+      formAvatar: '',
+      formName: '',
+      formBirthDate: '',
+      formGender: '',
+      joinBabyId: '',
+      joinBabyCode: ''
+    })
+  },
+
+  // ===== 登出 =====
+  handleLogout() {
+    wx.showModal({
+      title: '退出登录',
+      content: '退出后将清除本地数据，下次需重新登录。确定继续吗？',
+      confirmText: '退出',
+      confirmColor: '#E8554E',
+      success: (res) => {
+        if (res.confirm) {
+          app.logout()
+        }
+      }
+    })
   },
 
   /**

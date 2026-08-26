@@ -1,0 +1,9 @@
+{
+  "name": "createBaby",
+  "version": "1.0.0",
+  "description": "创建宝宝并生成唯一 babyId 与加入密码",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

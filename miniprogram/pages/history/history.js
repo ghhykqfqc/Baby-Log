@@ -23,14 +23,20 @@ Page({
 
   _pageIndex: 0,  // 当前已加载页数
 
-  onLoad() {
+  onLoad(options) {
+    this._onBabySwitched = () => { this.loadData() }
+    app.eventBus.on('babySwitched', this._onBabySwitched)
     this.loadData()
   },
 
   onShow() {
-    // 从成长页保存/删除后返回时刷新
-    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      // 非 tabBar 页，无操作
+    // 登录态校验
+    if (!app.requireLogin()) return
+  },
+
+  onUnload() {
+    if (this._onBabySwitched) {
+      app.eventBus.off('babySwitched', this._onBabySwitched)
     }
   },
 

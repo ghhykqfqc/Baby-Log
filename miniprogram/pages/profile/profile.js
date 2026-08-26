@@ -24,7 +24,10 @@ Page({
     startImgW: 0, startImgH: 0
   },
 
-  onLoad() {
+  onLoad(options) {
+    // 登录态校验
+    if (!app.requireLogin()) return
+
     // 计算裁剪舞台尺寸（屏幕宽度 * 0.8，不超过 360）
     try {
       const sys = wx.getSystemInfoSync()
@@ -37,8 +40,14 @@ Page({
       })
     } catch (e) {}
 
-    // 读取当前宝宝资料
-    const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+    // 优先用 URL 参数指定的 babyId；否则用当前宝宝
+    // 当从首页"编辑某宝宝"按钮跳转过来时，会带 babyId
+    this._targetBabyId = options.babyId || app.globalData.babyId || ''
+
+    // 读取目标宝宝资料：优先匹配 babies 列表中的对应项
+    const babies = app.globalData.babies || []
+    const matched = this._targetBabyId ? babies.find(b => b.babyId === this._targetBabyId) : null
+    const babyInfo = matched || storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
     this.setData({
       babyName: babyInfo.name || '',
       avatarUrl: babyInfo.avatar || '',
@@ -253,7 +262,8 @@ Page({
       // 如果头像是新的本地临时文件（非 cloud fileID、非 http URL、与原头像不同），上传到云存储
       const isLocalTemp = avatarUrl && avatarUrl.startsWith('http://tmp') || (avatarUrl && avatarUrl.startsWith('wxfile://')) || (avatarUrl && avatarUrl !== originalAvatar && !avatarUrl.startsWith('cloud://'))
       if (isLocalTemp && app.globalData.cloudReady) {
-        const cloudPath = `avatars/${app.globalData.babyId || 'default'}/${Date.now()}.png`
+        const targetId = this._targetBabyId || app.globalData.babyId || 'default'
+        const cloudPath = `avatars/${targetId}/${Date.now()}.png`
         const uploadRes = await wx.cloud.uploadFile({
           cloudPath,
           filePath: avatarUrl
@@ -267,7 +277,9 @@ Page({
       // 上传失败仍保存本地路径，离线可用
     }
 
-    // 更新本地缓存
+    const targetBabyId = this._targetBabyId || app.globalData.babyId || 'default'
+
+    // 更新本地缓存（仅当编辑的是当前宝宝时才更新全局缓存）
     const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
     const updated = { ...babyInfo, name: trimmed, avatar: finalAvatar }
     storage.set(storage.CACHE_KEYS.BABY_INFO, updated)
@@ -278,12 +290,14 @@ Page({
       try {
         const { call } = require('../../utils/request')
         await call('saveBabyInfo', {
-          babyId: app.globalData.babyId || 'default',
+          babyId: targetBabyId,
           name: trimmed,
           avatar: finalAvatar,
           birthDate: babyInfo.birthDate || '',
           gender: babyInfo.gender || ''
         })
+        // 刷新 babies 列表（编辑非当前宝宝时也保持列表最新）
+        app.refreshBabies().catch(() => {})
       } catch (err) {
         console.warn('云端保存宝宝资料失败（本地已保存）:', err && err.message)
       }
