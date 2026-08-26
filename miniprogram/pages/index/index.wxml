@@ -78,16 +78,17 @@
       <text>🔧 云开发未开通，当前为离线模式。记录会保存到本地，开通云环境后自动同步。</text>
     </view>
 
-    <!-- ===== 三栏智能预测卡（对齐时光轴，适配首页奶咖色系） =====
-         卡片常驻显示（新宝宝零记录也展示）；内部三栏各自显示
-         「预计下次」或「数据不足」占位 -->
-    <view class="predict-card">
-      <view class="predict-col {{item.overdue ? 'overdue' : ''}}" wx:for="{{predictList}}" wx:key="key">
-        <view class="predict-icon">{{item.icon}}</view>
-        <view class="predict-label">{{item.label}}</view>
-        <view class="predict-time {{item.overdue ? 'predict-time-overdue' : ''}}" wx:if="{{item.available}}">{{item.predictedText}}</view>
-        <view class="predict-time predict-time-empty" wx:else>{{item.predictedText}}</view>
-        <view class="predict-countdown" wx:if="{{item.available}}">{{item.countdownText}}</view>
+    <!-- ===== 每日育娃小贴士卡（原预测卡区，点击展开完整内容 + 复制） ===== -->
+    <view class="predict-card tip-card" bindtap="showDailyTip" hover-class="tip-card-hover" hover-stay-time="80">
+      <view class="tip-card-icon">💡</view>
+      <view class="tip-card-body">
+        <view class="tip-card-title">每日育娃小贴士</view>
+        <view class="tip-card-text" wx:if="{{!showTipFull}}">{{dailyTipShort}}</view>
+        <view class="tip-card-full" wx:else>{{dailyTipFull}}</view>
+      </view>
+      <view class="tip-card-copy" catchtap="copyDailyTip" hover-class="tip-copy-hover" hover-stay-time="60">
+        <text class="tip-copy-icon">⧉</text>
+        <text class="tip-copy-text">复制</text>
       </view>
     </view>
 

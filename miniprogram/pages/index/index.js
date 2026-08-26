@@ -3,7 +3,7 @@ const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
 const { formatElapsedSmart, formatRemainingSmart, formatDurationSmart } = require('../../utils/time')
-const { predictAll, predictDetail } = require('../../utils/predict')
+const { predictAll } = require('../../utils/predict')
 const { RECORD_TYPES } = require('../../utils/constants')
 
 // 入睡后超过此时间（毫秒）仍未结束，视为漏记结束，自动复位
@@ -14,6 +14,22 @@ const WEATHER_CACHE_MS = 30 * 60 * 1000
 
 // 相册最多张数
 const ALBUM_MAX = 9
+
+// ===== 每日育娃小贴士库（按日期取模轮换，温柔有用的育儿知识点） =====
+const DAILY_TIPS = [
+  { short: '辅食从单一食材开始，观察3天', full: '初次添加辅食建议从单一食材（如高铁米粉）开始，每次只添加一种新食物，观察 2-3 天，确认无过敏反应后再尝试下一种。' },
+  { short: '宝宝清醒信号：揉眼、打哈欠',  full: '当宝宝开始揉眼睛、打哈欠、目光发直时，就是困了。此时应尽快安排入睡，错过窗口期反而更难睡着。' },
+  { short: '喂奶后记得拍嗝',  full: '每次喂奶后竖抱宝宝 10-15 分钟，轻拍后背帮助排出胃里的空气，能有效减少吐奶和胀气，拍出嗝后再放下。' },
+  { short: '爬行期清空地面低矮物',  full: '宝宝学爬后活动范围迅速变大，地面上的小物件、电线、桌角都要处理好，给宝宝一个安全探索的空间。' },
+  { short: '多和宝宝说话，语言黄金期',  full: '从出生起就要多与宝宝说话，哪怕他听不懂。词汇刺激是语言发展的基础，每天读绘本、唱歌、交流都很重要。' },
+  { short: '发热时优先观察精神状态',  full: '宝宝发热时，先看精神状态：吃奶、玩耍正常则先物理降温观察；若精神差、嗜睡、高热不退或小于 3 个月发热，请及时就医。' },
+  { short: '洗澡水温 37℃ 左右',  full: '宝宝洗澡水温略高于体温（37-38℃），不能用手背判断，先用手肘试温，全程托稳头颈。' },
+  { short: '按时体检，别错过疫苗',  full: '按儿保时间表定期体检，监测身高体重与发育里程碑；疫苗按本接种，接种后观察半小时再离开。' },
+  { short: '出生 6 个月内纯母乳喂养',  full: '世卫组织建议 0-6 个月纯母乳喂养，6 个月后继续母乳并适时添加辅食。母乳是宝宝最好的口粮。' },
+  { short: '宝宝哭闹先排除基本需求',  full: '新手妈妈别慌：哭闹先依次排查「饿、困、尿布、热、胀气」。常见原因逐个排除，多数时候宝宝很快就安静了。' },
+  { short: '多趴是前庭与手臂锻炼',  full: '清醒时多让宝宝趴着（tummy time），有助于颈背肌、手眼协调和前庭发育，也是后续爬行的基础，从每天 1-2 分钟开始。' },
+  { short: '哭闹≠一定是饿了',  full: '哭闹有多种原因：饥饿、困倦、尿布、过热、受惊等。先观察喂养情况与便尿，别一哭就喂，避免过度喂养。' }
+]
 
 // 天气分类 → 展示文案
 const WEATHER_LABELS = {
@@ -46,9 +62,11 @@ Page({
       diaper: { elapsed: '--', next: '' },
       sleep:  { elapsed: '--', next: '' }
     },
-    // 三栏预测卡数据（对齐时光轴）
-    // 卡片常驻显示：predictList 三栏各自生成「预计下次/数据不足」占位，不再用开关字段
-    predictList: [],
+    // 三栏记录卡片的预测信息仍保留在 cardTexts（距上次 + 预计下次）
+    // 原预测卡区位置改为展示每日育娃小贴士（简短 + 点击展开完整 + 复制）
+    showTipFull: false,    // 是否展开完整贴士
+    dailyTipShort: '',     // 贴士卡里的短文案
+    dailyTipFull: '',      // 完整的贴士内容
     // 天气皮肤
     weatherClass: 'sunny',
     weatherText: '',
@@ -109,7 +127,6 @@ Page({
 
   _timer: null,
   _sleepTick: null,
-  _countdownTimer: null,
   _allRecords: [],   // 用于预测计算的完整记录
 
   onLoad() {
@@ -117,6 +134,7 @@ Page({
     app.eventBus.on('babySwitched', this.onBabySwitched.bind(this))
     this.updateTodayText()
     this.restoreSleepState()
+    this.initDailyTip()
     // 初始化上传裁剪舞台尺寸（4:3 裁剪框）
     try {
       const sys = wx.getSystemInfoSync()
@@ -209,13 +227,11 @@ Page({
       clearInterval(this._timer)
       this._timer = null
     }
-    this.stopCountdown()
     this.stopSleepTick()
   },
 
   onUnload() {
     if (this._timer) clearInterval(this._timer)
-    this.stopCountdown()
     this.stopSleepTick()
     app.eventBus.off('recordsUpdated', this.refreshFromCache)
     app.eventBus.off('babySwitched', this.onBabySwitched)
@@ -225,6 +241,46 @@ Page({
     const d = new Date()
     const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
     this.setData({ todayText: `${d.getMonth() + 1}/${d.getDate()} 周${week}` })
+  },
+
+  // ============================================
+  // 每日育娃小贴士
+  // ============================================
+
+  /**
+   * 按日期取模选择当天小贴士（每天换一条）
+   * 标题（缩略）与完整文案统一带“每日育娃小贴士”标识
+   */
+  initDailyTip() {
+    const now = new Date()
+    const dayIndex = now.getFullYear() * 1000 + now.getMonth() * 50 + now.getDate()
+    const tip = DAILY_TIPS[dayIndex % DAILY_TIPS.length]
+    this.setData({
+      // 贴士卡缩略文案
+      dailyTipShort: tip.short,
+      // 完整贴士：正文末尾追加品牌尾注（与正文间只换一行）
+      dailyTipFull: `${tip.full}\n--「每日育娃小贴士」`,
+      showTipFull: false
+    })
+  },
+
+  /**
+   * 展开/收起完整贴士
+   */
+  showDailyTip() {
+    this.setData({ showTipFull: !this.data.showTipFull })
+  },
+
+  /**
+   * 复制今日贴士到剪贴板（复制完整正文 + 尾注）
+   */
+  copyDailyTip() {
+    const tip = this.data.dailyTipFull || this.data.dailyTipShort
+    if (!tip) return
+    wx.setClipboardData({
+      data: tip,
+      success: () => wx.showToast({ title: '已复制', icon: 'success' })
+    })
   },
 
   // ============================================
@@ -899,45 +955,19 @@ loadAlbum(babyId) {
   // 数据刷新
   // ============================================
 
-  stopCountdown() {
-    if (this._countdownTimer) {
-      clearInterval(this._countdownTimer)
-      this._countdownTimer = null
-    }
-  },
-
   /**
-   * 计算三栏预测卡（预计时间点 + 倒计时）
-   * 三栏始终生成（含「数据不足」占位）；卡片常驻展示
+   * 更新预测缓存（供记录三卡的「预计下次」文案计算 avgInterval）
+   * 记录三卡文案仍展示预测信息，因此预测卡区移除后仍需维护 PREDICTION 缓存
    */
-  updatePredictions() {
-    const detail = predictDetail(this._allRecords)
-    const predictList = [
-      { key: 'feed', ...detail.feed },
-      { key: 'diaper', ...detail.diaper },
-      { key: 'sleep', ...detail.sleep }
-    ]
-    // 有任一类型可用预测才启动倒计时刷新；没有则清掉（三栏显示「数据不足」占位）
-    const hasAvailable = predictList.some(p => p.available)
-    this.setData({ predictList })
-
-    this.stopCountdown()
-    if (hasAvailable) {
-      this._countdownTimer = setInterval(() => {
-        const refreshed = predictList.map(p => {
-          if (!p.available) return p
-          const d = predictDetail(this._allRecords)[p.key]
-          return { ...p, countdownText: d.countdownText, overdue: d.overdue, predictedText: d.predictedText }
-        })
-        this.setData({ predictList: refreshed })
-      }, 30000)
-    }
+  updatePredictionCache() {
+    const predictionResult = predictAll(this._allRecords)
+    storage.set(storage.CACHE_KEYS.PREDICTION, predictionResult)
   },
 
   /**
-   * 记录操作后统一追加进预测数据源并刷新预测卡（避免依赖云端拉取）
+   * 记录操作后统一追加进预测数据源并刷新预测缓存（供记录三卡文案）
    * 记录已由各操作写入 todayRecords 缓存（storage.appendTodayRecord），
-   * 这里把它们并入 _allRecords 后立即重算 predictDetail
+   * 这里把它们并入 _allRecords 后立即重算 predictAll
    */
   syncPredictionsAfterRecord() {
     let latest = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
@@ -956,7 +986,8 @@ loadAlbum(babyId) {
       }
     })
     this._allRecords = merged
-    this.updatePredictions()
+    this.updatePredictionCache()
+    this.updateCardTexts()
   },
 
   // 从本地缓存刷新（首屏/记录事件/切宝宝后）
@@ -966,7 +997,7 @@ loadAlbum(babyId) {
     this._allRecords = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
 
     this.setData({ babyInfo, lastRecords })
-    this.updatePredictions()
+    this.updatePredictionCache()
     this.updateCardTexts()
   },
 
@@ -1033,7 +1064,7 @@ loadAlbum(babyId) {
 
         this._allRecords = normalized
         this.setData({ lastRecords })
-        this.updatePredictions()
+        this.updatePredictionCache()
         this.updateCardTexts()
       }
     } catch (err) {

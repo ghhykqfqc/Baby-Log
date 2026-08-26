@@ -71,79 +71,51 @@
   margin-top: 4rpx;
 }
 
-/* 每日育娃小贴士胶囊（替代原箭头，点击展开完整内容，右侧小复制控件） */
-.tip-capsule {
+/* 右侧档案胶囊：年龄 + 性别（替代原贴士胶囊） */
+.baby-bar-tags {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  max-width: 360rpx;
-  background: rgba(255, 255, 255, 0.75);
-  border: 2rpx solid rgba(212, 184, 150, 0.45);
-  border-radius: 999rpx;
-  padding: 8rpx 12rpx 8rpx 16rpx;
+  gap: 10rpx;
   margin-left: 12rpx;
-  transition: all 0.15s ease;
 }
 
-.tip-capsule-hover {
-  background: rgba(212, 184, 150, 0.22);
+.baby-tag {
+  display: flex;
+  align-items: center;
+  border-radius: 999rpx;
+  padding: 6rpx 16rpx;
 }
 
-.tip-capsule-icon {
+.baby-tag-age {
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2rpx solid rgba(212, 184, 150, 0.5);
+  padding: 4rpx 16rpx;
+  box-shadow: 0 2rpx 8rpx rgba(180, 150, 110, 0.08);
+}
+
+.baby-tag-num {
   font-size: 24rpx;
-  margin-right: 6rpx;
-  flex-shrink: 0;
-}
-
-.tip-capsule-text {
-  font-size: 20rpx;
-  color: var(--color-text-secondary, #8C7A66);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  line-height: 1.2;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
 }
 
-/* 小复制控件 */
-.tip-copy {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  margin-left: 12rpx;
-  background: rgba(212, 184, 150, 0.28);
-  border-radius: 999rpx;
-  padding: 4rpx 12rpx;
+.baby-tag-label {
+  font-size: 16rpx;
+  color: var(--color-text-hint, #A3988A);
+  line-height: 1.2;
 }
 
-.tip-copy-hover {
-  background: rgba(212, 184, 150, 0.5);
-}
-
-.tip-copy-icon {
-  font-size: 20rpx;
-  color: var(--color-text-secondary, #8A7C6A);
-  margin-right: 4rpx;
-}
-
-.tip-copy-text {
-  font-size: 20rpx;
-  color: var(--color-text-secondary, #8A7C6A);
-}
-
-/* 完整贴士展开条 */
-.daily-tip-full {
-  background: rgba(255, 255, 255, 0.82);
-  border-radius: 20rpx;
-  padding: 16rpx 20rpx;
-  margin: 0 4rpx 12rpx;
-  border-left: 6rpx solid var(--color-primary, #D4B896);
-}
-
-.daily-tip-full-text {
+.baby-tag-gender {
   font-size: 24rpx;
-  color: var(--color-text-regular, #5C4E3E);
-  line-height: 1.6;
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  background: var(--color-primary-light, #F0E6D4);
+  border: 1rpx solid rgba(212, 184, 150, 0.35);
 }
 
 .date-header {

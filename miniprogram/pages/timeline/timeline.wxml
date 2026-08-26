@@ -2,7 +2,7 @@
 <view class="page-timeline">
   <!-- ========== 固定头部区 ========== -->
   <view class="fixed-header">
-    <!-- 宝宝档案条（头像+昵称+月龄），点击跳转到宝宝管理 -->
+    <!-- 宝宝档案条（头像+昵称+年龄+性别），点击跳转到宝宝管理 -->
     <view class="baby-bar" bindtap="goBabyManage" hover-class="baby-bar-hover" hover-stay-time="80">
       <view class="baby-bar-avatar">
         <image wx:if="{{babyInfo.avatar}}" class="baby-bar-img" src="{{babyInfo.avatar}}" mode="aspectFill"></image>
@@ -12,20 +12,14 @@
         <view class="baby-bar-name">{{babyInfo.name || '宝宝'}}</view>
         <view class="baby-bar-meta">{{babyInfo.age || babyInfo.birthDate || '未设置生日'}}</view>
       </view>
-      <!-- 每日育娃小贴士（点击展开完整内容 + 小复制控件） -->
-      <view class="tip-capsule" catchtap="showDailyTip" hover-class="tip-capsule-hover" hover-stay-time="60">
-        <text class="tip-capsule-icon">💡</text>
-        <text class="tip-capsule-text">{{dailyTipShort}}</text>
-        <view class="tip-copy" catchtap="copyDailyTip" hover-class="tip-copy-hover">
-          <text class="tip-copy-icon">⧉</text>
-          <text class="tip-copy-text">复制</text>
+      <!-- 右侧档案胶囊：年龄 + 性别（替代原贴士胶囊） -->
+      <view class="baby-bar-tags">
+        <view class="baby-tag baby-tag-age" wx:if="{{babyAgeText}}">
+          <text class="baby-tag-num">{{babyAgeText}}</text>
+          <text class="baby-tag-label">年龄</text>
         </view>
+        <view class="baby-tag baby-tag-gender" wx:if="{{babyGenderText}}">{{babyGenderText}}</view>
       </view>
-    </view>
-
-    <!-- 每日小贴士完整内容条（默认收合，点击展开） -->
-    <view class="daily-tip-full" wx:if="{{showTipFull}}">
-      <text class="daily-tip-full-text">{{dailyTipFull}}</text>
     </view>
 
     <!-- 日期标题 + 记录入口 -->
