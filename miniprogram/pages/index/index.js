@@ -47,10 +47,8 @@ Page({
       sleep:  { elapsed: '--', next: '' }
     },
     // 三栏预测卡数据（对齐时光轴）
+    // 卡片常驻显示：predictList 三栏各自生成「预计下次/数据不足」占位，不再用开关字段
     predictList: [],
-    // 预测卡是否展示：宝宝有任一记录即常驻显示，内部各栏为「预计/数据不足」，
-    // 不再依赖 hasPrediction（只有个别类型有足够数据时才显示，导致空宝宝卡片整体消失）
-    showPredictCard: false,
     // 天气皮肤
     weatherClass: 'sunny',
     weatherText: '',
@@ -942,19 +940,8 @@ loadAlbum(babyId) {
     this._allRecords = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
 
     this.setData({ babyInfo, lastRecords })
-    // 预测卡常驻展示判定：任一类型有过记录（lastRecords 有值）就显示，
-    // 内部各栏由 predictList 决定「预计/数据不足」——全新空宝宝则不显示
-    this.setData({ showPredictCard: this.hasAnyRecord(lastRecords) })
     this.updatePredictions()
     this.updateCardTexts()
-  },
-
-  /**
-   * 是否已有任意类型记录（决定预测卡是否常驻显示）
-   */
-  hasAnyRecord(lastRecords) {
-    const src = lastRecords || this.data.lastRecords || {}
-    return !!(src.feed || src.diaper || src.sleep)
   },
 
   /**
@@ -1020,7 +1007,6 @@ loadAlbum(babyId) {
 
         this._allRecords = normalized
         this.setData({ lastRecords })
-        this.setData({ showPredictCard: this.hasAnyRecord(lastRecords) })
         this.updatePredictions()
         this.updateCardTexts()
       }
