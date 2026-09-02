@@ -22,6 +22,12 @@ Component({
         text: '成长',
         icon: '/images/tab-growth.png',
         iconActive: '/images/tab-growth-active.png'
+      },
+      {
+        pagePath: '/pages/schedule/schedule',
+        text: '日程',
+        icon: '/images/tab-schedule.png',
+        iconActive: '/images/tab-schedule-active.png'
       }
     ]
   },

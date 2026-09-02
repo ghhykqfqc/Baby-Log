@@ -7,7 +7,8 @@
     "pages/growth/growth",
     "pages/history/history",
     "pages/profile/profile",
-    "pages/share/share"
+    "pages/share/share",
+    "pages/schedule/schedule"
   ],
   "window": {
     "backgroundColor": "#FAF6F0",
@@ -42,6 +43,12 @@
         "text": "成长",
         "iconPath": "images/tab-growth.png",
         "selectedIconPath": "images/tab-growth-active.png"
+      },
+      {
+        "pagePath": "pages/schedule/schedule",
+        "text": "日程",
+        "iconPath": "images/tab-schedule.png",
+        "selectedIconPath": "images/tab-schedule-active.png"
       }
     ]
   },

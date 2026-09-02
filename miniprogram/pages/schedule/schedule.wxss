@@ -1,0 +1,711 @@
+/* pages/schedule/schedule.wxss - 日程页（日历 + 事项列表）
+   设计风格：奶咖色系 · 清新简约 · 大量留白 · 类别色点柔和醒目 */
+
+/* 整页锁定一屏：列布局 */
+.page-schedule {
+  height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 24rpx 32rpx 0;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 110rpx);
+  background: var(--color-bg);
+}
+
+/* ============================================
+   顶部标题区
+   ============================================ */
+.sched-header {
+  flex-shrink: 0;
+  padding: 8rpx 0 16rpx;
+}
+
+.sched-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sched-title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: 1rpx;
+}
+
+.sched-today-pill {
+  font-size: 24rpx;
+  color: var(--color-primary-dark);
+  background: var(--color-primary-bg);
+  padding: 10rpx 28rpx;
+  border-radius: 999rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+}
+
+.pill-hover {
+  background: var(--color-primary-light);
+  transform: scale(0.96);
+}
+
+.sched-subtitle {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  margin-top: 8rpx;
+}
+
+/* ============================================
+   日历卡
+   ============================================ */
+.calendar-card {
+  flex-shrink: 0;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  padding: 24rpx 20rpx 16rpx;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 24rpx;
+}
+
+/* 月份切换 */
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8rpx 16rpx;
+}
+
+.cal-arrow {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  color: var(--color-text-secondary);
+  border-radius: 50%;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.arrow-hover {
+  background: var(--color-primary-bg);
+  color: var(--color-primary-dark);
+  transform: scale(0.92);
+}
+
+.cal-month-label {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: 2rpx;
+}
+
+/* 星期表头 */
+.cal-weekdays {
+  display: flex;
+  padding: 0 0 12rpx;
+}
+
+.cal-weekday {
+  flex: 1;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  font-weight: 500;
+}
+
+.cal-weekday-end {
+  color: var(--color-primary-dark);
+}
+
+/* 日期网格：7 列 */
+.cal-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.cal-day {
+  position: relative;
+  flex: 0 0 calc(100% / 7);
+  height: 96rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  transition: background 0.15s ease;
+}
+
+.cal-day-out {
+  opacity: 0.32;
+}
+
+.cal-day-hover {
+  background: var(--color-primary-bg);
+}
+
+.cal-day-num {
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 今天：浅奶咖描边圈 */
+.cal-day-today .cal-day-num {
+  color: var(--color-primary-dark);
+  font-weight: 700;
+}
+
+.cal-day-today::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 56rpx;
+  height: 56rpx;
+  border: 2rpx solid var(--color-primary);
+  border-radius: 50%;
+  transform: translate(-50%, -75%);
+  pointer-events: none;
+}
+
+/* 选中态：实心奶咖底色 */
+.cal-day-selected {
+  background: var(--color-primary);
+}
+
+.cal-day-selected .cal-day-num {
+  color: #FFFFFF;
+  font-weight: 700;
+}
+
+.cal-day-selected.cal-day-today::before {
+  border-color: #FFFFFF;
+}
+
+/* 事项标记点 */
+.cal-day-dots {
+  position: absolute;
+  bottom: 12rpx;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+}
+
+.cal-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: var(--color-text-hint);
+}
+
+/* 各类别色（与 categoryOptions 对应） */
+.cal-dot-vaccine     { background: #E8554E; }
+.cal-dot-birthday    { background: #F5A623; }
+.cal-dot-appointment { background: #6CA3C5; }
+.cal-dot-class       { background: #9B6BD9; }
+.cal-dot-shopping    { background: #7FB069; }
+.cal-dot-gift        { background: #D4B896; }
+.cal-dot-redpacket   { background: #E4493D; }
+.cal-dot-other       { background: #8B7D6E; }
+.cal-dot-important   { background: #E4493D; box-shadow: 0 0 0 3rpx rgba(228,73,61,0.18); }
+
+.cal-dot-more {
+  width: 6rpx;
+  height: 6rpx;
+  border-radius: 50%;
+  background: var(--color-text-hint);
+  opacity: 0.6;
+}
+
+/* 选中态下的小点改为白色 */
+.cal-day-selected .cal-dot,
+.cal-day-selected .cal-dot-more {
+  background: rgba(255,255,255,0.9) !important;
+  box-shadow: none !important;
+}
+
+/* ============================================
+   事项列表区（可滚动）
+   ============================================ */
+.sched-list-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.sched-list-inner {
+  padding: 0 4rpx;
+}
+
+.sched-day-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 16rpx;
+}
+
+.sched-day-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+}
+
+.sched-day-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.sched-day-week {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+}
+
+.sched-day-count {
+  font-size: 24rpx;
+  color: var(--color-primary-dark);
+  background: var(--color-primary-bg);
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+}
+
+/* 加载 / 空状态 */
+.sched-loading {
+  text-align: center;
+  color: var(--color-text-hint);
+  font-size: 26rpx;
+  padding: 40rpx 0;
+}
+
+.sched-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60rpx 0 40rpx;
+}
+
+.sched-empty-icon {
+  font-size: 80rpx;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.sched-empty-text {
+  font-size: 30rpx;
+  color: var(--color-text-secondary);
+  margin-top: 20rpx;
+  font-weight: 500;
+}
+
+.sched-empty-sub {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  margin-top: 8rpx;
+}
+
+/* 事项卡片 */
+.sched-item {
+  position: relative;
+  display: flex;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  padding: 24rpx 24rpx 24rpx 32rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 2rpx 12rpx rgba(180,150,110,0.08);
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sched-item-hover {
+  transform: scale(0.985);
+  box-shadow: 0 4rpx 18rpx rgba(180,150,110,0.16);
+}
+
+/* 左侧类别色条 */
+.sched-item-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8rpx;
+  background: var(--color-text-hint);
+}
+
+/* 各类别条色 */
+.sched-cat-vaccine     .sched-item-bar { background: #E8554E; }
+.sched-cat-birthday    .sched-item-bar { background: #F5A623; }
+.sched-cat-appointment .sched-item-bar { background: #6CA3C5; }
+.sched-cat-class       .sched-item-bar { background: #9B6BD9; }
+.sched-cat-shopping    .sched-item-bar { background: #7FB069; }
+.sched-cat-gift        .sched-item-bar { background: #D4B896; }
+.sched-cat-redpacket   .sched-item-bar { background: #E4493D; }
+.sched-cat-other       .sched-item-bar { background: #8B7D6E; }
+
+/* 重要事项：背景轻微染色 */
+.sched-item-important {
+  background: linear-gradient(180deg, #FFF5F4 0%, #FFFFFF 60%);
+}
+
+.sched-item-important .sched-item-bar {
+  background: #E4493D !important;
+  width: 10rpx;
+}
+
+.sched-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.sched-item-row1 {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.sched-item-icon {
+  font-size: 32rpx;
+  line-height: 1;
+}
+
+.sched-item-title {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sched-item-cat {
+  font-size: 20rpx;
+  color: var(--color-text-hint);
+  background: var(--color-bg);
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+
+.sched-item-row2 {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 12rpx;
+  flex-wrap: wrap;
+}
+
+.sched-item-time,
+.sched-item-loc {
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sched-item-note {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  line-height: 1.5;
+  background: var(--color-bg);
+  padding: 10rpx 16rpx;
+  border-radius: 12rpx;
+}
+
+/* 添加事项按钮 */
+.sched-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  height: 96rpx;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  border: 2rpx dashed var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 28rpx;
+  font-weight: 500;
+  margin: 12rpx 0 0;
+}
+
+.sched-add-hover {
+  background: var(--color-primary-bg);
+  transform: scale(0.985);
+}
+
+.sched-add-icon {
+  font-size: 36rpx;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* ============================================
+   新增 / 编辑弹层
+   ============================================ */
+.sheet-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 10000;
+  display: flex;
+  align-items: flex-end;
+  animation: maskIn 0.25s ease;
+}
+
+@keyframes maskIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sched-form-sheet {
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-bg);
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 32rpx);
+  animation: sheetUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-handle {
+  width: 64rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+  background: var(--color-divider);
+  margin: 8rpx auto 20rpx;
+}
+
+.sched-form-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+  margin-bottom: 16rpx;
+}
+
+.sched-form-item {
+  margin-bottom: 20rpx;
+}
+
+.sched-form-label {
+  display: block;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  margin-bottom: 10rpx;
+}
+
+.sched-form-input {
+  width: 100%;
+  height: 88rpx;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+}
+
+.sched-form-input-inline {
+  height: 76rpx;
+}
+
+.sched-form-textarea {
+  width: 100%;
+  min-height: 100rpx;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.sched-form-picker {
+  height: 88rpx;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  display: flex;
+  align-items: center;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 内联两列 */
+.sched-form-row-inline {
+  display: flex;
+  gap: 20rpx;
+}
+
+.sched-form-half {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 类别选择网格 */
+.sched-cat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.sched-cat-pill {
+  flex: 1 1 calc(25% - 16rpx);
+  min-width: calc(25% - 16rpx);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16rpx 0;
+  background: var(--color-bg-card);
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+  transition: all 0.15s ease;
+}
+
+.sched-cat-pill.active {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+}
+
+.sched-cat-hover {
+  transform: scale(0.95);
+}
+
+.sched-cat-pill-icon {
+  font-size: 32rpx;
+  line-height: 1;
+}
+
+.sched-cat-pill-text {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  margin-top: 6rpx;
+}
+
+.sched-cat-pill.active .sched-cat-pill-text {
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+/* 重要开关 */
+.sched-important-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+}
+
+.sched-important-left {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  flex: 1;
+}
+
+.sched-important-icon {
+  font-size: 40rpx;
+  line-height: 1;
+}
+
+.sched-important-text {
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.sched-important-sub {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  margin-top: 4rpx;
+}
+
+/* 自定义开关 */
+.sched-switch {
+  width: 80rpx;
+  height: 44rpx;
+  border-radius: 999rpx;
+  background: var(--color-divider);
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sched-switch.on {
+  background: var(--color-primary);
+}
+
+.sched-switch-knob {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.15);
+  transition: left 0.2s ease;
+}
+
+.sched-switch.on .sched-switch-knob {
+  left: 40rpx;
+}
+
+/* 操作按钮组 */
+.sched-form-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.sched-form-cancel,
+.sched-form-del,
+.sched-form-save {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.sched-form-cancel {
+  background: var(--color-primary-light);
+  color: var(--color-text-secondary);
+}
+
+.sched-form-del {
+  flex: 0.8;
+  background: #FBE9E7;
+  color: var(--color-danger);
+}
+
+.sched-form-save {
+  flex: 1.4;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: var(--shadow-button);
+}
+
+.btn-hover {
+  transform: scale(0.97);
+}
