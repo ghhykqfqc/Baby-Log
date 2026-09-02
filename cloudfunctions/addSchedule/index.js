@@ -73,7 +73,9 @@ exports.main = async (event, context) => {
   }
 
   const validCategories = ['vaccine', 'birthday', 'appointment', 'class', 'shopping', 'gift', 'redpacket', 'other']
-  const finalCategory = validCategories.includes(category) ? category : 'other'
+  // 自定义类别：允许 custom_ 前缀（前端本地维护类别元数据），其余非法值回退 other
+  const isCustom = typeof category === 'string' && category.startsWith('custom_')
+  const finalCategory = validCategories.includes(category) || isCustom ? category : 'other'
 
   const schedule = {
     babyId,

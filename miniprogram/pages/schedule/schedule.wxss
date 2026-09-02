@@ -396,6 +396,7 @@
 .cal-day-has-shopping    { background: rgba(127, 176, 105, 0.12); }
 .cal-day-has-gift        { background: rgba(212, 184, 150, 0.16); }
 .cal-day-has-redpacket   { background: rgba(228, 73, 61, 0.10); }
+.cal-day-has-custom      { background: rgba(139, 125, 110, 0.10); }
 .cal-day-has-other       { background: rgba(139, 125, 110, 0.10); }
 .cal-day-has-important   { background: rgba(228, 73, 61, 0.14); }
 
@@ -407,6 +408,7 @@
 .cal-day-selected.cal-day-has-shopping,
 .cal-day-selected.cal-day-has-gift,
 .cal-day-selected.cal-day-has-redpacket,
+.cal-day-selected.cal-day-has-custom,
 .cal-day-selected.cal-day-has-other,
 .cal-day-selected.cal-day-has-important {
   background: transparent;
@@ -431,7 +433,7 @@
   background: var(--color-text-hint);
 }
 
-/* 各类别色（与 categoryOptions 对应） */
+/* 各类别色（与 categoryOptions 对应，custom 为自定义类别统一样式） */
 .cal-dot-vaccine     { background: #E8554E; }
 .cal-dot-birthday    { background: #F5A623; }
 .cal-dot-appointment { background: #6CA3C5; }
@@ -439,6 +441,7 @@
 .cal-dot-shopping    { background: #7FB069; }
 .cal-dot-gift        { background: #D4B896; }
 .cal-dot-redpacket   { background: #E4493D; }
+.cal-dot-custom      { background: #8B7D6E; }
 .cal-dot-other       { background: #8B7D6E; }
 .cal-dot-important   { background: #E4493D; box-shadow: 0 0 0 3rpx rgba(228,73,61,0.18); }
 
@@ -694,6 +697,7 @@
 .sched-cat-shopping    .sched-item-bar { background: #7FB069; }
 .sched-cat-gift        .sched-item-bar { background: #D4B896; }
 .sched-cat-redpacket   .sched-item-bar { background: #E4493D; }
+.sched-cat-custom      .sched-item-bar { background: #8B7D6E; }
 .sched-cat-other       .sched-item-bar { background: #8B7D6E; }
 
 /* 重要事项：背景轻微染色 */
@@ -1122,6 +1126,104 @@
 .sched-cat-pill.active .sched-cat-pill-text {
   color: var(--color-primary-dark);
   font-weight: 600;
+}
+
+/* 「＋」自定义入口：虚线描边 */
+.sched-cat-add {
+  border: 2rpx dashed var(--color-primary-light);
+  background: transparent;
+}
+
+.sched-cat-add-icon {
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+/* ============================================
+   自定义类别编辑弹层（居中卡片）
+   ============================================ */
+.cat-editor-mask {
+  z-index: 12000;
+  align-items: center;
+  justify-content: center;
+}
+
+.sched-cat-editor {
+  width: 580rpx;
+  background: var(--color-bg);
+  border-radius: 32rpx;
+  padding: 40rpx 36rpx 32rpx;
+  box-shadow: 0 16rpx 48rpx rgba(61, 48, 39, 0.2);
+  animation: catEditorIn 0.25s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes catEditorIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.sched-cat-editor-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+.sched-cat-editor-sub {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  text-align: center;
+  margin-top: 8rpx;
+}
+
+.sched-cat-editor-input {
+  width: 100%;
+  height: 88rpx;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  font-size: 30rpx;
+  color: var(--color-text-primary);
+  margin-top: 28rpx;
+}
+
+.sched-cat-editor-error {
+  font-size: 22rpx;
+  color: var(--color-danger);
+  margin-top: 12rpx;
+  text-align: center;
+  min-height: 32rpx;
+}
+
+.sched-cat-editor-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 16rpx;
+}
+
+.sched-cat-editor-cancel,
+.sched-cat-editor-save {
+  flex: 1;
+  height: 84rpx;
+  border-radius: 42rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.sched-cat-editor-cancel {
+  background: var(--color-primary-light);
+  color: var(--color-text-secondary);
+}
+
+.sched-cat-editor-save {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: var(--shadow-button);
 }
 
 /* 重要开关 */

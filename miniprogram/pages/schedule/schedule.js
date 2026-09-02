@@ -2,7 +2,8 @@
 const app = getApp()
 const { call } = require('../../utils/request')
 
-// 事项类别配置：key/icon/label/dotColor（日历标记颜色）
+// 事项类别配置：key/icon/label/color（日历标记颜色）
+// 注：无「其他」预设类别，用户可通过「＋」自定义（custom_ 前缀，本地维护）
 const CATEGORY_OPTIONS = [
   { key: 'vaccine',     icon: '💉', label: '疫苗',   color: '#E8554E' },
   { key: 'birthday',    icon: '🎂', label: '生日',   color: '#F5A623' },
@@ -10,19 +11,35 @@ const CATEGORY_OPTIONS = [
   { key: 'class',       icon: '📚', label: '上课',   color: '#9B6BD9' },
   { key: 'shopping',    icon: '🛒', label: '购物',   color: '#7FB069' },
   { key: 'gift',        icon: '🎁', label: '礼物',   color: '#D4B896' },
-  { key: 'redpacket',   icon: '🧧', label: '红包',   color: '#E4493D' },
-  { key: 'other',       icon: '📝', label: '其他',   color: '#8B7D6E' }
+  { key: 'redpacket',   icon: '🧧', label: '红包',   color: '#E4493D' }
 ]
 
+// 自定义类别的兜底元数据（图标/颜色固定，label 动态）
+const CUSTOM_CAT_META = { icon: '🏷️', label: '自定义', color: '#8B7D6E' }
+
+// 内置类别映射（静态）
 const CATEGORY_MAP = {}
 CATEGORY_OPTIONS.forEach(c => { CATEGORY_MAP[c.key] = c })
-
-// 重要事项的颜色覆盖（比类别色更醒目）
-const IMPORTANT_COLOR = '#E4493D'
 
 // 缓存键
 const CACHE_KEY_PREFIX = 'schedules_'
 const FAV_KEY_PREFIX = 'schedule_favs_'
+const CUSTOM_CAT_KEY_PREFIX = 'schedule_custom_cats_'
+
+/** 取类别元数据（内置或自定义） */
+function getCatMeta(key) {
+  if (CATEGORY_MAP[key]) return CATEGORY_MAP[key]
+  if (key && key.startsWith('custom_')) {
+    return { key, icon: CUSTOM_CAT_META.icon, label: key.slice('custom_'.length) || '自定义', color: CUSTOM_CAT_META.color }
+  }
+  return { key: 'other', icon: '📝', label: '其他', color: '#8B7D6E' }
+}
+
+/** 类别 → CSS 类名键：内置用 key，自定义/未知统一映射为 custom */
+function catCssKey(category) {
+  if (CATEGORY_MAP[category]) return category
+  return 'custom'
+}
 
 Page({
   data: {
@@ -50,9 +67,13 @@ Page({
     editingId: '',
     submitting: false,
     showMore: false,          // 新增模式「更多选项」折叠开关
+    showCatEditor: false,     // 自定义类别编辑弹层
+    catEditorValue: '',       // 自定义类别输入值
+    catEditorEditingKey: '',  // 正在重命名的自定义类别 key（空=新增）
+    catEditorError: '',
     formData: {
       title: '',
-      category: 'other',
+      category: '',
       date: '',
       startTime: '',
       endTime: '',
@@ -60,7 +81,10 @@ Page({
       note: '',
       important: false
     },
-    categoryOptions: CATEGORY_OPTIONS,
+    // 类别选项（渲染用）：自定义类别在前 + 内置在后 + 「+」入口排最前
+    categoryOptions: [],
+    // 自定义类别（本地存储）：[{ key, label }]
+    customCategories: [],
     // 常用事项（自定义快捷选项）
     favoriteItems: [],
     favManageMode: false,
@@ -80,9 +104,11 @@ Page({
     })
     this._refreshCalendar()
     this._loadFavorites()
+    this._loadCustomCategories()
     this._startCountdownTimer()
     app.eventBus.on('babySwitched', this._onBabySwitched = () => {
       this._loadFavorites()
+      this._loadCustomCategories()
       this.loadMonthSchedules()
     })
   },
@@ -151,7 +177,7 @@ Page({
       return
     }
 
-    const meta = CATEGORY_MAP[best.category] || CATEGORY_MAP.other
+    const meta = getCatMeta(best.category)
     this._upcomingTarget = best
     this.setData({
       upcoming: {
@@ -238,6 +264,120 @@ Page({
   },
 
   // ============================================
+  // 自定义类别（本地存储）
+  // ============================================
+
+  _customCatKey() {
+    const babyId = app.globalData.babyId || 'default'
+    return CUSTOM_CAT_KEY_PREFIX + babyId
+  },
+
+  _loadCustomCategories() {
+    let cats = []
+    try { cats = wx.getStorageSync(this._customCatKey()) || [] } catch (e) {}
+    this._customCats = cats
+    this._rebuildCategoryOptions()
+  },
+
+  _saveCustomCategories(cats) {
+    try { wx.setStorageSync(this._customCatKey(), cats) } catch (e) {}
+    this._customCats = cats
+    this._rebuildCategoryOptions()
+  },
+
+  /** 组装渲染用类别选项：＋入口 → 自定义类别 → 内置类别 */
+  _rebuildCategoryOptions() {
+    const customs = (this._customCats || []).map(c => ({
+      key: c.key, icon: CUSTOM_CAT_META.icon, label: c.label, custom: true
+    }))
+    this.setData({
+      categoryOptions: [{ key: '__add__', icon: '＋', label: '自定义', isAdd: true }, ...customs, ...CATEGORY_OPTIONS]
+    })
+  },
+
+  /** 打开自定义类别编辑弹层（editingKey 空=新增） */
+  openCatEditor(e) {
+    const key = (e && e.currentTarget && e.currentTarget.dataset.key) || ''
+    if (key) {
+      const cat = (this._customCats || []).find(c => c.key === key)
+      if (!cat) return
+      this.setData({ showCatEditor: true, catEditorEditingKey: key, catEditorValue: cat.label, catEditorError: '' })
+    } else {
+      this.setData({ showCatEditor: true, catEditorEditingKey: '', catEditorValue: '', catEditorError: '' })
+    }
+  },
+
+  onCatEditorInput(e) {
+    this.setData({ catEditorValue: e.detail.value, catEditorError: '' })
+  },
+
+  closeCatEditor() {
+    this.setData({ showCatEditor: false, catEditorEditingKey: '', catEditorValue: '', catEditorError: '' })
+  },
+
+  /** 保存自定义类别（新增或重命名）。生成 custom_<id> 格式 key。 */
+  saveCatEditor() {
+    const label = (this.data.catEditorValue || '').trim()
+    if (!label) {
+      this.setData({ catEditorError: '给类别起个名字吧' })
+      return
+    }
+    if (label.length > 6) {
+      this.setData({ catEditorError: '名称最多 6 个字' })
+      return
+    }
+    const cats = (this._customCats || []).slice()
+    const allLabels = [
+      ...cats.map(c => c.label),
+      ...CATEGORY_OPTIONS.map(c => c.label)
+    ]
+    if (allLabels.indexOf(label) >= 0) {
+      this.setData({ catEditorError: '已经有这个类别啦' })
+      return
+    }
+    const editingKey = this.data.catEditorEditingKey
+    if (editingKey) {
+      // 重命名
+      const cat = cats.find(c => c.key === editingKey)
+      if (cat) cat.label = label
+      // 若当前表单选中的正是该类别，同步刷新选中态显示
+      if (this.data.formData.category === editingKey) {
+        this.setData({ 'formData.title': label, isFavSaved: this.data.favoriteItems.indexOf(label) >= 0 })
+      }
+    } else {
+      // 新增：custom_<时间戳> 保证唯一
+      const key = 'custom_' + Date.now().toString(36)
+      cats.push({ key, label })
+    }
+    this._saveCustomCategories(cats)
+    this.closeCatEditor()
+    wx.showToast({ title: editingKey ? '已更新' : '已添加', icon: 'success' })
+  },
+
+  /** 长按自定义类别：删除确认 */
+  removeCustomCat(e) {
+    const key = e.currentTarget.dataset.key
+    const cat = (this._customCats || []).find(c => c.key === key)
+    if (!cat) return
+    wx.showModal({
+      title: '删除类别',
+      content: `删除「${cat.label}」类别？已保存的事项不受影响，但会归入「其他」显示。`,
+      confirmText: '删除',
+      confirmColor: '#E8554E',
+      success: r => {
+        if (!r.confirm) return
+        const cats = (this._customCats || []).filter(c => c.key !== key)
+        this._saveCustomCategories(cats)
+        // 若当前表单选中该类别，回落到无选中
+        if (this.data.formData.category === key) {
+          this.setData({ 'formData.category': '', 'formData.title': '' })
+        }
+        wx.showToast({ title: '已删除', icon: 'none' })
+      }
+    })
+  },
+
+  // ============================================
   // 常用事项（本地收藏）
   // ============================================
 
@@ -263,8 +403,8 @@ Page({
     const fav = e.currentTarget.dataset.fav
     if (!fav) return
     const patch = { 'formData.title': fav }
-    // 匹配类别名自动选中类别
-    const cat = CATEGORY_OPTIONS.find(c => c.label === fav)
+    // 匹配类别名（含自定义）自动选中类别
+    const cat = this.data.categoryOptions.find(c => !c.isAdd && c.label === fav)
     if (cat) patch['formData.category'] = cat.key
     // 检查是否已收藏状态
     const favs = this.data.favoriteItems
@@ -366,9 +506,9 @@ Page({
       isToday,
       dotCount: 0,
       hasImportant: false,
-      dotColor: '',
-      dotColor2: '',
-      dotColor3: ''
+      dotCssKey: '',
+      dotCssKey2: '',
+      dotCssKey3: ''
     }
     if (schedules && schedules.length > 0) {
       item.dotCount = schedules.length
@@ -378,10 +518,10 @@ Page({
         return 0
       })
       item.hasImportant = !!(sorted.length > 0 && sorted[0].important)
-      const dots = sorted.slice(0, 3).map(s => s.important ? 'important' : s.category)
-      item.dotColor = dots[0] || ''
-      item.dotColor2 = dots[1] || ''
-      item.dotColor3 = dots[2] || ''
+      const dots = sorted.slice(0, 3).map(s => s.important ? 'important' : catCssKey(s.category))
+      item.dotCssKey = dots[0] || ''
+      item.dotCssKey2 = dots[1] || ''
+      item.dotCssKey3 = dots[2] || ''
     }
     return item
   },
@@ -424,7 +564,7 @@ Page({
    * 给单条事项补上 categoryMeta 和 timeText
    */
   _enrichSchedule(s) {
-    const meta = CATEGORY_MAP[s.category] || CATEGORY_MAP.other
+    const meta = getCatMeta(s.category)
     let timeText = ''
     if (s.startTime && s.endTime) {
       timeText = `${s.startTime} - ${s.endTime}`
@@ -435,7 +575,7 @@ Page({
     }
     return {
       ...s,
-      categoryMeta: meta,
+      categoryMeta: { ...meta, cssKey: catCssKey(s.category) },
       timeText
     }
   },
@@ -565,6 +705,8 @@ Page({
   // ============================================
 
   openAddSheet() {
+    // 默认选中第一个可选类别（自定义在前，若无则第一个内置）
+    const firstCat = this.data.categoryOptions.find(c => !c.isAdd)
     this.setData({
       showForm: true,
       editingId: '',
@@ -572,8 +714,8 @@ Page({
       favManageMode: false,
       isFavSaved: false,
       formData: {
-        title: '',
-        category: 'other',
+        title: firstCat ? firstCat.label : '',
+        category: firstCat ? firstCat.key : '',
         date: this.data.selectedDate,
         startTime: '',
         endTime: '',
@@ -594,7 +736,7 @@ Page({
       isFavSaved: this.data.favoriteItems.indexOf(target.title || '') >= 0,
       formData: {
         title: target.title || '',
-        category: target.category || 'other',
+        category: target.category || '',
         date: target.date || this.data.selectedDate,
         startTime: target.startTime || '',
         endTime: target.endTime || '',
@@ -624,10 +766,15 @@ Page({
 
   onCatTap(e) {
     const newKey = e.currentTarget.dataset.key
+    // 「＋」入口：打开自定义类别编辑弹层
+    if (newKey === '__add__') {
+      this.openCatEditor()
+      return
+    }
     const oldKey = this.data.formData.category
     if (newKey === oldKey) return
-    const oldMeta = CATEGORY_MAP[oldKey] || CATEGORY_MAP.other
-    const newMeta = CATEGORY_MAP[newKey] || CATEGORY_MAP.other
+    const oldMeta = getCatMeta(oldKey)
+    const newMeta = getCatMeta(newKey)
     const patch = { 'formData.category': newKey }
     // 标题智能联动：当前标题为空、或就是旧类别名（用户未自定义）时，切换类别自动换成新类别名
     const curTitle = (this.data.formData.title || '').trim()
@@ -648,8 +795,13 @@ Page({
 
   async saveSchedule() {
     const f = this.data.formData
+    // 类别必选
+    if (!f.category) {
+      wx.showToast({ title: '请选择一个类别', icon: 'none' })
+      return
+    }
     // 事项非必填：留空则默认取类别名
-    const catMeta = CATEGORY_MAP[f.category] || CATEGORY_MAP.other
+    const catMeta = getCatMeta(f.category)
     const title = (f.title && f.title.trim()) || catMeta.label
     if (!f.date) {
       wx.showToast({ title: '请选择日期', icon: 'none' })

@@ -82,7 +82,7 @@
       <view
         wx:for="{{calendarDays}}"
         wx:key="key"
-        class="cal-day {{item.isCurrentMonth ? '' : 'cal-day-out'}} {{item.isToday ? 'cal-day-today' : ''}} {{selectedDate === item.dateStr ? 'cal-day-selected' : ''}} {{item.isCurrentMonth && item.dotCount > 0 ? 'cal-day-has-' + (item.hasImportant ? 'important' : item.dotColor) : ''}}"
+        class="cal-day {{item.isCurrentMonth ? '' : 'cal-day-out'}} {{item.isToday ? 'cal-day-today' : ''}} {{selectedDate === item.dateStr ? 'cal-day-selected' : ''}} {{item.isCurrentMonth && item.dotCount > 0 ? 'cal-day-has-' + (item.hasImportant ? 'important' : item.dotCssKey) : ''}}"
         data-date="{{item.dateStr}}"
         bindtap="selectDate"
         hover-class="{{item.isCurrentMonth ? 'cal-day-hover' : ''}}"
@@ -93,9 +93,9 @@
         </view>
         <!-- 事项标记：彩色小圆点 -->
         <view class="cal-day-dots" wx:if="{{item.isCurrentMonth && item.dotCount > 0}}">
-          <view class="cal-dot cal-dot-{{item.dotColor}}"></view>
-          <view class="cal-dot cal-dot-{{item.dotColor2}}" wx:if="{{item.dotCount > 1}}"></view>
-          <view class="cal-dot cal-dot-{{item.dotColor3}}" wx:if="{{item.dotCount > 2 && item.dotCount <= 3}}"></view>
+          <view class="cal-dot cal-dot-{{item.dotCssKey}}"></view>
+          <view class="cal-dot cal-dot-{{item.dotCssKey2}}" wx:if="{{item.dotCount > 1}}"></view>
+          <view class="cal-dot cal-dot-{{item.dotCssKey3}}" wx:if="{{item.dotCount > 2 && item.dotCount <= 3}}"></view>
           <view class="cal-dot-more" wx:if="{{item.dotCount > 3}}"></view>
         </view>
       </view>
@@ -153,7 +153,7 @@
           <view
             wx:for="{{selectedSchedules}}"
             wx:key="_id"
-            class="sched-item sched-cat-{{item.category}} {{item.important ? 'sched-item-important' : ''}}"
+            class="sched-item sched-cat-{{item.categoryMeta.cssKey}} {{item.important ? 'sched-item-important' : ''}}"
             data-id="{{item._id}}"
             bindtap="editSchedule"
             hover-class="sched-item-hover"
@@ -234,22 +234,23 @@
         <input class="sched-form-input" placeholder="如：接种乙肝疫苗（可不填）" value="{{formData.title}}" bindinput="onTitleInput" maxlength="30" focus="{{!editingId}}" />
       </view>
 
-      <!-- 类别（必选） -->
+      <!-- 类别（必选，自定义在前，「＋」入口排最前） -->
       <view class="sched-form-item">
         <view class="sched-form-label-row">
           <text class="sched-form-label-inline">类别</text>
-          <text class="sched-form-label-tip">必选</text>
+          <text class="sched-form-label-tip">必选 · 点＋自定义</text>
         </view>
         <view class="sched-cat-grid">
           <view
-            class="sched-cat-pill {{formData.category === item.key ? 'active' : ''}}"
+            class="sched-cat-pill {{item.isAdd ? 'sched-cat-add' : ''}} {{formData.category === item.key ? 'active' : ''}}"
             wx:for="{{categoryOptions}}" wx:key="key"
             data-key="{{item.key}}"
             bindtap="onCatTap"
+            bindlongpress="{{item.custom ? 'removeCustomCat' : ''}}"
             hover-class="sched-cat-hover"
             hover-stay-time="40"
           >
-            <text class="sched-cat-pill-icon">{{item.icon}}</text>
+            <text class="sched-cat-pill-icon {{item.isAdd ? 'sched-cat-add-icon' : ''}}">{{item.icon}}</text>
             <text class="sched-cat-pill-text">{{item.label}}</text>
           </view>
         </view>
@@ -346,6 +347,27 @@
         <view class="sched-form-del" wx:if="{{editingId}}" bindtap="deleteSchedule" hover-class="btn-hover">删除</view>
         <view class="sched-form-cancel" bindtap="closeForm" hover-class="btn-hover">取消</view>
         <view class="sched-form-save" bindtap="saveSchedule" hover-class="btn-hover">{{submitting ? '保存中…' : '保存'}}</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ========== 自定义类别编辑弹层（最高层级） ========== -->
+  <view class="sheet-mask cat-editor-mask" wx:if="{{showCatEditor}}" bindtap="closeCatEditor" catchtouchmove="noop">
+    <view class="sched-cat-editor" catchtap="noop">
+      <view class="sched-cat-editor-title">{{catEditorEditingKey ? '重命名类别' : '新增自定义类别'}}</view>
+      <view class="sched-cat-editor-sub" wx:if="{{!catEditorEditingKey}}">起个名字，下次直接选，最多 6 个字</view>
+      <input
+        class="sched-cat-editor-input"
+        placeholder="如：体检、早教、游泳…"
+        value="{{catEditorValue}}"
+        bindinput="onCatEditorInput"
+        maxlength="6"
+        focus="{{true}}"
+      />
+      <view class="sched-cat-editor-error" wx:if="{{catEditorError}}">{{catEditorError}}</view>
+      <view class="sched-cat-editor-actions">
+        <view class="sched-cat-editor-cancel" bindtap="closeCatEditor" hover-class="btn-hover">取消</view>
+        <view class="sched-cat-editor-save" bindtap="saveCatEditor" hover-class="btn-hover">保存</view>
       </view>
     </view>
   </view>

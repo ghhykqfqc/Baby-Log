@@ -52,7 +52,8 @@ exports.main = async (event, context) => {
 
   if (cleanUpdates.category) {
     const validCategories = ['vaccine', 'birthday', 'appointment', 'class', 'shopping', 'gift', 'redpacket', 'other']
-    if (!validCategories.includes(cleanUpdates.category)) {
+    const isCustom = typeof cleanUpdates.category === 'string' && cleanUpdates.category.startsWith('custom_')
+    if (!validCategories.includes(cleanUpdates.category) && !isCustom) {
       return { code: -1, message: '无效的 category' }
     }
   }
