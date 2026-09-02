@@ -831,7 +831,7 @@ Page({
       }
       if (hit.type === 'diaper') {
         const record = this._allRecords.find(r => r.timestamp === hit.ts && r.recordType === 'diaper')
-        const subType = record && record.subType ? (record.subType === 'poop' ? '大便' : '小便') : ''
+        const subType = record && record.subType ? (record.subType === 'poop' ? '大便' : record.subType === 'loose' ? '拉稀' : '小便') : ''
         return { x: hit.x, y: hit.y, pos, icon: '🧷', title: `${time} 换尿布`, sub: subType || '' }
       }
       if (hit.type === 'sleep') {

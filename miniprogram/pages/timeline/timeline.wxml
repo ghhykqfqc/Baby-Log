@@ -16,8 +16,11 @@
       <view class="today-capsule" wx:if="{{todayLabel}}">
         <text class="today-text">{{todayLabel}}</text>
       </view>
-      <!-- 「记录」入口固定在最右侧 -->
-      <view class="record-btn" bindtap="goRecords" hover-class="record-btn-hover" hover-stay-time="80">
+      <!-- 「记录」入口固定在最右侧
+           注意：必须使用 catchtap 而非 bindtap，否则点击事件会冒泡到父级
+           .baby-bar（bindtap=goBabyManage），真机上会先触发 goRecords 再
+           触发 goBabyManage 导致跳回首页（模拟器有时不重现）。 -->
+      <view class="record-btn" catchtap="goRecords" hover-class="record-btn-hover" hover-stay-time="80">
         <text class="record-btn-icon">📋</text>
         <text class="record-btn-text">记录</text>
       </view>

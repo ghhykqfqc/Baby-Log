@@ -157,7 +157,7 @@ Page({
       } else if (r.recordType === 'feed' && r.amount) {
         extra = `${r.amount}ml`
       } else if (r.recordType === 'diaper' && r.subType) {
-        extra = r.subType === 'poop' ? '💩 大便' : '💦 小便'
+        extra = r.subType === 'poop' ? '💩 大便' : r.subType === 'loose' ? '🤢 拉稀' : '💦 小便'
       } else {
         extra = '无数据'
         extraClass = 'extra-no-data'

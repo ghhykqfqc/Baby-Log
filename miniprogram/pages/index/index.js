@@ -89,6 +89,12 @@ Page({
     // 喂奶量弹层（长按触发）
     showFeedSheet: false,
     feedAmountInput: '',
+    // 喂奶量弹层：是否显示自定义输入框（点击「自定义」标签后显示）
+    feedCustomMode: false,
+    // 当前选中的快捷喂奶量（ml），未选为 0
+    feedQuickAmount: 0,
+    // 喂奶量快捷选项（两排，单位 ml）
+    feedQuickOptions: [30, 60, 90, 120, 150, 180, 210, 240],
     // 尿布类型弹层（长按触发）
     showDiaperSheet: false,
     diaperTypeInput: '',
@@ -228,11 +234,13 @@ Page({
       this._timer = null
     }
     this.stopSleepTick()
+    this.stopRainAnimation()
   },
 
   onUnload() {
     if (this._timer) clearInterval(this._timer)
     this.stopSleepTick()
+    this.stopRainAnimation()
     app.eventBus.off('recordsUpdated', this.refreshFromCache)
     app.eventBus.off('babySwitched', this.onBabySwitched)
   },
@@ -332,6 +340,183 @@ Page({
     try {
       wx.setBackgroundColor({ backgroundColor: WEATHER_BG[category] })
     } catch (e) {}
+    // 雨天启动 Canvas 雨滴动画；其它天气停止
+    if (category === 'rain') {
+      // 延迟一帧，等 wx:if 渲染出 canvas 节点
+      setTimeout(() => this.startRainAnimation(), 50)
+    } else {
+      this.stopRainAnimation()
+    }
+  },
+
+  // ============================================
+  // 雨天 Canvas 动画（真实雨滴 + 底部涟漪）
+  // ============================================
+  _rainRAF: null,
+  _rainCanvas: null,
+  _rainCtx: null,
+  _rainDrops: [],
+  _ripples: [],
+  _rainDPR: 1,
+
+  /**
+   * 启动雨滴动画：用 Canvas 2d 直接绘制，不使用 setData，性能友好
+   * 设计：
+   *  - 雨滴：随机长度（10-22px）、随机倾斜角度（约 100-115 度）、随机速度
+   *  - 落地：到达底部约 88% 高度时生成涟漪并重置雨滴
+   *  - 涟漪：圆环扩散 + 淡出
+   */
+  startRainAnimation() {
+    this.stopRainAnimation()
+    const query = wx.createSelectorQuery()
+    query.select('#rainCanvas').fields({ node: true, size: true }).exec((res) => {
+      if (!res || !res[0] || !res[0].node) {
+        // canvas 还没渲染（可能弹层打开中），下次再启动
+        return
+      }
+      const canvas = res[0].node
+      const ctx = canvas.getContext('2d')
+      const dpr = wx.getSystemInfoSync().pixelRatio || 1
+      const w = res[0].width
+      const h = res[0].height
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+      ctx.scale(dpr, dpr)
+      this._rainCanvas = canvas
+      this._rainCtx = ctx
+      this._rainDPR = dpr
+
+      // 初始化雨滴：数量根据屏幕宽度自适应（约 70-120 个）
+      const count = Math.min(120, Math.max(70, Math.floor(w / 4)))
+      this._rainDrops = []
+      for (let i = 0; i < count; i++) {
+        this._rainDrops.push(this._spawnRainDrop(w, h, true))
+      }
+      this._ripples = []
+
+      // 动画循环（使用 canvas.requestAnimationFrame）
+      const tick = () => {
+        this._renderRainFrame(ctx, w, h)
+        this._rainRAF = canvas.requestAnimationFrame(tick)
+      }
+      this._rainRAF = canvas.requestAnimationFrame(tick)
+    })
+  },
+
+  /**
+   * 生成一个雨滴对象（随机长度、角度、速度、位置）
+   * initial=true 时 y 随机分布全屏（避免集中从顶部一起落下）
+   */
+  _spawnRainDrop(w, h, initial) {
+    // 倾斜角度：100-115 度（接近垂直，略向右倾斜）
+    const angleDeg = 100 + Math.random() * 15
+    const angleRad = (angleDeg * Math.PI) / 180
+    // 长度：10-22px（短线/长线混合，更像真实雨）
+    const len = 10 + Math.random() * 12
+    // 速度：6-11 px/帧
+    const speed = 6 + Math.random() * 5
+    return {
+      x: Math.random() * (w + 100) - 50,
+      y: initial ? Math.random() * h : -len - Math.random() * 60,
+      len,
+      angle: angleRad,
+      // vx, vy 由角度和速度推导
+      vx: Math.cos(angleRad) * speed,
+      vy: Math.sin(angleRad) * speed,
+      opacity: 0.25 + Math.random() * 0.35
+    }
+  },
+
+  /**
+   * 渲染一帧：雨滴下落 + 涟漪扩散
+   */
+  _renderRainFrame(ctx, w, h) {
+    ctx.clearRect(0, 0, w, h)
+    const groundY = h * 0.9 // 涟漪触发线（接近底部）
+
+    // 绘制雨滴
+    ctx.lineCap = 'round'
+    for (let i = 0; i < this._rainDrops.length; i++) {
+      const d = this._rainDrops[i]
+      const x2 = d.x + Math.cos(d.angle) * d.len
+      const y2 = d.y + Math.sin(d.angle) * d.len
+      // 渐变线条：顶部淡，底部浓，更真实
+      const grad = ctx.createLinearGradient(d.x, d.y, x2, y2)
+      grad.addColorStop(0, `rgba(180, 200, 226, 0)`)
+      grad.addColorStop(1, `rgba(180, 200, 226, ${d.opacity})`)
+      ctx.strokeStyle = grad
+      ctx.lineWidth = 1.2
+      ctx.beginPath()
+      ctx.moveTo(d.x, d.y)
+      ctx.lineTo(x2, y2)
+      ctx.stroke()
+
+      // 更新位置
+      d.x += d.vx
+      d.y += d.vy
+
+      // 落地：生成涟漪并重置雨滴
+      if (d.y > groundY + Math.random() * (h - groundY) * 0.6) {
+        // 仅有一定概率生成涟漪（避免过密），并且只在地面区域内
+        if (Math.random() < 0.5 && d.x > 0 && d.x < w) {
+          this._ripples.push({
+            x: d.x,
+            y: Math.min(h - 2, d.y),
+            r: 1,
+            maxR: 6 + Math.random() * 8,
+            opacity: 0.4
+          })
+        }
+        // 重置雨滴到顶部
+        const fresh = this._spawnRainDrop(w, h, false)
+        this._rainDrops[i] = fresh
+      }
+      // 超出右边界也重置
+      if (d.x > w + 60) {
+        const fresh = this._spawnRainDrop(w, h, false)
+        fresh.x = -50
+        this._rainDrops[i] = fresh
+      }
+    }
+
+    // 绘制并更新涟漪
+    for (let i = this._ripples.length - 1; i >= 0; i--) {
+      const rp = this._ripples[i]
+      ctx.strokeStyle = `rgba(190, 210, 232, ${rp.opacity})`
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      // 椭圆涟漪（横向稍扁，更像水面被击打的视觉效果）
+      ctx.ellipse(rp.x, rp.y, rp.r, rp.r * 0.4, 0, 0, Math.PI * 2)
+      ctx.stroke()
+      rp.r += 0.6
+      rp.opacity -= 0.025
+      if (rp.opacity <= 0 || rp.r >= rp.maxR) {
+        this._ripples.splice(i, 1)
+      }
+    }
+  },
+
+  /**
+   * 停止雨滴动画并清理（页面隐藏/切到非雨天时调用）
+   */
+  stopRainAnimation() {
+    if (this._rainRAF && this._rainCanvas) {
+      try { this._rainCanvas.cancelAnimationFrame(this._rainRAF) } catch (e) {}
+    }
+    this._rainRAF = null
+    this._rainCanvas = null
+    this._rainCtx = null
+    this._rainDrops = []
+    this._ripples = []
+  },
+
+  /**
+   * 弹层关闭后若仍是雨天，延迟 ~120ms 重启 canvas 动画
+   * （canvas 被 wx:if 卸载又重新挂载，需要等节点重建后再启动）
+   */
+  _resumeRainIfNeeded() {
+    if (this.data.weatherClass !== 'rain') return
+    setTimeout(() => this.startRainAnimation(), 120)
   },
 
   // ============================================
@@ -501,6 +686,7 @@ loadAlbum(babyId) {
 
   cancelUploadCropper() {
     this.setData({ showUploadCropper: false, uploadRawPath: '' })
+    this._resumeRainIfNeeded()
   },
 
   /**
@@ -764,6 +950,7 @@ loadAlbum(babyId) {
 
   hidePhotoEdit() {
     this.setData({ showPhotoEditSheet: false })
+    this._resumeRainIfNeeded()
   },
 
   /**
@@ -1119,19 +1306,38 @@ loadAlbum(babyId) {
   // ===== 喂奶量弹层（长按） =====
   showFeedSheet() {
     wx.vibrateShort({ type: 'light' })
-    this.setData({ showFeedSheet: true, feedAmountInput: '' })
+    this.setData({ showFeedSheet: true, feedAmountInput: '', feedCustomMode: false, feedQuickAmount: 0 })
   },
 
   hideFeedSheet() {
     this.setData({ showFeedSheet: false })
+    this._resumeRainIfNeeded()
   },
 
   onFeedAmountInput(e) {
     this.setData({ feedAmountInput: e.detail.value })
   },
 
+  /**
+   * 快捷喂奶量标签点击：选中后高亮，可直接保存
+   */
+  selectFeedQuick(e) {
+    const amount = Number(e.currentTarget.dataset.amount) || 0
+    wx.vibrateShort({ type: 'light' })
+    this.setData({ feedQuickAmount: amount, feedCustomMode: false, feedAmountInput: '' })
+  },
+
+  /**
+   * 切换到自定义输入模式
+   */
+  enableFeedCustom() {
+    wx.vibrateShort({ type: 'light' })
+    this.setData({ feedCustomMode: true, feedQuickAmount: 0 })
+  },
+
   async saveFeedWithAmount() {
-    const amount = parseFloat(this.data.feedAmountInput) || 0
+    // 优先取快捷选择的量，其次取自定义输入
+    const amount = this.data.feedQuickAmount || (this.data.feedCustomMode ? (parseFloat(this.data.feedAmountInput) || 0) : 0)
     this.setData({ showFeedSheet: false })
     wx.vibrateShort({ type: 'light' })
     this.setData({ feedPress: true })
@@ -1175,6 +1381,7 @@ loadAlbum(babyId) {
 
   hideDiaperSheet() {
     this.setData({ showDiaperSheet: false })
+    this._resumeRainIfNeeded()
   },
 
   selectDiaperType(e) {
@@ -1215,7 +1422,7 @@ loadAlbum(babyId) {
       app.enqueuePendingSync(record)
     }
 
-    const typeText = subType === 'poop' ? '大便' : subType === 'pee' ? '小便' : ''
+    const typeText = subType === 'poop' ? '大便' : subType === 'pee' ? '小便' : subType === 'loose' ? '拉稀' : ''
     wx.showToast({ title: typeText ? `已记录${typeText}` : '已记录换尿布', icon: 'success' })
   },
 
@@ -1352,6 +1559,7 @@ loadAlbum(babyId) {
 
   hideSleepSheet() {
     this.setData({ showSleepSheet: false })
+    this._resumeRainIfNeeded()
   },
 
   noop() {},
@@ -1383,6 +1591,7 @@ loadAlbum(babyId) {
       joinBabyId: '',
       joinBabyCode: ''
     })
+    this._resumeRainIfNeeded()
   },
 
   /**

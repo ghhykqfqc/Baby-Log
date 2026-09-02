@@ -15,12 +15,22 @@
       <view class="cloud cloud-1 cloud-dim"></view>
       <view class="cloud cloud-2 cloud-dim"></view>
     </block>
-    <!-- 雨：玻璃水雾 + 雨丝 -->
+    <!-- 雨：玻璃水雾 + Canvas 真实雨滴动画（随机长短/角度 + 底部涟漪） -->
     <block wx:if="{{weatherClass === 'rain'}}">
       <view class="glass-mist"></view>
-      <view class="rain-layer"></view>
-      <view class="droplet droplet-1"></view>
-      <view class="droplet droplet-2"></view>
+      <!--
+        Canvas 2d 用于绘制真实雨滴动画：
+        - 雨滴长度、角度、速度随机
+        - 底部落地后触发涟漪扩散
+        - 性能注意：弹层打开时通过 wx:if 卸载 canvas 避免真机同层渲染冲突
+        （见 MEMORY.md：弹层与 canvas 同页共存会导致弹层被 canvas 盖住）
+      -->
+      <canvas
+        type="2d"
+        id="rainCanvas"
+        class="rain-canvas"
+        wx:if="{{!showFeedSheet && !showDiaperSheet && !showSleepSheet && !showBabySheet && !showUploadCropper && !showPhotoEditSheet}}"
+      ></canvas>
     </block>
     <!-- 雪 -->
     <block wx:if="{{weatherClass === 'snow'}}">
@@ -209,11 +219,35 @@
     <view class="sleep-sheet" catchtap="noop">
       <view class="sheet-handle"></view>
       <view class="sleep-sheet-title">记录喂奶</view>
-      <view class="sheet-sub">填入喂奶量，不填也可记录时间点</view>
-      <view class="amount-input-row">
-        <input class="amount-input" type="digit" placeholder="如 120" value="{{feedAmountInput}}" bindinput="onFeedAmountInput" confirm-type="done" bindconfirm="saveFeedWithAmount" />
-        <text class="amount-unit">ml</text>
+      <view class="sheet-sub">选择常见喂奶量，或点「自定义」输入具体数值</view>
+
+      <!-- 快捷喂奶量：两排胶囊，每个点击即选中（高亮） -->
+      <view class="feed-quick-grid">
+        <view
+          class="feed-quick-item {{feedQuickAmount === item && !feedCustomMode ? 'active' : ''}}"
+          wx:for="{{feedQuickOptions}}" wx:key="*this"
+          data-amount="{{item}}"
+          bindtap="selectFeedQuick"
+          hover-class="duration-item-hover"
+        >{{item}}ml</view>
       </view>
+
+      <!-- 自定义入口标签 -->
+      <view class="feed-custom-row">
+        <view
+          class="feed-custom-tag {{feedCustomMode ? 'active' : ''}}"
+          bindtap="enableFeedCustom"
+          hover-class="duration-item-hover"
+        >✏️ 自定义</view>
+        <!-- 自定义输入框：仅当处于自定义模式时显示 -->
+        <block wx:if="{{feedCustomMode}}">
+          <view class="amount-input-row feed-custom-input">
+            <input class="amount-input" type="digit" placeholder="如 125" value="{{feedAmountInput}}" bindinput="onFeedAmountInput" confirm-type="done" bindconfirm="saveFeedWithAmount" focus="{{true}}" />
+            <text class="amount-unit">ml</text>
+          </view>
+        </block>
+      </view>
+
       <view class="sleep-action-btn sleep-action-primary" bindtap="saveFeedWithAmount" hover-class="btn-hover">
         💾 保存
       </view>
@@ -230,6 +264,7 @@
       <view class="diaper-type-grid">
         <view class="diaper-type-item {{diaperTypeInput === 'pee' ? 'active' : ''}}" data-type="pee" bindtap="selectDiaperType" hover-class="duration-item-hover">💦 小便</view>
         <view class="diaper-type-item {{diaperTypeInput === 'poop' ? 'active' : ''}}" data-type="poop" bindtap="selectDiaperType" hover-class="duration-item-hover">💩 大便</view>
+        <view class="diaper-type-item {{diaperTypeInput === 'loose' ? 'active' : ''}}" data-type="loose" bindtap="selectDiaperType" hover-class="duration-item-hover">🤢 拉稀</view>
       </view>
       <view class="sleep-action-btn sleep-action-primary" bindtap="saveDiaperWithType" hover-class="btn-hover">
         💾 保存

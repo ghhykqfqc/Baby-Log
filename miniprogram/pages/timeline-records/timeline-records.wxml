@@ -102,6 +102,7 @@
         <view class="diaper-type-row">
           <view class="diaper-type-btn {{editFormData.subType === 'pee' ? 'active' : ''}}" data-type="pee" bindtap="onEditSubType" hover-class="btn-hover">💦 小便</view>
           <view class="diaper-type-btn {{editFormData.subType === 'poop' ? 'active' : ''}}" data-type="poop" bindtap="onEditSubType" hover-class="btn-hover">💩 大便</view>
+          <view class="diaper-type-btn {{editFormData.subType === 'loose' ? 'active' : ''}}" data-type="loose" bindtap="onEditSubType" hover-class="btn-hover">🤢 拉稀</view>
         </view>
       </view>
 

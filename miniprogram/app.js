@@ -16,7 +16,7 @@
 //   - 云函数代码全部使用 cloud.DYNAMIC_CURRENT_ENV，
 //     部署到哪个环境就操作哪个环境的数据库（见 cloudfunctions/ 下各函数）
 // ============================================================
-const DEV_ENV = 'cloud1-d9gi06a3f00988852'
+const DEV_ENV = 'cloud1-d7gydxtyp19bc9ff0'
 const PROD_ENV = ''   // TODO: 填入你的生产环境 ID（云开发控制台 → 环境 → 环境 ID）
 
 /**

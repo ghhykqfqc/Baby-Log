@@ -127,7 +127,16 @@
     radial-gradient(ellipse 70% 45% at 50% 15%, rgba(226, 238, 246, 0.5) 0%, rgba(226, 238, 246, 0) 75%);
 }
 
-/* 雨丝层 */
+/* 雨滴动画 Canvas：覆盖整个背景层 */
+.rain-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 旧的 CSS 雨丝层（已废弃，保留兜底；新版用 Canvas 渲染更真实） */
 .rain-layer {
   position: absolute;
   top: -200rpx;
@@ -150,7 +159,7 @@
   to { transform: translateY(140rpx); }
 }
 
-/* 玻璃上的水珠 */
+/* 玻璃上的水珠（装饰，保留） */
 .droplet {
   position: absolute;
   border-radius: 50%;
@@ -806,6 +815,74 @@
   height: 96rpx;
   margin-bottom: 24rpx;
   box-shadow: 0 2rpx 8rpx rgba(180, 150, 110, 0.06);
+}
+
+/* 喂奶量：快捷选择网格（两排胶囊） */
+.feed-quick-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.feed-quick-item {
+  flex: 1 1 calc(25% - 16rpx);
+  min-width: calc(25% - 16rpx);
+  height: 88rpx;
+  border-radius: 22rpx;
+  background: var(--color-bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  border: 1rpx solid var(--color-divider);
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.feed-quick-item.active {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+  box-shadow: 0 4rpx 16rpx rgba(212, 184, 150, 0.35);
+}
+
+/* 自定义入口行：标签 + 输入框（点击标签后展开输入框） */
+.feed-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.feed-custom-tag {
+  flex-shrink: 0;
+  height: 88rpx;
+  padding: 0 28rpx;
+  border-radius: 22rpx;
+  background: var(--color-bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  border: 1rpx solid var(--color-divider);
+  transition: all 0.15s ease;
+}
+
+.feed-custom-tag.active {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+}
+
+/* 自定义输入框：复用 amount-input-row，但去掉默认下边距 */
+.feed-custom-input {
+  flex: 1;
+  margin-bottom: 0;
 }
 
 .amount-input {
