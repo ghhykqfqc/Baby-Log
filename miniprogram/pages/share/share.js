@@ -586,7 +586,7 @@ Page({
     ctx.textAlign = 'left'
     ctx.fillStyle = opts.brandColor || '#3D3027'
     ctx.font = 'bold 15px sans-serif'
-    ctx.fillText('秒记宝宝', pad, H - 46)
+    ctx.fillText('贝贝log', pad, H - 46)
 
     ctx.fillStyle = '#B5A795'
     ctx.font = '10px sans-serif'

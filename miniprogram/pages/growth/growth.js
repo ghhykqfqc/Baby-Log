@@ -571,7 +571,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '秒记宝宝 - 见证每一次成长',
+      title: '贝贝log - 见证每一次成长',
       path: '/pages/growth/growth'
     }
   }

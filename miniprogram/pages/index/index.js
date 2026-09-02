@@ -1920,12 +1920,12 @@ loadAlbum(babyId) {
 
   onShareAppMessage() {
     return {
-      title: '秒记宝宝 - 极简育儿记录',
+      title: '贝贝log - 极简育儿记录',
       path: '/pages/index/index'
     }
   },
 
   onShareTimeline() {
-    return { title: '我用秒记宝宝轻松记录宝宝作息' }
+    return { title: '我用贝贝log轻松记录宝宝作息' }
   }
 })

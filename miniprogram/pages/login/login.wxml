@@ -3,7 +3,7 @@
   <!-- 顶部品牌区 -->
   <view class="brand">
     <view class="logo">👶</view>
-    <view class="brand-title">秒记宝宝</view>
+    <view class="brand-title">贝贝log</view>
     <view class="brand-subtitle">极简育儿记录，一家人共同守护</view>
   </view>
 
