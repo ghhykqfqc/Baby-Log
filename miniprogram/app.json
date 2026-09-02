@@ -33,7 +33,7 @@
       },
       {
         "pagePath": "pages/timeline/timeline",
-        "text": "时光轴",
+        "text": "时光",
         "iconPath": "images/tab-timeline.png",
         "selectedIconPath": "images/tab-timeline-active.png"
       },

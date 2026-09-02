@@ -1299,13 +1299,11 @@ loadAlbum(babyId) {
    * 睡眠长按：弹出回忆记录面板
    */
   showSleepSheet() {
-    wx.vibrateShort({ type: 'light' })
     this.setData({ showSleepSheet: true })
   },
 
   // ===== 喂奶量弹层（长按） =====
   showFeedSheet() {
-    wx.vibrateShort({ type: 'light' })
     this.setData({ showFeedSheet: true, feedAmountInput: '', feedCustomMode: false, feedQuickAmount: 0 })
   },
 
@@ -1323,7 +1321,6 @@ loadAlbum(babyId) {
    */
   selectFeedQuick(e) {
     const amount = Number(e.currentTarget.dataset.amount) || 0
-    wx.vibrateShort({ type: 'light' })
     this.setData({ feedQuickAmount: amount, feedCustomMode: false, feedAmountInput: '' })
   },
 
@@ -1331,7 +1328,6 @@ loadAlbum(babyId) {
    * 切换到自定义输入模式
    */
   enableFeedCustom() {
-    wx.vibrateShort({ type: 'light' })
     this.setData({ feedCustomMode: true, feedQuickAmount: 0 })
   },
 
@@ -1339,7 +1335,6 @@ loadAlbum(babyId) {
     // 优先取快捷选择的量，其次取自定义输入
     const amount = this.data.feedQuickAmount || (this.data.feedCustomMode ? (parseFloat(this.data.feedAmountInput) || 0) : 0)
     this.setData({ showFeedSheet: false })
-    wx.vibrateShort({ type: 'light' })
     this.setData({ feedPress: true })
     setTimeout(() => this.setData({ feedPress: false }), 300)
 
@@ -1375,7 +1370,6 @@ loadAlbum(babyId) {
 
   // ===== 尿布类型弹层（长按） =====
   showDiaperSheet() {
-    wx.vibrateShort({ type: 'light' })
     this.setData({ showDiaperSheet: true, diaperTypeInput: '' })
   },
 
@@ -1391,7 +1385,6 @@ loadAlbum(babyId) {
   async saveDiaperWithType() {
     const subType = this.data.diaperTypeInput
     this.setData({ showDiaperSheet: false })
-    wx.vibrateShort({ type: 'light' })
     this.setData({ diaperPress: true })
     setTimeout(() => this.setData({ diaperPress: false }), 300)
 
@@ -1431,7 +1424,6 @@ loadAlbum(babyId) {
    */
   async startSleep() {
     const now = Date.now()
-    wx.vibrateShort({ type: 'light' })
     this.setData({
       showSleepSheet: false,
       sleeping: true,
@@ -1482,7 +1474,6 @@ loadAlbum(babyId) {
     const end = Date.now()
     const minutes = Math.max(1, Math.round((end - start) / 60000))
 
-    wx.vibrateShort({ type: 'light' })
     this.setData({
       sleeping: false,
       showSleepSheet: false,
@@ -1527,7 +1518,6 @@ loadAlbum(babyId) {
     const end = Date.now()
     const start = end - minutes * 60000
 
-    wx.vibrateShort({ type: 'light' })
     this.setData({ showSleepSheet: false, sleepPress: true })
     setTimeout(() => this.setData({ sleepPress: false }), 300)
 
@@ -1898,7 +1888,6 @@ loadAlbum(babyId) {
    * 通用记录动作（喂奶 / 尿布）
    */
   async recordAction(type, pressKey, successKey) {
-    wx.vibrateShort({ type: 'light' })
     this.setData({ [pressKey]: true })
     setTimeout(() => this.setData({ [pressKey]: false }), 300)
 

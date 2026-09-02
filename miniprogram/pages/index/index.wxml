@@ -180,7 +180,7 @@
         <view class="record-icon-wrap">
           <image class="record-icon" src="/images/icons/diaper.svg" mode="aspectFit"></image>
         </view>
-        <view class="record-label">换尿布</view>
+        <view class="record-label">尿布</view>
         <view class="card-info" wx:if="{{cardTexts.diaper.elapsed !== '--'}}">
           <view class="info-row">{{cardTexts.diaper.elapsed}}</view>
           <view class="info-row info-next" wx:if="{{cardTexts.diaper.next}}">{{cardTexts.diaper.next}}</view>

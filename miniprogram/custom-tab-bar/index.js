@@ -13,7 +13,7 @@ Component({
       },
       {
         pagePath: '/pages/timeline/timeline',
-        text: '时光轴',
+        text: '时光',
         icon: '/images/tab-timeline.png',
         iconActive: '/images/tab-timeline-active.png'
       },
