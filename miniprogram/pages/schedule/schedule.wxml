@@ -1,13 +1,55 @@
 <!-- pages/schedule/schedule.wxml - 日程页（日历视图 + 事项管理） -->
-<view class="page-schedule safe-bottom">
+<view class="page-schedule">
 
   <!-- ========== 顶部标题区 ========== -->
   <view class="sched-header">
     <view class="sched-title-row">
-      <view class="sched-title">📅 日程</view>
-      <view class="sched-today-pill" bindtap="goToday" hover-class="pill-hover" hover-stay-time="60">今天</view>
+      <view class="sched-title-wrap">
+        <view class="sched-title-icon">
+          <text class="sched-title-icon-emoji">🐰</text>
+        </view>
+        <view class="sched-title-text">
+          <view class="sched-title">{{babyInfo.name ? babyInfo.name + '的小日程' : '宝宝的小日程'}}</view>
+          <view class="sched-subtitle">把每一件小事，都放进温柔的小日历里 🌷</view>
+        </view>
+      </view>
+      <view class="sched-today-pill" bindtap="goToday" hover-class="pill-hover" hover-stay-time="60">
+        <text class="sched-today-pill-dot"></text>
+        <text>今天</text>
+      </view>
     </view>
-    <view class="sched-subtitle">{{babyInfo.name ? babyInfo.name + '的' : ''}}事项一目了然</view>
+  </view>
+
+  <!-- ========== 最近未来事项倒计时 tips ========== -->
+  <view class="sched-tips" wx:if="{{upcoming}}">
+    <view class="sched-tips-icon">
+      <text>{{upcoming.categoryMeta.icon}}</text>
+    </view>
+    <view class="sched-tips-body">
+      <view class="sched-tips-text">
+        <text class="sched-tips-label">{{upcoming.important ? '重要' : '即将到来'}}</text>
+        <text class="sched-tips-title">{{upcoming.title}}</text>
+        <text class="sched-tips-date" wx:if="{{upcoming.dateLabel}}">{{upcoming.dateLabel}}{{upcoming.startTime ? ' · ' + upcoming.startTime : ''}}</text>
+      </view>
+      <view class="sched-tips-count">
+        <view class="sched-count-block" wx:if="{{countdown.days > 0}}">
+          <text class="sched-count-num">{{countdown.days}}</text>
+          <text class="sched-count-unit">天</text>
+        </view>
+        <view class="sched-count-block">
+          <text class="sched-count-num">{{countdown.hours}}</text>
+          <text class="sched-count-unit">时</text>
+        </view>
+        <view class="sched-count-block">
+          <text class="sched-count-num">{{countdown.minutes}}</text>
+          <text class="sched-count-unit">分</text>
+        </view>
+        <view class="sched-count-block">
+          <text class="sched-count-num">{{countdown.seconds}}</text>
+          <text class="sched-count-unit">秒</text>
+        </view>
+      </view>
+    </view>
   </view>
 
   <!-- ========== 日历卡 ========== -->
@@ -15,7 +57,12 @@
     <!-- 月份切换条 -->
     <view class="cal-nav">
       <view class="cal-arrow" bindtap="prevMonth" hover-class="arrow-hover" hover-stay-time="60">‹</view>
-      <view class="cal-month-label">{{viewYear}}年 {{viewMonth}}月</view>
+      <view class="cal-month-label">
+        <text class="cal-month-year">{{viewYear}}</text>
+        <text class="cal-month-sep">年</text>
+        <text class="cal-month-num">{{viewMonth}}</text>
+        <text class="cal-month-sep">月</text>
+      </view>
       <view class="cal-arrow" bindtap="nextMonth" hover-class="arrow-hover" hover-stay-time="60">›</view>
     </view>
 
@@ -35,14 +82,16 @@
       <view
         wx:for="{{calendarDays}}"
         wx:key="key"
-        class="cal-day {{item.isCurrentMonth ? '' : 'cal-day-out'}} {{item.isToday ? 'cal-day-today' : ''}} {{selectedDate === item.dateStr ? 'cal-day-selected' : ''}}"
+        class="cal-day {{item.isCurrentMonth ? '' : 'cal-day-out'}} {{item.isToday ? 'cal-day-today' : ''}} {{selectedDate === item.dateStr ? 'cal-day-selected' : ''}} {{item.isCurrentMonth && item.dotCount > 0 ? 'cal-day-has-' + (item.hasImportant ? 'important' : item.dotColor) : ''}}"
         data-date="{{item.dateStr}}"
         bindtap="selectDate"
         hover-class="{{item.isCurrentMonth ? 'cal-day-hover' : ''}}"
         hover-stay-time="40"
       >
-        <view class="cal-day-num">{{item.day}}</view>
-        <!-- 事项标记点：根据优先级只显示一个主色点，最多叠加 3 个小点 -->
+        <view class="cal-day-num-wrap">
+          <view class="cal-day-num">{{item.day}}</view>
+        </view>
+        <!-- 事项标记：彩色小圆点 -->
         <view class="cal-day-dots" wx:if="{{item.isCurrentMonth && item.dotCount > 0}}">
           <view class="cal-dot cal-dot-{{item.dotColor}}"></view>
           <view class="cal-dot cal-dot-{{item.dotColor2}}" wx:if="{{item.dotCount > 1}}"></view>
@@ -53,63 +102,90 @@
     </view>
   </view>
 
-  <!-- ========== 滚动区：选中日事项列表 + 新增入口 ========== -->
-  <scroll-view class="sched-list-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
-    <view class="sched-list-inner">
-      <!-- 选中日期标题 -->
+  <!-- ========== 选中日摘要条（点击弹出当日事项弹层） ========== -->
+  <view class="sched-day-bar" bindtap="openDaySheet" hover-class="sched-day-bar-hover" hover-stay-time="60">
+    <view class="sched-day-bar-left">
+      <view class="sched-day-bar-date">
+        <text class="sched-day-bar-day">{{selectedShortLabel}}</text>
+        <text class="sched-day-bar-week">{{selectedWeekday}}</text>
+      </view>
+      <view class="sched-day-bar-divider"></view>
+      <view class="sched-day-bar-summary">
+        <text wx:if="{{selectedSchedules.length > 0}}">{{selectedSchedules.length}} 项安排</text>
+        <text wx:else>这一天还没有安排</text>
+        <text class="sched-day-bar-hint">点击查看和管理 ›</text>
+      </view>
+    </view>
+    <view class="sched-day-bar-add" catchtap="openAddSheet" hover-class="btn-hover">
+      <text class="sched-day-bar-add-icon">＋</text>
+      <text>添加</text>
+    </view>
+  </view>
+
+  <!-- 底部弹性留白 -->
+  <view class="sched-flex-spacer"></view>
+
+  <!-- ========== 当日事项弹层 ========== -->
+  <view class="sheet-mask" wx:if="{{showDaySheet}}" bindtap="closeDaySheet" catchtouchmove="noop">
+    <view class="sched-day-sheet" catchtap="noop">
+      <view class="sheet-handle"></view>
       <view class="sched-day-header">
         <view class="sched-day-title">
           <text class="sched-day-text">{{selectedDateLabel}}</text>
           <text class="sched-day-week">{{selectedWeekday}}</text>
         </view>
-        <view class="sched-day-count" wx:if="{{selectedSchedules.length > 0}}">{{selectedSchedules.length}} 项</view>
+        <view class="sched-day-close" bindtap="closeDaySheet" hover-class="btn-hover">✕</view>
       </view>
 
-      <!-- 加载骨架 -->
-      <view class="sched-loading" wx:if="{{loadingSchedules}}">加载中…</view>
+      <scroll-view class="sched-sheet-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+        <view class="sched-list-inner">
+          <!-- 加载骨架 -->
+          <view class="sched-loading" wx:if="{{loadingSchedules}}">加载中…</view>
 
-      <!-- 空状态 -->
-      <view class="sched-empty" wx:if="{{!loadingSchedules && selectedSchedules.length === 0}}">
-        <view class="sched-empty-icon">🌤️</view>
-        <view class="sched-empty-text">这一天还没有安排</view>
-        <view class="sched-empty-sub">点击下方按钮添加一项</view>
-      </view>
+          <!-- 空状态 -->
+          <view class="sched-empty" wx:if="{{!loadingSchedules && selectedSchedules.length === 0}}">
+            <view class="sched-empty-icon">🌤️</view>
+            <view class="sched-empty-text">这一天还没有安排</view>
+            <view class="sched-empty-sub">点击下方按钮添加一项</view>
+          </view>
 
-      <!-- 事项列表 -->
-      <view
-        wx:for="{{selectedSchedules}}"
-        wx:key="_id"
-        class="sched-item sched-cat-{{item.category}} {{item.important ? 'sched-item-important' : ''}}"
-        data-id="{{item._id}}"
-        bindtap="editSchedule"
-        hover-class="sched-item-hover"
-        hover-stay-time="60"
-      >
-        <view class="sched-item-bar"></view>
-        <view class="sched-item-body">
-          <view class="sched-item-row1">
-            <text class="sched-item-icon">{{item.categoryMeta.icon}}</text>
-            <text class="sched-item-title">{{item.title}}</text>
-            <text class="sched-item-cat">{{item.categoryMeta.label}}</text>
+          <!-- 事项列表 -->
+          <view
+            wx:for="{{selectedSchedules}}"
+            wx:key="_id"
+            class="sched-item sched-cat-{{item.category}} {{item.important ? 'sched-item-important' : ''}}"
+            data-id="{{item._id}}"
+            bindtap="editSchedule"
+            hover-class="sched-item-hover"
+            hover-stay-time="60"
+          >
+            <view class="sched-item-bar"></view>
+            <view class="sched-item-body">
+              <view class="sched-item-row1">
+                <text class="sched-item-icon">{{item.categoryMeta.icon}}</text>
+                <text class="sched-item-title">{{item.title}}</text>
+                <text class="sched-item-cat">{{item.categoryMeta.label}}</text>
+              </view>
+              <view class="sched-item-row2">
+                <text class="sched-item-time" wx:if="{{item.timeText}}">🕒 {{item.timeText}}</text>
+                <text class="sched-item-loc" wx:if="{{item.location}}">📍 {{item.location}}</text>
+              </view>
+              <view class="sched-item-note" wx:if="{{item.note}}">{{item.note}}</view>
+            </view>
           </view>
-          <view class="sched-item-row2">
-            <text class="sched-item-time" wx:if="{{item.timeText}}">🕒 {{item.timeText}}</text>
-            <text class="sched-item-loc" wx:if="{{item.location}}">📍 {{item.location}}</text>
+
+          <!-- 新增事项按钮 -->
+          <view class="sched-add-btn" bindtap="openAddSheet" hover-class="sched-add-hover" hover-stay-time="60">
+            <text class="sched-add-icon">＋</text>
+            <text>添加事项</text>
           </view>
-          <view class="sched-item-note" wx:if="{{item.note}}">{{item.note}}</view>
+
+          <!-- 底部留白 -->
+          <view style="height: 20rpx;"></view>
         </view>
-      </view>
-
-      <!-- 新增事项按钮 -->
-      <view class="sched-add-btn" bindtap="openAddSheet" hover-class="sched-add-hover" hover-stay-time="60">
-        <text class="sched-add-icon">＋</text>
-        <text>添加事项</text>
-      </view>
-
-      <!-- 底部留白避免被 tabBar 遮挡 -->
-      <view style="height: 40rpx;"></view>
+      </scroll-view>
     </view>
-  </scroll-view>
+  </view>
 
   <!-- ========== 新增 / 编辑事项弹层 ========== -->
   <view class="sheet-mask" wx:if="{{showForm}}" bindtap="closeForm" catchtouchmove="noop">
@@ -117,15 +193,53 @@
       <view class="sheet-handle"></view>
       <view class="sched-form-title">{{editingId ? '编辑事项' : '新增事项'}}</view>
 
-      <!-- 标题 -->
-      <view class="sched-form-item">
-        <text class="sched-form-label">事项</text>
-        <input class="sched-form-input" placeholder="如：接种乙肝疫苗" value="{{formData.title}}" bindinput="onTitleInput" maxlength="30" focus="{{!editingId}}" />
+      <!-- 常用事项快捷选择（仅新增模式） -->
+      <view class="sched-form-item" wx:if="{{!editingId && favoriteItems.length > 0}}">
+        <view class="sched-form-label-row">
+          <text class="sched-form-label-inline">常用事项</text>
+          <view class="sched-fav-manage" bindtap="toggleFavManage" hover-class="btn-hover">{{favManageMode ? '完成' : '管理'}}</view>
+        </view>
+        <scroll-view class="sched-fav-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+          <view class="sched-fav-row">
+            <view
+              class="sched-fav-chip"
+              wx:for="{{favoriteItems}}" wx:key="index"
+              data-fav="{{item}}" data-index="{{index}}"
+              bindtap="onFavTap"
+              hover-class="sched-cat-hover"
+              hover-stay-time="40"
+            >
+              <text class="sched-fav-chip-text">{{item}}</text>
+              <view class="sched-fav-chip-del" wx:if="{{favManageMode}}" catchtap="removeFavItem" data-fav="{{item}}">×</view>
+            </view>
+          </view>
+        </scroll-view>
       </view>
 
-      <!-- 类别 -->
+      <!-- 标题（可选，默认取类别名） -->
       <view class="sched-form-item">
-        <text class="sched-form-label">类别</text>
+        <view class="sched-form-label-row">
+          <text class="sched-form-label-inline">事项</text>
+          <text class="sched-form-label-tip">留空则默认用类别名</text>
+          <!-- 收藏当前输入为常用事项 -->
+          <view
+            class="sched-fav-add {{formData.title ? 'show' : ''}}"
+            bindtap="addFavItem"
+            hover-class="btn-hover"
+          >
+            <text class="sched-fav-add-star">{{isFavSaved ? '★' : '☆'}}</text>
+            <text class="sched-fav-add-text">{{isFavSaved ? '已收藏' : '存为常用'}}</text>
+          </view>
+        </view>
+        <input class="sched-form-input" placeholder="如：接种乙肝疫苗（可不填）" value="{{formData.title}}" bindinput="onTitleInput" maxlength="30" focus="{{!editingId}}" />
+      </view>
+
+      <!-- 类别（必选） -->
+      <view class="sched-form-item">
+        <view class="sched-form-label-row">
+          <text class="sched-form-label-inline">类别</text>
+          <text class="sched-form-label-tip">必选</text>
+        </view>
         <view class="sched-cat-grid">
           <view
             class="sched-cat-pill {{formData.category === item.key ? 'active' : ''}}"
@@ -141,7 +255,7 @@
         </view>
       </view>
 
-      <!-- 日期 + 时间 -->
+      <!-- 日期 + 开始时间 -->
       <view class="sched-form-item sched-form-row-inline">
         <view class="sched-form-half">
           <text class="sched-form-label">日期</text>
@@ -157,24 +271,61 @@
         </view>
       </view>
 
-      <view class="sched-form-item sched-form-row-inline">
-        <view class="sched-form-half">
-          <text class="sched-form-label">结束时间（可选）</text>
-          <picker mode="time" value="{{formData.endTime}}" bindchange="onEndTimeChange">
-            <view class="sched-form-picker">{{formData.endTime || '不填'}}</view>
-          </picker>
+      <!-- 更多选项：+ 号折叠区 -->
+      <view class="sched-more-section" wx:if="{{!editingId}}">
+        <view class="sched-more-toggle" bindtap="toggleMore" hover-class="btn-hover">
+          <view class="sched-more-toggle-left">
+            <view class="sched-more-toggle-icon {{showMore ? 'open' : ''}}">＋</view>
+            <text class="sched-more-toggle-text">{{showMore ? '收起更多选项' : '更多选项（结束时间 / 地点 / 备注）'}}</text>
+          </view>
+          <view class="sched-more-badges" wx:if="{{!showMore}}">
+            <text class="sched-more-badge" wx:if="{{formData.endTime}}">⏱</text>
+            <text class="sched-more-badge" wx:if="{{formData.location}}">📍</text>
+            <text class="sched-more-badge" wx:if="{{formData.note}}">📝</text>
+          </view>
         </view>
-        <view class="sched-form-half">
-          <text class="sched-form-label">地点（可选）</text>
-          <input class="sched-form-input sched-form-input-inline" placeholder="如：社区卫生中心" value="{{formData.location}}" bindinput="onLocationInput" maxlength="40" />
+
+        <view class="sched-more-body" wx:if="{{showMore}}">
+          <view class="sched-form-item sched-form-row-inline">
+            <view class="sched-form-half">
+              <text class="sched-form-label">结束时间（可选）</text>
+              <picker mode="time" value="{{formData.endTime}}" bindchange="onEndTimeChange">
+                <view class="sched-form-picker">{{formData.endTime || '不填'}}</view>
+              </picker>
+            </view>
+            <view class="sched-form-half">
+              <text class="sched-form-label">地点（可选）</text>
+              <input class="sched-form-input sched-form-input-inline" placeholder="如：社区卫生中心" value="{{formData.location}}" bindinput="onLocationInput" maxlength="40" />
+            </view>
+          </view>
+
+          <view class="sched-form-item">
+            <text class="sched-form-label">备注（可选）</text>
+            <textarea class="sched-form-textarea" placeholder="补充说明…" value="{{formData.note}}" bindinput="onNoteInput" maxlength="120" auto-height="{{true}}"></textarea>
+          </view>
         </view>
       </view>
 
-      <!-- 备注 -->
-      <view class="sched-form-item">
-        <text class="sched-form-label">备注（可选）</text>
-        <textarea class="sched-form-textarea" placeholder="补充说明…" value="{{formData.note}}" bindinput="onNoteInput" maxlength="120" auto-height="{{true}}"></textarea>
-      </view>
+      <!-- 编辑模式直接展示（无折叠） -->
+      <block wx:if="{{editingId}}">
+        <view class="sched-form-item sched-form-row-inline">
+          <view class="sched-form-half">
+            <text class="sched-form-label">结束时间（可选）</text>
+            <picker mode="time" value="{{formData.endTime}}" bindchange="onEndTimeChange">
+              <view class="sched-form-picker">{{formData.endTime || '不填'}}</view>
+            </picker>
+          </view>
+          <view class="sched-form-half">
+            <text class="sched-form-label">地点（可选）</text>
+            <input class="sched-form-input sched-form-input-inline" placeholder="如：社区卫生中心" value="{{formData.location}}" bindinput="onLocationInput" maxlength="40" />
+          </view>
+        </view>
+
+        <view class="sched-form-item">
+          <text class="sched-form-label">备注（可选）</text>
+          <textarea class="sched-form-textarea" placeholder="补充说明…" value="{{formData.note}}" bindinput="onNoteInput" maxlength="120" auto-height="{{true}}"></textarea>
+        </view>
+      </block>
 
       <!-- 重要标记 -->
       <view class="sched-form-item sched-important-row" bindtap="toggleImportant">

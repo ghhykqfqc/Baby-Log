@@ -1,4 +1,4 @@
-// pages/schedule/schedule.js - 日程页（日历视图 + 事项 CRUD）
+// pages/schedule/schedule.js - 日程页（日历视图 + 事项 CRUD + 倒计时 tips + 常用事项）
 const app = getApp()
 const { call } = require('../../utils/request')
 
@@ -22,6 +22,7 @@ const IMPORTANT_COLOR = '#E4493D'
 
 // 缓存键
 const CACHE_KEY_PREFIX = 'schedules_'
+const FAV_KEY_PREFIX = 'schedule_favs_'
 
 Page({
   data: {
@@ -34,14 +35,21 @@ Page({
     // 当前选中日期 YYYY-MM-DD
     selectedDate: '',
     selectedDateLabel: '',
+    selectedShortLabel: '',
     selectedWeekday: '',
     // 选中日事项
     selectedSchedules: [],
     loadingSchedules: false,
+    // 当日事项弹层
+    showDaySheet: false,
+    // 最近未来事项（倒计时 tips）
+    upcoming: null,
+    countdown: { days: 0, hours: '00', minutes: '00', seconds: '00' },
     // 表单
     showForm: false,
     editingId: '',
     submitting: false,
+    showMore: false,          // 新增模式「更多选项」折叠开关
     formData: {
       title: '',
       category: 'other',
@@ -53,6 +61,10 @@ Page({
       important: false
     },
     categoryOptions: CATEGORY_OPTIONS,
+    // 常用事项（自定义快捷选项）
+    favoriteItems: [],
+    favManageMode: false,
+    isFavSaved: false,        // 当前输入的标题是否已收藏
     // 当前月份所有事项（按 date 分组），用于日历标记
     _monthSchedules: {} // 不在 setData 里更新，纯运行时缓存
   },
@@ -67,7 +79,10 @@ Page({
       'formData.date': todayStr
     })
     this._refreshCalendar()
+    this._loadFavorites()
+    this._startCountdownTimer()
     app.eventBus.on('babySwitched', this._onBabySwitched = () => {
+      this._loadFavorites()
       this.loadMonthSchedules()
     })
   },
@@ -79,11 +94,218 @@ Page({
     }
     this.setData({ babyInfo: app.globalData.babyInfo || {} })
     this.loadMonthSchedules()
+    // 页面重新可见：恢复倒计时，并立即校正一次（处理后台期间的时间流逝）
+    this._startCountdownTimer()
+    this._tickCountdown(true)
   },
 
-  onHide() {},
+  onHide() {
+    this._stopCountdownTimer()
+  },
+
   onUnload() {
+    this._stopCountdownTimer()
     if (this._onBabySwitched) app.eventBus.off('babySwitched', this._onBabySwitched)
+  },
+
+  // ============================================
+  // 最近未来事项 + 实时倒计时
+  // ============================================
+
+  /**
+   * 从「运行时已加载的全部事项」里找出最近的未来事项。
+   * 数据源：本月事项 + 云端拉取的未来 90 天事项（_upcomingPool）。
+   * 规则：事项时间点 > 当前时间；有 startTime 按 date+startTime，
+   * 无 startTime 按 date 当天 00:00 结束后视为当天过期（当天无时间事项仍提示「今天」）。
+   */
+  _refreshUpcoming() {
+    const pool = []
+    const monthSchedules = this._monthSchedules || {}
+    Object.keys(monthSchedules).forEach(k => {
+      pool.push(...monthSchedules[k])
+    })
+    if (this._upcomingPool && this._upcomingPool.length > 0) {
+      pool.push(...this._upcomingPool)
+    }
+
+    const now = new Date()
+    const todayStr = this._fmtDate(now)
+    let best = null
+    let bestTs = Infinity
+    let todayNoTime = null // 兜底：今天的无时间事项（无未来事项时才展示）
+    const seen = {}
+    pool.forEach(s => {
+      if (!s || !s.date || seen[s._id]) return
+      seen[s._id] = true
+      const ts = this._scheduleTs(s)
+      if (ts > now.getTime()) {
+        if (ts < bestTs) { bestTs = ts; best = s }
+      } else if (!s.startTime && s.date === todayStr) {
+        if (!todayNoTime) todayNoTime = s
+      }
+    })
+    if (!best) best = todayNoTime
+
+    if (!best) {
+      if (this.data.upcoming) this.setData({ upcoming: null })
+      return
+    }
+
+    const meta = CATEGORY_MAP[best.category] || CATEGORY_MAP.other
+    this._upcomingTarget = best
+    this.setData({
+      upcoming: {
+        ...best,
+        categoryMeta: meta,
+        dateLabel: best.date === todayStr ? '今天' : this._fmtDateLabel(best.date),
+        isToday: best.date === todayStr
+      }
+    })
+    this._tickCountdown(true)
+  },
+
+  /** 计算事项的目标时间戳：date + startTime（无 startTime 则当天 00:00） */
+  _scheduleTs(s) {
+    const [y, m, d] = s.date.split('-').map(n => parseInt(n, 10))
+    if (s.startTime) {
+      const [hh, mm] = s.startTime.split(':').map(n => parseInt(n, 10))
+      return new Date(y, m - 1, d, hh, mm, 0).getTime()
+    }
+    return new Date(y, m - 1, d, 0, 0, 0).getTime()
+  },
+
+  /** 启动每秒倒计时（只在页面可见时运行） */
+  _startCountdownTimer() {
+    if (this._countdownTimer) return
+    this._countdownTimer = setInterval(() => this._tickCountdown(), 1000)
+  },
+
+  _stopCountdownTimer() {
+    if (this._countdownTimer) {
+      clearInterval(this._countdownTimer)
+      this._countdownTimer = null
+    }
+  },
+
+  /**
+   * 计算并渲染倒计时。force=true 时强制重算（即使无目标也清零）。
+   * 到期后自动刷新数据源（防止显示负数）。
+   */
+  _tickCountdown(force) {
+    const target = this._upcomingTarget
+    if (!target) {
+      if (force && this.data.upcoming) this.setData({ upcoming: null })
+      return
+    }
+    let diff = this._scheduleTs(target) - Date.now()
+    if (diff <= 0) {
+      // 已到期：若是无时间事项且还在今天，显示提示但倒计时归零
+      if (!target.startTime && target.date === this._fmtDate(new Date())) {
+        if (this.data.countdown.seconds !== '00') {
+          this.setData({ countdown: { days: 0, hours: '00', minutes: '00', seconds: '00' } })
+        }
+        return
+      }
+      // 到期：刷新最近事项
+      this._refreshUpcoming()
+      return
+    }
+    const days = Math.floor(diff / 86400000)
+    const hours = Math.floor((diff % 86400000) / 3600000)
+    const minutes = Math.floor((diff % 3600000) / 60000)
+    const seconds = Math.floor((diff % 60000) / 1000)
+    const pad = n => String(n).padStart(2, '0')
+    this.setData({
+      countdown: { days, hours: pad(hours), minutes: pad(minutes), seconds: pad(seconds) }
+    })
+  },
+
+  /** 拉取未来 90 天内的事项（只用于倒计时 tips，不影响日历） */
+  async _loadUpcomingPool() {
+    const babyId = app.globalData.babyId || 'default'
+    if (!app.globalData.cloudReady || !app.globalData.isOnline) return
+    const today = new Date()
+    const start = this._fmtDate(today)
+    const endD = new Date(today.getTime() + 90 * 86400000)
+    const end = this._fmtDate(endD)
+    try {
+      const data = await call('getSchedules', { babyId, startDate: start, endDate: end })
+      this._upcomingPool = (data && data.schedules) || []
+    } catch (e) {
+      // 静默失败：仅用本月数据兜底
+    }
+    this._refreshUpcoming()
+  },
+
+  // ============================================
+  // 常用事项（本地收藏）
+  // ============================================
+
+  _favKey() {
+    const babyId = app.globalData.babyId || 'default'
+    return FAV_KEY_PREFIX + babyId
+  },
+
+  _loadFavorites() {
+    let favs = []
+    try { favs = wx.getStorageSync(this._favKey()) || [] } catch (e) {}
+    this.setData({ favoriteItems: favs.slice(0, 20) })
+  },
+
+  _saveFavorites(favs) {
+    try { wx.setStorageSync(this._favKey(), favs) } catch (e) {}
+    this.setData({ favoriteItems: favs.slice(0, 20) })
+  },
+
+  /** 点击常用事项 chip：填充标题并联动类别 */
+  onFavTap(e) {
+    if (this.data.favManageMode) return
+    const fav = e.currentTarget.dataset.fav
+    if (!fav) return
+    const patch = { 'formData.title': fav }
+    // 匹配类别名自动选中类别
+    const cat = CATEGORY_OPTIONS.find(c => c.label === fav)
+    if (cat) patch['formData.category'] = cat.key
+    // 检查是否已收藏状态
+    const favs = this.data.favoriteItems
+    patch.isFavSaved = favs.indexOf(fav) >= 0
+    this.setData(patch)
+  },
+
+  /** 收藏当前输入的事项为常用 */
+  addFavItem() {
+    const title = (this.data.formData.title || '').trim()
+    if (!title) {
+      wx.showToast({ title: '先输入事项名称', icon: 'none' })
+      return
+    }
+    let favs = this.data.favoriteItems.slice()
+    const idx = favs.indexOf(title)
+    if (idx >= 0) {
+      // 已收藏：再次点击取消收藏
+      favs.splice(idx, 1)
+      this._saveFavorites(favs)
+      this.setData({ isFavSaved: false })
+      wx.showToast({ title: '已取消收藏', icon: 'none' })
+      return
+    }
+    favs.unshift(title)
+    if (favs.length > 20) favs.pop()
+    this._saveFavorites(favs)
+    this.setData({ isFavSaved: true })
+    wx.showToast({ title: '已存为常用 ✓', icon: 'none' })
+  },
+
+  /** 管理模式删除常用事项 */
+  removeFavItem(e) {
+    const fav = e.currentTarget.dataset.fav
+    const favs = this.data.favoriteItems.filter(f => f !== fav)
+    this._saveFavorites(favs)
+    if (this.data.formData.title === fav) this.setData({ isFavSaved: false })
+  },
+
+  toggleFavManage() {
+    this.setData({ favManageMode: !this.data.favManageMode })
   },
 
   // ============================================
@@ -143,17 +365,19 @@ Page({
       isCurrentMonth,
       isToday,
       dotCount: 0,
+      hasImportant: false,
       dotColor: '',
       dotColor2: '',
       dotColor3: ''
     }
     if (schedules && schedules.length > 0) {
       item.dotCount = schedules.length
-      // 排序：重要优先，然后按类别顺序
+      // 排序：重要优先
       const sorted = schedules.slice().sort((a, b) => {
         if (!!b.important - !!a.important) return !!b.important - !!a.important
         return 0
       })
+      item.hasImportant = !!(sorted.length > 0 && sorted[0].important)
       const dots = sorted.slice(0, 3).map(s => s.important ? 'important' : s.category)
       item.dotColor = dots[0] || ''
       item.dotColor2 = dots[1] || ''
@@ -179,8 +403,21 @@ Page({
     this.setData({
       selectedSchedules: enriched,
       selectedDateLabel: this._fmtDateLabel(sel),
+      selectedShortLabel: this._fmtShortLabel(sel),
       selectedWeekday: this._weekdayLabel(sel)
     })
+  },
+
+  /** 短日期标签：今天 / 明天 / X月X日 */
+  _fmtShortLabel(dateStr) {
+    if (!dateStr) return ''
+    const todayStr = this._fmtDate(new Date())
+    if (dateStr === todayStr) return '今天'
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    if (dateStr === this._fmtDate(tomorrow)) return '明天'
+    const [, m, d] = dateStr.split('-').map(n => parseInt(n, 10))
+    return `${m}月${d}日`
   },
 
   /**
@@ -237,6 +474,9 @@ Page({
         console.warn('getSchedules failed', err)
       }
     }
+
+    // 倒计时数据源：本月 + 未来 90 天
+    this._loadUpcomingPool()
   },
 
   /**
@@ -251,6 +491,7 @@ Page({
     })
     this._monthSchedules = grouped
     this._refreshCalendar()
+    this._refreshUpcoming()
   },
 
   // ============================================
@@ -259,13 +500,13 @@ Page({
 
   selectDate(e) {
     const dateStr = e.currentTarget.dataset.date
-    if (!dateStr || dateStr === this.data.selectedDate) return
+    if (!dateStr) return
     // 若点击非当月日期，自动切换视图月份
     const d = new Date(dateStr)
     const y = d.getFullYear()
     const m = d.getMonth() + 1
     let viewChanged = false
-    const patch = { selectedDate: dateStr }
+    const patch = { selectedDate: dateStr, showDaySheet: true }
     if (y !== this.data.viewYear || m !== this.data.viewMonth) {
       patch.viewYear = y
       patch.viewMonth = m
@@ -301,9 +542,22 @@ Page({
     this.setData({
       viewYear: today.getFullYear(),
       viewMonth: today.getMonth() + 1,
-      selectedDate: todayStr
+      selectedDate: todayStr,
+      showDaySheet: true
     })
     this.loadMonthSchedules()
+  },
+
+  // ============================================
+  // 当日事项弹层
+  // ============================================
+
+  openDaySheet() {
+    this.setData({ showDaySheet: true })
+  },
+
+  closeDaySheet() {
+    this.setData({ showDaySheet: false })
   },
 
   // ============================================
@@ -314,6 +568,9 @@ Page({
     this.setData({
       showForm: true,
       editingId: '',
+      showMore: false,
+      favManageMode: false,
+      isFavSaved: false,
       formData: {
         title: '',
         category: 'other',
@@ -334,6 +591,7 @@ Page({
     this.setData({
       showForm: true,
       editingId: id,
+      isFavSaved: this.data.favoriteItems.indexOf(target.title || '') >= 0,
       formData: {
         title: target.title || '',
         category: target.category || 'other',
@@ -348,10 +606,16 @@ Page({
   },
 
   closeForm() {
-    this.setData({ showForm: false, editingId: '' })
+    this.setData({ showForm: false, editingId: '', favManageMode: false })
   },
 
-  onTitleInput(e)       { this.setData({ 'formData.title': e.detail.value }) },
+  onTitleInput(e) {
+    const title = e.detail.value
+    this.setData({
+      'formData.title': title,
+      isFavSaved: this.data.favoriteItems.indexOf(title.trim()) >= 0 && !!title.trim()
+    })
+  },
   onLocationInput(e)    { this.setData({ 'formData.location': e.detail.value }) },
   onNoteInput(e)        { this.setData({ 'formData.note': e.detail.value }) },
   onDateChange(e)       { this.setData({ 'formData.date': e.detail.value }) },
@@ -362,16 +626,19 @@ Page({
     this.setData({ 'formData.category': e.currentTarget.dataset.key })
   },
 
+  toggleMore() {
+    this.setData({ showMore: !this.data.showMore })
+  },
+
   toggleImportant() {
     this.setData({ 'formData.important': !this.data.formData.important })
   },
 
   async saveSchedule() {
     const f = this.data.formData
-    if (!f.title || !f.title.trim()) {
-      wx.showToast({ title: '请填写事项标题', icon: 'none' })
-      return
-    }
+    // 事项非必填：留空则默认取类别名
+    const catMeta = CATEGORY_MAP[f.category] || CATEGORY_MAP.other
+    const title = (f.title && f.title.trim()) || catMeta.label
     if (!f.date) {
       wx.showToast({ title: '请选择日期', icon: 'none' })
       return
@@ -385,13 +652,13 @@ Page({
     const babyId = app.globalData.babyId || 'default'
     const payload = {
       babyId,
-      title: f.title.trim(),
+      title,
       category: f.category,
       date: f.date,
       startTime: f.startTime,
       endTime: f.endTime,
-      location: f.location.trim(),
-      note: f.note.trim(),
+      location: (f.location || '').trim(),
+      note: (f.note || '').trim(),
       important: f.important
     }
 
@@ -403,7 +670,8 @@ Page({
         await call('addSchedule', payload)
         wx.showToast({ title: '已添加', icon: 'success' })
       }
-      this.setData({ showForm: false, editingId: '' })
+      // 保存成功：关闭表单弹层，回到当日事项弹层
+      this.setData({ showForm: false, editingId: '', favManageMode: false })
       this.loadMonthSchedules()
     } catch (err) {
       console.error('save schedule failed', err)
@@ -413,26 +681,25 @@ Page({
     }
   },
 
-  async deleteSchedule() {
+  deleteSchedule() {
     if (!this.data.editingId) return
-    const res = await new Promise(resolve => {
-      wx.showModal({
-        title: '删除事项',
-        content: '确定要删除这条事项吗？',
-        confirmText: '删除',
-        confirmColor: '#E8554E',
-        success: r => resolve(r.confirm)
-      })
+    wx.showModal({
+      title: '删除事项',
+      content: '确定要删除这条事项吗？',
+      confirmText: '删除',
+      confirmColor: '#E8554E',
+      success: r => {
+        if (!r.confirm) return
+        call('deleteSchedule', { scheduleId: this.data.editingId }).then(() => {
+          wx.showToast({ title: '已删除', icon: 'success' })
+          // 删除成功：关闭表单，回到当日事项弹层
+          this.setData({ showForm: false, editingId: '' })
+          this.loadMonthSchedules()
+        }).catch(() => {
+          wx.showToast({ title: '删除失败', icon: 'none' })
+        })
+      }
     })
-    if (!res) return
-    try {
-      await call('deleteSchedule', { scheduleId: this.data.editingId })
-      wx.showToast({ title: '已删除', icon: 'success' })
-      this.setData({ showForm: false, editingId: '' })
-      this.loadMonthSchedules()
-    } catch (err) {
-      wx.showToast({ title: '删除失败', icon: 'none' })
-    }
   },
 
   noop() {},

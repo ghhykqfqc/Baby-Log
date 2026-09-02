@@ -1,5 +1,5 @@
 /* pages/schedule/schedule.wxss - 日程页（日历 + 事项列表）
-   设计风格：奶咖色系 · 清新简约 · 大量留白 · 类别色点柔和醒目 */
+   设计风格：奶咖色系 · 清新可爱 · 圆润柔和 · 类别色温柔醒目 */
 
 /* 整页锁定一屏：列布局 */
 .page-schedule {
@@ -14,11 +14,11 @@
 }
 
 /* ============================================
-   顶部标题区
+   顶部标题区（可爱徽章图标 + 温柔副标题）
    ============================================ */
 .sched-header {
   flex-shrink: 0;
-  padding: 8rpx 0 16rpx;
+  padding: 8rpx 0 20rpx;
 }
 
 .sched-title-row {
@@ -27,21 +27,93 @@
   justify-content: space-between;
 }
 
+.sched-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  min-width: 0;
+}
+
+/* 可爱徽章图标：圆润奶咖底 + 兔兔 */
+.sched-title-icon {
+  position: relative;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(135deg, #F7E8D2 0%, #EAD3B4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6rpx 16rpx rgba(212, 184, 150, 0.35);
+  flex-shrink: 0;
+}
+
+.sched-title-icon-emoji {
+  font-size: 48rpx;
+  line-height: 1;
+}
+
+/* 徽章右上角小装饰点 */
+.sched-title-icon::after {
+  content: '';
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  width: 22rpx;
+  height: 22rpx;
+  border-radius: 50%;
+  background: #F5C6AA;
+  border: 4rpx solid #FFFFFF;
+  box-sizing: content-box;
+}
+
+.sched-title-text {
+  min-width: 0;
+  flex: 1;
+}
+
 .sched-title {
-  font-size: 44rpx;
+  font-size: 40rpx;
   font-weight: 700;
   color: var(--color-text-primary);
   letter-spacing: 1rpx;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.sched-subtitle {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  margin-top: 6rpx;
+  letter-spacing: 1rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「今天」胶囊按钮 */
 .sched-today-pill {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
   font-size: 24rpx;
   color: var(--color-primary-dark);
   background: var(--color-primary-bg);
-  padding: 10rpx 28rpx;
+  padding: 10rpx 26rpx;
   border-radius: 999rpx;
   font-weight: 600;
   letter-spacing: 1rpx;
+  flex-shrink: 0;
+  border: 2rpx solid rgba(212, 184, 150, 0.35);
+}
+
+.sched-today-pill-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #E89B7B;
 }
 
 .pill-hover {
@@ -49,10 +121,105 @@
   transform: scale(0.96);
 }
 
-.sched-subtitle {
-  font-size: 24rpx;
+/* ============================================
+   最近未来事项倒计时 tips
+   ============================================ */
+.sched-tips {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  background: linear-gradient(135deg, #FDF3E3 0%, #FAE7D0 100%);
+  border: 2rpx solid rgba(212, 184, 150, 0.3);
+  border-radius: var(--radius-md);
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 4rpx 16rpx rgba(212, 184, 150, 0.15);
+}
+
+.sched-tips-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  flex-shrink: 0;
+  box-shadow: 0 4rpx 10rpx rgba(212, 184, 150, 0.25);
+}
+
+.sched-tips-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.sched-tips-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.sched-tips-label {
+  font-size: 20rpx;
+  color: #C08A50;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  align-self: flex-start;
+}
+
+.sched-tips-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sched-tips-date {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 倒计时数字块 */
+.sched-tips-count {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+
+.sched-count-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 56rpx;
+  background: #FFFFFF;
+  border-radius: 14rpx;
+  padding: 6rpx 8rpx;
+  box-shadow: 0 3rpx 8rpx rgba(212, 184, 150, 0.2);
+}
+
+.sched-count-num {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.sched-count-unit {
+  font-size: 18rpx;
   color: var(--color-text-hint);
-  margin-top: 8rpx;
+  line-height: 1.2;
 }
 
 /* ============================================
@@ -65,6 +232,7 @@
   padding: 24rpx 20rpx 16rpx;
   box-shadow: var(--shadow-card);
   margin-bottom: 24rpx;
+  border: 2rpx solid rgba(240, 232, 222, 0.8);
 }
 
 /* 月份切换 */
@@ -86,6 +254,8 @@
   border-radius: 50%;
   font-weight: 300;
   line-height: 1;
+  background: var(--color-bg);
+  transition: all 0.15s ease;
 }
 
 .arrow-hover {
@@ -95,10 +265,28 @@
 }
 
 .cal-month-label {
-  font-size: 32rpx;
-  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+}
+
+.cal-month-year {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.cal-month-sep {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+}
+
+.cal-month-num {
+  font-size: 36rpx;
+  font-weight: 700;
   color: var(--color-text-primary);
   letter-spacing: 2rpx;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 星期表头 */
@@ -116,10 +304,10 @@
 }
 
 .cal-weekday-end {
-  color: var(--color-primary-dark);
+  color: #E8A88F;
 }
 
-/* 日期网格：7 列 */
+/* 日期网格：7 列（弹层化后格子加大） */
 .cal-grid {
   display: flex;
   flex-wrap: wrap;
@@ -128,12 +316,11 @@
 .cal-day {
   position: relative;
   flex: 0 0 calc(100% / 7);
-  height: 96rpx;
+  height: 108rpx;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 16rpx;
+  border-radius: 20rpx;
   transition: background 0.15s ease;
 }
 
@@ -145,6 +332,17 @@
   background: var(--color-primary-bg);
 }
 
+/* 数字容器：固定宽高圆形，彻底解决垂直不居中 */
+.cal-day-num-wrap {
+  position: relative;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .cal-day-num {
   font-size: 28rpx;
   color: var(--color-text-primary);
@@ -152,28 +350,28 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 今天：浅奶咖描边圈 */
-.cal-day-today .cal-day-num {
-  color: var(--color-primary-dark);
-  font-weight: 700;
-}
-
-.cal-day-today::before {
+/* 今天：圆圈画在数字容器上，绝对居中 */
+.cal-day-today .cal-day-num-wrap::before {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 56rpx;
-  height: 56rpx;
-  border: 2rpx solid var(--color-primary);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 3rpx solid #E8A88F;
   border-radius: 50%;
-  transform: translate(-50%, -75%);
   pointer-events: none;
 }
 
-/* 选中态：实心奶咖底色 */
-.cal-day-selected {
-  background: var(--color-primary);
+.cal-day-today .cal-day-num {
+  color: #D67E5A;
+  font-weight: 700;
+}
+
+/* 选中态：实心暖色底（画在数字容器上，居中且不撑满格子） */
+.cal-day-selected .cal-day-num-wrap {
+  background: linear-gradient(135deg, #E8B990 0%, #D4B896 100%);
+  box-shadow: 0 4rpx 12rpx rgba(212, 184, 150, 0.45);
 }
 
 .cal-day-selected .cal-day-num {
@@ -181,20 +379,49 @@
   font-weight: 700;
 }
 
-.cal-day-selected.cal-day-today::before {
+/* 选中 + 今天：圈改为白色描边（保留"今天"识别） */
+.cal-day-selected.cal-day-today .cal-day-num-wrap::before {
   border-color: #FFFFFF;
+  top: -4rpx;
+  left: -4rpx;
+  right: -4rpx;
+  bottom: -4rpx;
 }
 
-/* 事项标记点 */
+/* ===== 有事项的日期：柔和浅色底（比小圆点更醒目） ===== */
+.cal-day-has-vaccine     { background: rgba(232, 85, 78, 0.10); }
+.cal-day-has-birthday    { background: rgba(245, 166, 35, 0.12); }
+.cal-day-has-appointment { background: rgba(108, 163, 197, 0.12); }
+.cal-day-has-class       { background: rgba(155, 107, 217, 0.10); }
+.cal-day-has-shopping    { background: rgba(127, 176, 105, 0.12); }
+.cal-day-has-gift        { background: rgba(212, 184, 150, 0.16); }
+.cal-day-has-redpacket   { background: rgba(228, 73, 61, 0.10); }
+.cal-day-has-other       { background: rgba(139, 125, 110, 0.10); }
+.cal-day-has-important   { background: rgba(228, 73, 61, 0.14); }
+
+/* 选中态优先级最高：覆盖事项底色 */
+.cal-day-selected.cal-day-has-vaccine,
+.cal-day-selected.cal-day-has-birthday,
+.cal-day-selected.cal-day-has-appointment,
+.cal-day-selected.cal-day-has-class,
+.cal-day-selected.cal-day-has-shopping,
+.cal-day-selected.cal-day-has-gift,
+.cal-day-selected.cal-day-has-redpacket,
+.cal-day-selected.cal-day-has-other,
+.cal-day-selected.cal-day-has-important {
+  background: transparent;
+}
+
+/* 事项标记点：贴着数字容器底部 */
 .cal-day-dots {
   position: absolute;
-  bottom: 12rpx;
+  bottom: 10rpx;
   left: 0;
   right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
+  gap: 5rpx;
 }
 
 .cal-dot {
@@ -231,28 +458,154 @@
 }
 
 /* ============================================
-   事项列表区（可滚动）
+   选中日摘要条（主页面，点击弹层）
    ============================================ */
-.sched-list-scroll {
+.sched-day-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  border: 2rpx solid rgba(240, 232, 222, 0.8);
+  padding: 20rpx 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(180,150,110,0.08);
+}
+
+.sched-day-bar-hover {
+  transform: scale(0.99);
+  background: #FDFBF7;
+}
+
+.sched-day-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  min-width: 0;
+  flex: 1;
+}
+
+.sched-day-bar-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 88rpx;
+}
+
+.sched-day-bar-day {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  line-height: 1.2;
+}
+
+.sched-day-bar-week {
+  font-size: 20rpx;
+  color: var(--color-text-hint);
+  line-height: 1.3;
+}
+
+.sched-day-bar-divider {
+  width: 2rpx;
+  height: 48rpx;
+  background: var(--color-divider);
+  flex-shrink: 0;
+}
+
+.sched-day-bar-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  min-width: 0;
+  font-size: 26rpx;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.sched-day-bar-hint {
+  font-size: 20rpx;
+  color: var(--color-text-hint);
+  font-weight: 400;
+}
+
+/* 摘要条上的快捷添加按钮 */
+.sched-day-bar-add {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  background: var(--color-primary-bg);
+  border: 2rpx solid rgba(212, 184, 150, 0.35);
+  color: var(--color-primary-dark);
+  font-size: 24rpx;
+  font-weight: 600;
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+
+.sched-day-bar-add-icon {
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 底部弹性留白（整页不滚动，多余空间留白） */
+.sched-flex-spacer {
+  flex: 1;
+  min-height: 20rpx;
+}
+
+/* ============================================
+   当日事项弹层
+   ============================================ */
+.sched-day-sheet {
+  width: 100%;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 24rpx);
+  box-sizing: border-box;
+  animation: sheetUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.sched-sheet-scroll {
   flex: 1;
   min-height: 0;
+  max-height: calc(82vh - 160rpx);
 }
 
-.sched-list-inner {
-  padding: 0 4rpx;
+.sched-day-close {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
+/* 弹层内头部标题 */
 .sched-day-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding: 8rpx 4rpx 16rpx;
+  padding: 0 4rpx 20rpx;
+  flex-shrink: 0;
 }
 
 .sched-day-title {
   display: flex;
   align-items: baseline;
   gap: 12rpx;
+  min-width: 0;
 }
 
 .sched-day-text {
@@ -266,12 +619,9 @@
   color: var(--color-text-hint);
 }
 
-.sched-day-count {
-  font-size: 24rpx;
-  color: var(--color-primary-dark);
-  background: var(--color-primary-bg);
-  padding: 6rpx 16rpx;
-  border-radius: 999rpx;
+/* 弹层内列表容器 */
+.sched-list-inner {
+  padding: 0 4rpx;
 }
 
 /* 加载 / 空状态 */
@@ -280,9 +630,7 @@
   color: var(--color-text-hint);
   font-size: 26rpx;
   padding: 40rpx 0;
-}
-
-.sched-empty {
+}.sched-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -315,7 +663,7 @@
   display: flex;
   background: var(--color-bg-card);
   border-radius: var(--radius-md);
-  padding: 24rpx 24rpx 24rpx 32rpx;
+  padding: 24rpx 24rpx 24rpx 36rpx;
   margin-bottom: 16rpx;
   box-shadow: 0 2rpx 12rpx rgba(180,150,110,0.08);
   overflow: hidden;
@@ -327,13 +675,14 @@
   box-shadow: 0 4rpx 18rpx rgba(180,150,110,0.16);
 }
 
-/* 左侧类别色条 */
+/* 左侧类别色条：圆头胶囊 */
 .sched-item-bar {
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  left: 12rpx;
+  top: 20rpx;
+  bottom: 20rpx;
   width: 8rpx;
+  border-radius: 4rpx;
   background: var(--color-text-hint);
 }
 
@@ -444,7 +793,7 @@
 }
 
 /* ============================================
-   新增 / 编辑弹层
+   通用弹层遮罩（新增/编辑表单弹层，层级高于当日事项弹层）
    ============================================ */
 .sheet-mask {
   position: fixed;
@@ -452,8 +801,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 10000;
+  background: rgba(61, 48, 39, 0.45);
+  z-index: 11000;
   display: flex;
   align-items: flex-end;
   animation: maskIn 0.25s ease;
@@ -492,11 +841,110 @@
   font-weight: 600;
   color: var(--color-text-primary);
   text-align: center;
-  margin-bottom: 16rpx;
+  margin-bottom: 20rpx;
 }
 
 .sched-form-item {
   margin-bottom: 20rpx;
+}
+
+/* 标签行：标签 + 提示 + 收藏按钮 */
+.sched-form-label-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 10rpx;
+}
+
+.sched-form-label-inline {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.sched-form-label-tip {
+  font-size: 20rpx;
+  color: #C9BBA8;
+  flex-shrink: 0;
+}
+
+/* 「存为常用」收藏按钮（有输入才显示） */
+.sched-fav-add {
+  display: none;
+  align-items: center;
+  gap: 4rpx;
+  margin-left: auto;
+  font-size: 22rpx;
+  color: #C08A50;
+  background: #FDF3E3;
+  border: 2rpx solid rgba(212, 184, 150, 0.35);
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.sched-fav-add.show {
+  display: flex;
+}
+
+.sched-fav-add-text {
+  font-size: 20rpx;
+}
+
+/* 常用事项横向滚动条 */
+.sched-fav-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.sched-fav-row {
+  display: inline-flex;
+  gap: 12rpx;
+  padding: 4rpx 0 8rpx;
+}
+
+.sched-fav-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  background: var(--color-bg-card);
+  border: 2rpx solid rgba(212, 184, 150, 0.35);
+  border-radius: 999rpx;
+  padding: 12rpx 24rpx;
+  flex-shrink: 0;
+}
+
+.sched-fav-chip-text {
+  font-size: 24rpx;
+  color: var(--color-text-primary);
+}
+
+.sched-fav-chip-del {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: #FBE9E7;
+  color: var(--color-danger);
+  font-size: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* 管理按钮 */
+.sched-fav-manage {
+  margin-left: auto;
+  font-size: 22rpx;
+  color: var(--color-primary-dark);
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  background: var(--color-primary-bg);
+  flex-shrink: 0;
 }
 
 .sched-form-label {
@@ -556,6 +1004,79 @@
   min-width: 0;
 }
 
+/* ===== 更多选项折叠区（+ 号） ===== */
+.sched-more-section {
+  margin-bottom: 20rpx;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  overflow: hidden;
+}
+
+.sched-more-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 24rpx;
+  gap: 12rpx;
+}
+
+.sched-more-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+}
+
+/* + 号图标：展开时旋转成 × */
+.sched-more-toggle-icon {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: var(--color-primary-bg);
+  color: var(--color-primary-dark);
+  font-size: 30rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+
+.sched-more-toggle-icon.open {
+  transform: rotate(45deg);
+  background: var(--color-primary-light);
+}
+
+.sched-more-toggle-text {
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 折叠时显示已填字段的 emoji 徽标 */
+.sched-more-badges {
+  display: flex;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.sched-more-badge {
+  font-size: 24rpx;
+  background: var(--color-bg);
+  border-radius: 10rpx;
+  padding: 4rpx 10rpx;
+  line-height: 1.3;
+}
+
+.sched-more-body {
+  padding: 0 24rpx 20rpx;
+  animation: fadeIn 0.25s ease;
+}
+
 /* 类别选择网格 */
 .sched-cat-grid {
   display: flex;
@@ -580,6 +1101,7 @@
 .sched-cat-pill.active {
   background: var(--color-primary-bg);
   border-color: var(--color-primary);
+  box-shadow: 0 4rpx 12rpx rgba(212, 184, 150, 0.25);
 }
 
 .sched-cat-hover {
@@ -648,7 +1170,7 @@
 }
 
 .sched-switch.on {
-  background: var(--color-primary);
+  background: #E8A88F;
 }
 
 .sched-switch-knob {
