@@ -623,7 +623,19 @@ Page({
   onEndTimeChange(e)    { this.setData({ 'formData.endTime': e.detail.value }) },
 
   onCatTap(e) {
-    this.setData({ 'formData.category': e.currentTarget.dataset.key })
+    const newKey = e.currentTarget.dataset.key
+    const oldKey = this.data.formData.category
+    if (newKey === oldKey) return
+    const oldMeta = CATEGORY_MAP[oldKey] || CATEGORY_MAP.other
+    const newMeta = CATEGORY_MAP[newKey] || CATEGORY_MAP.other
+    const patch = { 'formData.category': newKey }
+    // 标题智能联动：当前标题为空、或就是旧类别名（用户未自定义）时，切换类别自动换成新类别名
+    const curTitle = (this.data.formData.title || '').trim()
+    if (!curTitle || curTitle === oldMeta.label) {
+      patch['formData.title'] = newMeta.label
+      patch.isFavSaved = this.data.favoriteItems.indexOf(newMeta.label) >= 0
+    }
+    this.setData(patch)
   },
 
   toggleMore() {
