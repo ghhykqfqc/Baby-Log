@@ -114,6 +114,7 @@ Page({
     favoriteItems: [],
     favManageMode: false,
     isFavSaved: false,        // 当前输入的标题是否已收藏
+    titleFocus: false,        // 标题输入框受控聚焦（联动更新前强制失焦，规避 input 聚焦时不刷新 value 的特性）
     // 当前月份所有事项（按 date 分组），用于日历标记
     _monthSchedules: {} // 不在 setData 里更新，纯运行时缓存
   },
@@ -364,12 +365,10 @@ Page({
       // 重命名
       const cat = cats.find(c => c.key === editingKey)
       if (cat) cat.label = label
-      // 若当前表单选中的正是该类别：未手动输入标题时同步跟随新类别名（保持展示一致，超长省略）
+      // 若当前表单选中的正是该类别：标题无条件跟随新类别名（超长省略，与标签一致）
       if (this.data.formData.category === editingKey) {
-        if (!this._titleDirty) {
-          const displayLabel = ellipsizeLabel(label)
-          this.setData({ 'formData.title': displayLabel, isFavSaved: this.data.favoriteItems.indexOf(displayLabel) >= 0 })
-        }
+        const displayLabel = ellipsizeLabel(label)
+        this.setData({ 'formData.title': displayLabel, isFavSaved: this.data.favoriteItems.indexOf(displayLabel) >= 0 })
       }
     } else {
       // 新增：custom_<时间戳> 保证唯一；头插排第一个（刚建的最常用）
@@ -379,18 +378,16 @@ Page({
     }
     this._saveCustomCategories(cats)
     this.closeCatEditor()
-    // 新增成功：默认选中新类别，标题同步填充为类别展示名（与标签一致，超长省略）
+    // 新增成功：默认选中新类别，标题无条件填充为类别展示名（与标签一致，超长省略）
     if (newCatKey && this.data.showForm) {
-      if (!this._titleDirty) {
-        const displayLabel = ellipsizeLabel(label)
-        this.setData({
-          'formData.category': newCatKey,
-          'formData.title': displayLabel,
-          isFavSaved: this.data.favoriteItems.indexOf(displayLabel) >= 0
-        })
-      } else {
-        this.setData({ 'formData.category': newCatKey })
+      const displayLabel = ellipsizeLabel(label)
+      const patch = {
+        'formData.category': newCatKey,
+        'formData.title': displayLabel,
+        isFavSaved: this.data.favoriteItems.indexOf(displayLabel) >= 0
       }
+      if (this.data.titleFocus) patch.titleFocus = false
+      this.setData(patch)
     }
     wx.showToast({ title: editingKey ? '已更新' : '已添加', icon: 'success' })
   },
@@ -409,14 +406,9 @@ Page({
         if (!r.confirm) return
         const cats = (this._customCats || []).filter(c => c.key !== key)
         this._saveCustomCategories(cats)
-        // 若当前表单选中该类别，回落到无选中；标题仅在被自动填充（未编辑）时清空
+        // 若当前表单选中该类别，回落到无选中并清空标题（下次点类别重新联动）
         if (this.data.formData.category === key) {
-          const patch = { 'formData.category': '' }
-          if (!this._titleDirty) {
-            patch['formData.title'] = ''
-            patch.isFavSaved = false
-          }
-          this.setData(patch)
+          this.setData({ 'formData.category': '', 'formData.title': '', isFavSaved: false })
         }
         wx.showToast({ title: '已删除', icon: 'none' })
       }
@@ -448,7 +440,6 @@ Page({
     if (this.data.favManageMode) return
     const fav = e.currentTarget.dataset.fav
     if (!fav) return
-    this._titleDirty = true // 主动选择的内容视为用户输入，切类别不再覆盖
     const patch = { 'formData.title': fav }
     // 匹配类别名自动选中类别（兼容完整名与省略名：chip 可能存完整名，pill 展示省略名）
     const cat = this.data.categoryOptions.find(c => !c.isAdd && (c.label === fav || ellipsizeLabel(fav) === c.label))
@@ -754,13 +745,13 @@ Page({
   openAddSheet() {
     // 默认选中第一个可选类别（自定义在前，若无则第一个内置）
     const firstCat = this.data.categoryOptions.find(c => !c.isAdd)
-    this._titleDirty = false // 用户未手动输入过标题：切类别时标题自动跟随类别名
     this.setData({
       showForm: true,
       editingId: '',
       showMore: false,
       favManageMode: false,
       isFavSaved: false,
+      titleFocus: false, // 打开表单后延迟聚焦，避免聚焦态干扰联动更新
       formData: {
         title: firstCat ? firstCat.label : '',
         category: firstCat ? firstCat.key : '',
@@ -772,18 +763,20 @@ Page({
         important: false
       }
     })
+    // 新增模式延迟自动聚焦标题框（延迟期内用户已点类别/输入则不再强制聚焦）
+    this._titleFocusTimer = setTimeout(() => {
+      if (this.data.showForm && !this.data.editingId) this.setData({ titleFocus: true })
+    }, 300)
   },
 
   editSchedule(e) {
     const id = e.currentTarget.dataset.id
     const target = (this._monthSchedules[this.data.selectedDate] || []).find(s => s._id === id)
     if (!target) return
-    // 本次会话内用户尚未手动输入标题：若带入的旧标题就是旧类别名（默认填充产物），
-    // 视为「未编辑」，切类别时标题继续跟随；否则视为用户内容，切类别不覆盖
-    this._titleDirty = !!(target.title && target.title !== getCatMeta(target.category).label)
     this.setData({
       showForm: true,
       editingId: id,
+      titleFocus: false, // 编辑模式不自动聚焦，避免键盘遮挡
       isFavSaved: this.data.favoriteItems.indexOf(target.title || '') >= 0,
       formData: {
         title: target.title || '',
@@ -799,16 +792,21 @@ Page({
   },
 
   closeForm() {
-    this.setData({ showForm: false, editingId: '', favManageMode: false })
+    if (this._titleFocusTimer) { clearTimeout(this._titleFocusTimer); this._titleFocusTimer = null }
+    this.setData({ showForm: false, editingId: '', favManageMode: false, titleFocus: false })
   },
 
   onTitleInput(e) {
     const title = e.detail.value
-    this._titleDirty = true // 用户手动编辑过标题，此后切类别不再覆盖
     this.setData({
       'formData.title': title,
       isFavSaved: this.data.favoriteItems.indexOf(title.trim()) >= 0 && !!title.trim()
     })
+  },
+
+  /** 标题输入框失焦：解除聚焦态，后续切类别的联动更新才能刷新 input 显示 */
+  onTitleBlur(e) {
+    if (this.data.titleFocus) this.setData({ titleFocus: false })
   },
   onLocationInput(e)    { this.setData({ 'formData.location': e.detail.value }) },
   onNoteInput(e)        { this.setData({ 'formData.note': e.detail.value }) },
@@ -826,15 +824,16 @@ Page({
     const oldKey = this.data.formData.category
     if (newKey === oldKey) return
     const newMeta = getCatMeta(newKey)
-    const patch = { 'formData.category': newKey }
-    // 标题智能联动：用户未手动编辑过标题（或标题为空）时，切换类别自动填充新类别名；
-    // 用户输入过（即使内容恰好与类别名一致）则一律保留，绝不覆盖
-    if (!this._titleDirty) {
-      // 标题填充与类别标签展示保持一致：超长类别用省略名（前4字…）
-      const displayLabel = ellipsizeLabel(newMeta.label)
-      patch['formData.title'] = displayLabel
-      patch.isFavSaved = this.data.favoriteItems.indexOf(displayLabel) >= 0
+    // 点击类别即联动：标题无条件切换为该类别展示名（超长省略，与标签一致）；
+    // 用户随后仍可手动编辑标题，保存时按输入框实际内容存储
+    const displayLabel = ellipsizeLabel(newMeta.label)
+    const patch = {
+      'formData.category': newKey,
+      'formData.title': displayLabel,
+      isFavSaved: this.data.favoriteItems.indexOf(displayLabel) >= 0
     }
+    // 微信 input 聚焦期间 setData 不刷新显示：先解除聚焦再更新
+    if (this.data.titleFocus) patch.titleFocus = false
     this.setData(patch)
   },
 

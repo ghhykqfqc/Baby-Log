@@ -231,7 +231,7 @@
             <text class="sched-fav-add-text">{{isFavSaved ? '已收藏' : '存为常用'}}</text>
           </view>
         </view>
-        <input class="sched-form-input" placeholder="如：接种乙肝疫苗（可不填）" value="{{formData.title}}" bindinput="onTitleInput" maxlength="30" focus="{{!editingId}}" />
+        <input class="sched-form-input" placeholder="如：接种乙肝疫苗（可不填）" value="{{formData.title}}" bindinput="onTitleInput" bindblur="onTitleBlur" maxlength="30" focus="{{titleFocus}}" />
       </view>
 
       <!-- 类别（必选，自定义在前，「＋」入口排最前） -->
