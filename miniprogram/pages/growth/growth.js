@@ -7,6 +7,36 @@ const storage = require('../../utils/storage')
 const DAYS_PER_MONTH = 30.44
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
+// 图表内边距（bottom 40：容纳 X 轴两行标签——「日」刻度 + 年月单位，互不遮挡）
+const CHART_PADDING = { left: 44, right: 16, top: 16, bottom: 40 }
+
+// WHO 生长参考标准锚点（月龄 → 中位参考值）
+const WHO_WEIGHT = [
+  { month: 0, val: 3.3 }, { month: 3, val: 6.0 }, { month: 6, val: 7.9 },
+  { month: 12, val: 9.6 }, { month: 24, val: 12.2 }, { month: 36, val: 14.3 }
+]
+const WHO_HEIGHT = [
+  { month: 0, val: 50 }, { month: 3, val: 61 }, { month: 6, val: 67 },
+  { month: 12, val: 76 }, { month: 24, val: 87 }, { month: 36, val: 95 }
+]
+
+/** 月龄 → WHO 参考值（相邻锚点线性插值，超出 0~36 月取端点值） */
+function whoValAt(month, isWeight) {
+  const anchors = isWeight ? WHO_WEIGHT : WHO_HEIGHT
+  if (month <= anchors[0].month) return anchors[0].val
+  const lastA = anchors[anchors.length - 1]
+  if (month >= lastA.month) return lastA.val
+  for (let i = 1; i < anchors.length; i++) {
+    if (month <= anchors[i].month) {
+      const a = anchors[i - 1]
+      const b = anchors[i]
+      const t = (month - a.month) / (b.month - a.month)
+      return a.val + (b.val - a.val) * t
+    }
+  }
+  return lastA.val
+}
+
 Page({
   data: {
     babyInfo: {},
@@ -84,7 +114,12 @@ Page({
    */
   async loadData() {
     const cached = storage.get(storage.CACHE_KEYS.GROWTH_DATA) || []
-    const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+    // 合并全局与本地缓存的宝宝资料：缓存可能缺 birthDate（旧数据），
+    // 缺失时用 globalData 补齐——否则 WHO 虚线会退化为水平参考线
+    const globalInfo = app.globalData.babyInfo || {}
+    const storedInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+    const babyInfo = { ...globalInfo, ...storedInfo }
+    if (!babyInfo.birthDate && globalInfo.birthDate) babyInfo.birthDate = globalInfo.birthDate
     this.setData({ babyInfo })
 
     // 有缓存 → 立即渲染数据卡并结束骨架，不等云端（卡片首先出现，图表随后）
@@ -384,6 +419,64 @@ Page({
   },
 
   /**
+   * 图表主题色：体重=暖橙，身高=雾蓝（与日程页约诊同色系），数据点/曲线/渐变统一取色
+   */
+  chartTheme() {
+    return this.data.chartType === 'weight'
+      ? { main: '#E89B5F', fillTop: 'rgba(232, 155, 95, 0.25)' }
+      : { main: '#6CA3C5', fillTop: 'rgba(108, 163, 197, 0.25)' }
+  },
+
+  /**
+   * 构建自适应 Y 轴范围：包络「可见记录值 ∪ 窗口内 WHO 参考值」，
+   * 上下各扩 15% 呼吸空间后取整到漂亮刻度。
+   * 效果：12 天窗口内 WHO 虚线 ~0.35kg 的增长被放大为清晰斜率，
+   * 而不是在 0~15kg 全量程里被压成水平线。
+   */
+  buildYRange() {
+    const type = this.data.chartType
+    const isWeight = type === 'weight'
+    const range = this._dateRange
+    const babyInfo = this.data.babyInfo
+    const birthTs = babyInfo.birthDate && !isNaN(new Date(babyInfo.birthDate.replace(/-/g, '/')).getTime())
+      ? new Date(babyInfo.birthDate.replace(/-/g, '/')).getTime()
+      : null
+
+    const vals = []
+    // 宝宝记录值
+    this.data.records.forEach(r => {
+      if (r[type]) vals.push(Number(r[type]))
+    })
+    // 窗口内 WHO 参考值（有生日才换算月龄；无生日取 0 月龄锚点值）
+    if (range) {
+      if (birthTs !== null) {
+        const startM = (range.startTs - birthTs) / (DAYS_PER_MONTH * MS_PER_DAY)
+        const endM = (range.endTs - birthTs) / (DAYS_PER_MONTH * MS_PER_DAY)
+        vals.push(whoValAt(startM, isWeight), whoValAt(endM, isWeight))
+        // WHO 在区间内非单调时（凸增），中点也要采样，避免包络偏窄
+        vals.push(whoValAt((startM + endM) / 2, isWeight))
+      } else {
+        vals.push(whoValAt(0, isWeight))
+      }
+    }
+    if (vals.length === 0) {
+      return isWeight ? { min: 0, max: 15 } : { min: 40, max: 100 }
+    }
+
+    let min = Math.min(...vals)
+    let max = Math.max(...vals)
+    const span = max - min || Math.max(1, max * 0.2) // 全部同值时给 20% 展开空间
+    min = min - span * 0.15
+    max = max + span * 0.15
+    // 取整到漂亮刻度：体重步长 0.5kg，身高步长 2cm
+    const step = isWeight ? 0.5 : 2
+    min = Math.floor(min / step) * step
+    max = Math.ceil(max / step) * step
+    if (max - min < step * 4) max = min + step * 4 // 至少 4 格，防止过窄
+    return { min, max }
+  },
+
+  /**
    * 计算宝宝在测量日期时的月龄（浮点数）
    */
   monthAgeOf(birthDate, measureDate) {
@@ -393,7 +486,7 @@ Page({
   },
 
   /**
-   * 使用 Canvas 2D 绘制生长曲线（平滑曲线 + 弱化 WHO 参考线）
+   * 使用 Canvas 2D 绘制生长曲线（日期横轴 + WHO 参考虚线 + 宝宝数据点）
    */
   drawChart() {
     const query = wx.createSelectorQuery()
@@ -415,14 +508,54 @@ Page({
         ctx.fillStyle = '#FFFFFF'
         ctx.fillRect(0, 0, width, height)
 
-        this.drawWHOStandards(ctx, width, height)
-        this.drawBabyCurve(ctx, width, height)
-        this.drawAxes(ctx, width, height)
+        // 构建日期范围（横轴数据域）+ 自适应 Y 轴范围；无有效日期则只画 Y 轴
+        this._dateRange = this.buildDateRange()
+        this._yRange = this.buildYRange()
+        this.drawYAxis(ctx, width, height)
+        if (this._dateRange) {
+          this.drawWHOStandards(ctx, width, height)
+          this.drawBabyCurve(ctx, width, height)
+          this.drawDateAxis(ctx, width, height)
+          this.drawYearMonthLabel(ctx, width, height)
+        }
       })
   },
 
-  drawAxes(ctx, width, height) {
-    const padding = { left: 44, right: 16, top: 16, bottom: 34 }
+  /**
+   * 构建日期横轴的时间范围：当前指标的记录日 - 2天 ~ +2天（单条 ±3 天）。
+   * 只看当前图表类型（体重/身高）有值的记录，避免另一指标的日期把窗口撑宽。
+   */
+  buildDateRange() {
+    const type = this.data.chartType
+    const dates = this.data.records
+      .filter(r => r[type] && r.measureDate)
+      .map(r => r.measureDate)
+      .sort()
+    if (dates.length === 0) return null
+    const start = new Date(dates[0].replace(/-/g, '/'))
+    const end = new Date(dates[dates.length - 1].replace(/-/g, '/'))
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return null
+    const pad = dates.length === 1 ? 3 * MS_PER_DAY : 2 * MS_PER_DAY
+    return {
+      startTs: start.getTime() - pad,
+      endTs: end.getTime() + pad
+    }
+  },
+
+  /**
+   * 时间戳 → 图表 x 坐标
+   */
+  xOfTs(ts, chartW) {
+    const range = this._dateRange
+    const ratio = (ts - range.startTs) / (range.endTs - range.startTs)
+    return CHART_PADDING.left + chartW * Math.max(0, Math.min(1, ratio))
+  },
+
+  /**
+   * 绘制 Y 轴：水平网格线 + 刻度值 + 单位（kg/cm 放左上角）
+   */
+  drawYAxis(ctx, width, height) {
+    const padding = CHART_PADDING
     const chartW = width - padding.left - padding.right
     const chartH = height - padding.top - padding.bottom
 
@@ -437,10 +570,10 @@ Page({
       ctx.stroke()
     }
 
-    // Y 轴刻度文字
+    // Y 轴刻度值（自适应范围，保留合适小数位：体重 1 位、身高 0 位）
+    const { min: yMin, max: yMax } = this._yRange
     const type = this.data.chartType
-    const yMax = type === 'weight' ? 15 : 100
-    const yMin = type === 'weight' ? 0 : 40
+    const decimals = type === 'weight' ? 1 : 0
     ctx.fillStyle = '#B5A795'
     ctx.font = '10px -apple-system, sans-serif'
     ctx.textAlign = 'right'
@@ -448,85 +581,172 @@ Page({
     for (let i = 0; i <= 4; i++) {
       const yVal = yMin + (yMax - yMin) * (1 - i / 4)
       const yPos = padding.top + chartH * i / 4
-      ctx.fillText(yVal.toFixed(0), padding.left - 6, yPos)
+      ctx.fillText(yVal.toFixed(decimals), padding.left - 6, yPos)
     }
-
-    // X 轴月龄标签
-    const months = [0, 6, 12, 18, 24, 30, 36]
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'top'
-    months.forEach((m) => {
-      const xPos = padding.left + chartW * m / 36
-      ctx.fillText(`${m}`, xPos, padding.top + chartH + 8)
-    })
+    // 单位放 Y 轴顶端左上角
+    ctx.font = '600 10px -apple-system, sans-serif'
+    ctx.fillStyle = '#8B7D6E'
+    ctx.textAlign = 'left'
+    ctx.fillText(type === 'weight' ? 'kg' : 'cm', 4, padding.top + 2)
   },
 
   /**
-   * 绘制 WHO 参考曲线（弱化为背景虚线）
+   * 绘制日期横轴刻度：每 1~3 天一个「日」刻度，右端预留年月单位区不遮挡
    */
-  drawWHOStandards(ctx, width, height) {
-    const padding = { left: 44, right: 16, top: 16, bottom: 34 }
+  drawDateAxis(ctx, width, height) {
+    const padding = CHART_PADDING
     const chartW = width - padding.left - padding.right
     const chartH = height - padding.top - padding.bottom
+    const range = this._dateRange
 
-    const whoWeight = [
-      { month: 0, val: 3.3 }, { month: 3, val: 6.0 }, { month: 6, val: 7.9 },
-      { month: 12, val: 9.6 }, { month: 24, val: 12.2 }, { month: 36, val: 14.3 }
-    ]
-    const whoHeight = [
-      { month: 0, val: 50 }, { month: 3, val: 61 }, { month: 6, val: 67 },
-      { month: 12, val: 76 }, { month: 24, val: 87 }, { month: 36, val: 95 }
-    ]
+    // 候选刻度：从起始日到结束日，每 1~3 天取一个（保证相邻刻度间隔 ≥ 18px）
+    const totalDays = Math.ceil((range.endTs - range.startTs) / MS_PER_DAY)
+    const approxW = totalDays > 0 ? chartW / totalDays : chartW
+    const step = Math.max(1, Math.ceil(18 / approxW))
 
-    const data = this.data.chartType === 'weight' ? whoWeight : whoHeight
-    const yMax = this.data.chartType === 'weight' ? 15 : 100
-    const yMin = this.data.chartType === 'weight' ? 0 : 40
+    ctx.font = '10px -apple-system, sans-serif'
+    ctx.fillStyle = '#B5A795'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+
+    const dayStart = new Date(range.startTs)
+    dayStart.setHours(0, 0, 0, 0)
+    const firstDayTs = dayStart.getTime()
+    let tickCount = 0
+    for (let d = 0; d <= totalDays; d += step) {
+      const ts = firstDayTs + d * MS_PER_DAY
+      const date = new Date(ts)
+      const xPos = this.xOfTs(ts, chartW)
+      // 右端预留「年月」单位区（约 34px），超出则不画刻度
+      if (xPos > padding.left + chartW - 34) continue
+      ctx.fillText(`${date.getDate()}`, xPos, padding.top + chartH + 8)
+      tickCount++
+    }
+    return tickCount
+  },
+
+  /**
+   * 绘制横轴「年月」单位：取数据范围实际覆盖的年月，放在 X 轴下方第二行
+   * （与「日」刻度错行 + 右侧留白，互不遮挡）
+   */
+  drawYearMonthLabel(ctx, width, height) {
+    const padding = CHART_PADDING
+    const chartH = height - padding.top - padding.bottom
+    const range = this._dateRange
+    const startD = new Date(range.startTs)
+    const endD = new Date(range.endTs)
+    const sameYear = startD.getFullYear() === endD.getFullYear()
+    const sameMonth = sameYear && startD.getMonth() === endD.getMonth()
+    let label
+    if (sameMonth) {
+      label = `${startD.getFullYear()}年${startD.getMonth() + 1}月`
+    } else if (sameYear) {
+      label = `${startD.getFullYear()}年 ${startD.getMonth() + 1}~${endD.getMonth() + 1}月`
+    } else {
+      label = `${startD.getFullYear()}.${startD.getMonth() + 1} ~ ${endD.getFullYear()}.${endD.getMonth() + 1}`
+    }
+    ctx.font = '600 10px -apple-system, sans-serif'
+    ctx.fillStyle = '#8B7D6E'
+    ctx.textAlign = 'right'
+    ctx.textBaseline = 'top'
+    ctx.fillText(label, width - 4, padding.top + chartH + 22)
+  },
+
+  /**
+   * 绘制 WHO 参考虚线：按可见日期区间逐日采样，月龄值由 WHO 锚点线性插值得出，
+   * 虚线铺满横轴且随宝宝月龄平滑上升（自适应 Y 轴下上升趋势清晰可见）。
+   * 无出生日期时退化为水平参照线（取 0 月龄锚点值，仍可对比数值高低）。
+   */
+  drawWHOStandards(ctx, width, height) {
+    const padding = CHART_PADDING
+    const chartW = width - padding.left - padding.right
+    const chartH = height - padding.top - padding.bottom
+    const isWeight = this.data.chartType === 'weight'
+    const { min: yMin, max: yMax } = this._yRange
+
+    const range = this._dateRange
+    const babyInfo = this.data.babyInfo
+    const birthTs = babyInfo.birthDate && !isNaN(new Date(babyInfo.birthDate.replace(/-/g, '/')).getTime())
+      ? new Date(babyInfo.birthDate.replace(/-/g, '/')).getTime()
+      : null
 
     ctx.strokeStyle = '#E8DCC9'
     ctx.lineWidth = 1.5
     ctx.setLineDash([4, 4])
     ctx.beginPath()
-    data.forEach((d, i) => {
-      const x = padding.left + chartW * d.month / 36
-      const y = padding.top + chartH - chartH * (d.val - yMin) / (yMax - yMin)
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    })
+
+    let labelAnchor = null // 用于「WHO 参考线」标注定位
+    if (birthTs !== null) {
+      // 有生日：可见区间内逐日采样（最多 ~40 个点，足够平滑），虚线铺满横轴
+      const totalDays = Math.ceil((range.endTs - range.startTs) / MS_PER_DAY)
+      const stepDays = Math.max(1, Math.ceil(totalDays / 40))
+      const dayStart = new Date(range.startTs)
+      dayStart.setHours(0, 0, 0, 0)
+      let started = false
+      for (let d = 0; d <= totalDays; d += stepDays) {
+        const ts = dayStart.getTime() + d * MS_PER_DAY
+        const monthAge = (ts - birthTs) / (DAYS_PER_MONTH * MS_PER_DAY)
+        const val = whoValAt(monthAge, isWeight)
+        const x = this.xOfTs(ts, chartW)
+        const y = padding.top + chartH - chartH * (val - yMin) / (yMax - yMin)
+        if (!started) { ctx.moveTo(x, y); started = true; labelAnchor = { x, y } }
+        else ctx.lineTo(x, y)
+      }
+    } else {
+      // 无生日：0 月龄锚点值画水平参照线
+      const midTs = (range.startTs + range.endTs) / 2
+      const x1 = this.xOfTs(range.startTs, chartW)
+      const x2 = this.xOfTs(range.endTs, chartW)
+      const val = whoValAt(0, isWeight)
+      const y = padding.top + chartH - chartH * (val - yMin) / (yMax - yMin)
+      ctx.moveTo(x1, y)
+      ctx.lineTo(x2, y)
+      labelAnchor = { x: this.xOfTs(midTs, chartW), y }
+    }
     ctx.stroke()
     ctx.setLineDash([])
+
+    // 虚线含义标注：贴在虚线起点（或水平参照线中部）下方
+    if (labelAnchor) {
+      ctx.font = '9px -apple-system, sans-serif'
+      ctx.fillStyle = '#C9BBAA'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'top'
+      const labelY = Math.min(labelAnchor.y + 10, padding.top + chartH - 12)
+      const labelX = Math.min(labelAnchor.x + 6, padding.left + chartW - 56)
+      ctx.fillText('WHO 参考线', labelX, labelY)
+    }
   },
 
   /**
-   * 绘制宝宝实际数据曲线（平滑贝塞尔 + 数据点）
+   * 绘制宝宝实际数据曲线（按测量日期定位，不依赖出生日期）
+   * 体重=暖橙 / 身高=雾蓝，白底描边大圆点 + 数值标注，与 WHO 虚线清晰对比
    */
   drawBabyCurve(ctx, width, height) {
     const type = this.data.chartType
-    const records = this.data.records.filter(r => r[type])
+    const records = this.data.records
+      .filter(r => r[type] && r.measureDate)
+      .sort((a, b) => (a.measureDate || '').localeCompare(b.measureDate || ''))
     if (records.length === 0) return
 
-    const babyInfo = this.data.babyInfo
-    const birthDate = babyInfo.birthDate ? new Date(babyInfo.birthDate.replace(/-/g, '/')) : null
-    if (!birthDate || isNaN(birthDate.getTime())) return
-
-    const padding = { left: 44, right: 16, top: 16, bottom: 34 }
+    const theme = this.chartTheme()
+    const padding = CHART_PADDING
     const chartW = width - padding.left - padding.right
     const chartH = height - padding.top - padding.bottom
-    const yMax = type === 'weight' ? 15 : 100
-    const yMin = type === 'weight' ? 0 : 40
+    const { min: yMin, max: yMax } = this._yRange
 
-    // 计算每个点的坐标
+    // 每条记录按测量日期映射 x 坐标（日期轴，与出生日期无关）
     const points = records.map((r) => {
-      const monthAge = this.monthAgeOf(birthDate, r.measureDate)
-      const monthClamped = Math.max(0, Math.min(36, monthAge))
-      const x = padding.left + chartW * monthClamped / 36
+      const ts = new Date(r.measureDate.replace(/-/g, '/')).getTime()
+      const x = this.xOfTs(ts, chartW)
       const y = padding.top + chartH - chartH * (r[type] - yMin) / (yMax - yMin)
-      return { x, y }
+      return { x, y, record: r }
     })
 
-    // 填充渐变区域
+    // 填充渐变区域（跟随主题色）
     const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH)
-    gradient.addColorStop(0, 'rgba(232, 155, 95, 0.25)')
-    gradient.addColorStop(1, 'rgba(232, 155, 95, 0.02)')
+    gradient.addColorStop(0, theme.fillTop)
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
     ctx.fillStyle = gradient
     ctx.beginPath()
     ctx.moveTo(points[0].x, padding.top + chartH)
@@ -535,15 +755,13 @@ Page({
     ctx.closePath()
     ctx.fill()
 
-    // 平滑曲线（二次贝塞尔）
-    ctx.strokeStyle = '#E89B5F'
-    ctx.lineWidth = 2.5
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.beginPath()
-    if (points.length === 1) {
-      ctx.moveTo(points[0].x, points[0].y)
-    } else {
+    // 平滑曲线（两点以上才有连线；单点只画数据点）
+    if (points.length > 1) {
+      ctx.strokeStyle = theme.main
+      ctx.lineWidth = 2.5
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.beginPath()
       ctx.moveTo(points[0].x, points[0].y)
       for (let i = 1; i < points.length; i++) {
         const prev = points[i - 1]
@@ -553,19 +771,36 @@ Page({
         ctx.quadraticCurveTo(prev.x, prev.y, midX, midY)
       }
       ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y)
+      ctx.stroke()
     }
-    ctx.stroke()
 
-    // 数据点
+    // 醒目数据点：白底大圆（主题色描边）+ 内充实心圆——不依赖任何生日信息，必定绘制
     points.forEach((p) => {
       ctx.fillStyle = '#FFFFFF'
+      ctx.strokeStyle = theme.main
+      ctx.lineWidth = 1.5
       ctx.beginPath()
-      ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI)
+      ctx.arc(p.x, p.y, 6, 0, 2 * Math.PI)
       ctx.fill()
-      ctx.fillStyle = '#E89B5F'
+      ctx.stroke()
+      ctx.fillStyle = theme.main
       ctx.beginPath()
-      ctx.arc(p.x, p.y, 3, 0, 2 * Math.PI)
+      ctx.arc(p.x, p.y, 3.2, 0, 2 * Math.PI)
       ctx.fill()
+    })
+
+    // 数值标注：每个点上方标注「数值+单位」，边缘避让（顶部不够翻到点下方、左右不出界）
+    const unit = type === 'weight' ? 'kg' : 'cm'
+    ctx.font = 'bold 10px -apple-system, sans-serif'
+    ctx.fillStyle = theme.main
+    ctx.textAlign = 'center'
+    points.forEach((p) => {
+      const label = `${this.round1(p.record[type])}${unit}`
+      const above = p.y - 18 >= padding.top
+      const labelY = above ? p.y - 18 : p.y + 14
+      const labelX = Math.min(Math.max(p.x, padding.left + 18), padding.left + chartW - 18)
+      ctx.textBaseline = above ? 'bottom' : 'top'
+      ctx.fillText(label, labelX, labelY)
     })
   },
 
