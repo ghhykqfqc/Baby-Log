@@ -17,6 +17,27 @@ const CATEGORY_OPTIONS = [
 // 自定义类别的兜底元数据（图标/颜色固定，label 动态）
 const CUSTOM_CAT_META = { icon: '🏷️', label: '自定义', color: '#8B7D6E' }
 
+// 类别标签展示省略长度：超过 4 个字符截断为前 4 字 + …（保证标签不超宽；
+// 仅影响展示，存储与标题填充仍用完整名）
+const CAT_LABEL_MAX = 4
+
+/** 展示用类别名：超过 4 字省略为「前4字…」 */
+function ellipsizeLabel(label, max) {
+  const m = max || CAT_LABEL_MAX
+  const s = String(label || '')
+  return s.length > m ? s.slice(0, m) + '…' : s
+}
+
+/** 取类别展示名（内置或自定义）：返回完整 label（含自定义类别映射） */
+function getCatLabel(key, customCats) {
+  if (CATEGORY_MAP[key]) return CATEGORY_MAP[key].label
+  if (key && key.startsWith('custom_')) {
+    const cat = (customCats || []).find(c => c.key === key)
+    return (cat && cat.label) || '自定义'
+  }
+  return '其他'
+}
+
 // 内置类别映射（静态）
 const CATEGORY_MAP = {}
 CATEGORY_OPTIONS.forEach(c => { CATEGORY_MAP[c.key] = c })
@@ -26,11 +47,15 @@ const CACHE_KEY_PREFIX = 'schedules_'
 const FAV_KEY_PREFIX = 'schedule_favs_'
 const CUSTOM_CAT_KEY_PREFIX = 'schedule_custom_cats_'
 
-/** 取类别元数据（内置或自定义） */
+// 自定义类别模块级缓存引用：页面加载/保存时同步，供 getCatMeta 取真实 label
+let _customCatsRef = []
+
+/** 取类别元数据（内置或自定义）。自定义类别 label 从模块级缓存取真实名 */
 function getCatMeta(key) {
   if (CATEGORY_MAP[key]) return CATEGORY_MAP[key]
   if (key && key.startsWith('custom_')) {
-    return { key, icon: CUSTOM_CAT_META.icon, label: key.slice('custom_'.length) || '自定义', color: CUSTOM_CAT_META.color }
+    // 修复旧版从 key 反推 label 显示乱码的问题：真实名存在 _customCats 里
+    return { key, icon: CUSTOM_CAT_META.icon, label: getCatLabel(key, _customCatsRef), color: CUSTOM_CAT_META.color }
   }
   return { key: 'other', icon: '📝', label: '其他', color: '#8B7D6E' }
 }
@@ -276,19 +301,21 @@ Page({
     let cats = []
     try { cats = wx.getStorageSync(this._customCatKey()) || [] } catch (e) {}
     this._customCats = cats
+    _customCatsRef = cats // 同步模块级引用（getCatMeta 用）
     this._rebuildCategoryOptions()
   },
 
   _saveCustomCategories(cats) {
     try { wx.setStorageSync(this._customCatKey(), cats) } catch (e) {}
     this._customCats = cats
+    _customCatsRef = cats // 同步模块级引用（getCatMeta 用）
     this._rebuildCategoryOptions()
   },
 
-  /** 组装渲染用类别选项：＋入口 → 自定义类别 → 内置类别 */
+  /** 组装渲染用类别选项：＋入口 → 自定义类别 → 内置类别（自定义类别超 4 字省略展示） */
   _rebuildCategoryOptions() {
     const customs = (this._customCats || []).map(c => ({
-      key: c.key, icon: CUSTOM_CAT_META.icon, label: c.label, custom: true
+      key: c.key, icon: CUSTOM_CAT_META.icon, label: ellipsizeLabel(c.label), custom: true
     }))
     this.setData({
       categoryOptions: [{ key: '__add__', icon: '＋', label: '自定义', isAdd: true }, ...customs, ...CATEGORY_OPTIONS]
@@ -315,15 +342,11 @@ Page({
     this.setData({ showCatEditor: false, catEditorEditingKey: '', catEditorValue: '', catEditorError: '' })
   },
 
-  /** 保存自定义类别（新增或重命名）。生成 custom_<id> 格式 key。 */
+  /** 保存自定义类别（新增或重命名）。生成 custom_<id> 格式 key。不限字数，超长仅展示省略。 */
   saveCatEditor() {
     const label = (this.data.catEditorValue || '').trim()
     if (!label) {
       this.setData({ catEditorError: '给类别起个名字吧' })
-      return
-    }
-    if (label.length > 6) {
-      this.setData({ catEditorError: '名称最多 6 个字' })
       return
     }
     const cats = (this._customCats || []).slice()
@@ -336,21 +359,39 @@ Page({
       return
     }
     const editingKey = this.data.catEditorEditingKey
+    let newCatKey = '' // 新增成功后的 key（用于自动选中）
     if (editingKey) {
       // 重命名
       const cat = cats.find(c => c.key === editingKey)
       if (cat) cat.label = label
-      // 若当前表单选中的正是该类别，同步刷新选中态显示
+      // 若当前表单选中的正是该类别：未手动输入标题时同步跟随新类别名（保持展示一致，超长省略）
       if (this.data.formData.category === editingKey) {
-        this.setData({ 'formData.title': label, isFavSaved: this.data.favoriteItems.indexOf(label) >= 0 })
+        if (!this._titleDirty) {
+          const displayLabel = ellipsizeLabel(label)
+          this.setData({ 'formData.title': displayLabel, isFavSaved: this.data.favoriteItems.indexOf(displayLabel) >= 0 })
+        }
       }
     } else {
-      // 新增：custom_<时间戳> 保证唯一
+      // 新增：custom_<时间戳> 保证唯一；头插排第一个（刚建的最常用）
       const key = 'custom_' + Date.now().toString(36)
-      cats.push({ key, label })
+      cats.unshift({ key, label })
+      newCatKey = key
     }
     this._saveCustomCategories(cats)
     this.closeCatEditor()
+    // 新增成功：默认选中新类别，标题同步填充为类别展示名（与标签一致，超长省略）
+    if (newCatKey && this.data.showForm) {
+      if (!this._titleDirty) {
+        const displayLabel = ellipsizeLabel(label)
+        this.setData({
+          'formData.category': newCatKey,
+          'formData.title': displayLabel,
+          isFavSaved: this.data.favoriteItems.indexOf(displayLabel) >= 0
+        })
+      } else {
+        this.setData({ 'formData.category': newCatKey })
+      }
+    }
     wx.showToast({ title: editingKey ? '已更新' : '已添加', icon: 'success' })
   },
 
@@ -368,9 +409,14 @@ Page({
         if (!r.confirm) return
         const cats = (this._customCats || []).filter(c => c.key !== key)
         this._saveCustomCategories(cats)
-        // 若当前表单选中该类别，回落到无选中
+        // 若当前表单选中该类别，回落到无选中；标题仅在被自动填充（未编辑）时清空
         if (this.data.formData.category === key) {
-          this.setData({ 'formData.category': '', 'formData.title': '' })
+          const patch = { 'formData.category': '' }
+          if (!this._titleDirty) {
+            patch['formData.title'] = ''
+            patch.isFavSaved = false
+          }
+          this.setData(patch)
         }
         wx.showToast({ title: '已删除', icon: 'none' })
       }
@@ -402,9 +448,10 @@ Page({
     if (this.data.favManageMode) return
     const fav = e.currentTarget.dataset.fav
     if (!fav) return
+    this._titleDirty = true // 主动选择的内容视为用户输入，切类别不再覆盖
     const patch = { 'formData.title': fav }
-    // 匹配类别名（含自定义）自动选中类别
-    const cat = this.data.categoryOptions.find(c => !c.isAdd && c.label === fav)
+    // 匹配类别名自动选中类别（兼容完整名与省略名：chip 可能存完整名，pill 展示省略名）
+    const cat = this.data.categoryOptions.find(c => !c.isAdd && (c.label === fav || ellipsizeLabel(fav) === c.label))
     if (cat) patch['formData.category'] = cat.key
     // 检查是否已收藏状态
     const favs = this.data.favoriteItems
@@ -561,7 +608,7 @@ Page({
   },
 
   /**
-   * 给单条事项补上 categoryMeta 和 timeText
+   * 给单条事项补上 categoryMeta 和 timeText（类别名超长省略展示，与类别标签一致）
    */
   _enrichSchedule(s) {
     const meta = getCatMeta(s.category)
@@ -575,7 +622,7 @@ Page({
     }
     return {
       ...s,
-      categoryMeta: { ...meta, cssKey: catCssKey(s.category) },
+      categoryMeta: { ...meta, label: ellipsizeLabel(meta.label), cssKey: catCssKey(s.category) },
       timeText
     }
   },
@@ -707,6 +754,7 @@ Page({
   openAddSheet() {
     // 默认选中第一个可选类别（自定义在前，若无则第一个内置）
     const firstCat = this.data.categoryOptions.find(c => !c.isAdd)
+    this._titleDirty = false // 用户未手动输入过标题：切类别时标题自动跟随类别名
     this.setData({
       showForm: true,
       editingId: '',
@@ -730,6 +778,9 @@ Page({
     const id = e.currentTarget.dataset.id
     const target = (this._monthSchedules[this.data.selectedDate] || []).find(s => s._id === id)
     if (!target) return
+    // 本次会话内用户尚未手动输入标题：若带入的旧标题就是旧类别名（默认填充产物），
+    // 视为「未编辑」，切类别时标题继续跟随；否则视为用户内容，切类别不覆盖
+    this._titleDirty = !!(target.title && target.title !== getCatMeta(target.category).label)
     this.setData({
       showForm: true,
       editingId: id,
@@ -753,6 +804,7 @@ Page({
 
   onTitleInput(e) {
     const title = e.detail.value
+    this._titleDirty = true // 用户手动编辑过标题，此后切类别不再覆盖
     this.setData({
       'formData.title': title,
       isFavSaved: this.data.favoriteItems.indexOf(title.trim()) >= 0 && !!title.trim()
@@ -773,14 +825,15 @@ Page({
     }
     const oldKey = this.data.formData.category
     if (newKey === oldKey) return
-    const oldMeta = getCatMeta(oldKey)
     const newMeta = getCatMeta(newKey)
     const patch = { 'formData.category': newKey }
-    // 标题智能联动：当前标题为空、或就是旧类别名（用户未自定义）时，切换类别自动换成新类别名
-    const curTitle = (this.data.formData.title || '').trim()
-    if (!curTitle || curTitle === oldMeta.label) {
-      patch['formData.title'] = newMeta.label
-      patch.isFavSaved = this.data.favoriteItems.indexOf(newMeta.label) >= 0
+    // 标题智能联动：用户未手动编辑过标题（或标题为空）时，切换类别自动填充新类别名；
+    // 用户输入过（即使内容恰好与类别名一致）则一律保留，绝不覆盖
+    if (!this._titleDirty) {
+      // 标题填充与类别标签展示保持一致：超长类别用省略名（前4字…）
+      const displayLabel = ellipsizeLabel(newMeta.label)
+      patch['formData.title'] = displayLabel
+      patch.isFavSaved = this.data.favoriteItems.indexOf(displayLabel) >= 0
     }
     this.setData(patch)
   },
@@ -802,7 +855,8 @@ Page({
     }
     // 事项非必填：留空则默认取类别名
     const catMeta = getCatMeta(f.category)
-    const title = (f.title && f.title.trim()) || catMeta.label
+    // 留空回退与类别展示一致：超长类别用省略名
+    const title = (f.title && f.title.trim()) || ellipsizeLabel(catMeta.label)
     if (!f.date) {
       wx.showToast({ title: '请选择日期', icon: 'none' })
       return

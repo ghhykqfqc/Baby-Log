@@ -26,14 +26,14 @@
       </view>
     </view>
 
-    <!-- 三栏智能预测卡 -->
-    <view class="predict-card" wx:if="{{!loading && hasRecords && hasPrediction}}">
+    <!-- 三栏智能预测卡（区域随当日记录常驻：倒计时行始终渲染，结构高度固定，避免图表区高度跳变） -->
+    <view class="predict-card" wx:if="{{!loading && hasRecords}}">
       <view class="predict-col {{item.overdue ? 'overdue' : ''}}" wx:for="{{predictList}}" wx:key="key" data-key="{{item.key}}">
         <view class="predict-icon">{{item.icon}}</view>
         <view class="predict-label">{{item.label}}</view>
         <view class="predict-time {{item.overdue ? 'predict-time-overdue' : ''}}" wx:if="{{item.available}}">{{item.predictedText}}</view>
         <view class="predict-time predict-time-empty" wx:else>{{item.predictedText}}</view>
-        <view class="predict-countdown" wx:if="{{item.available}}">{{item.countdownText}}</view>
+        <view class="predict-countdown">{{item.countdownText}}</view>
       </view>
     </view>
 

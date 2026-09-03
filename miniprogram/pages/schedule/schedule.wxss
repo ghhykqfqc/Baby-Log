@@ -1122,6 +1122,11 @@
   font-size: 22rpx;
   color: var(--color-text-secondary);
   margin-top: 6rpx;
+  /* 兜底：即使逻辑层漏掉省略，也保证单行不溢出（超长自动 CSS 省略） */
+  max-width: 120rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sched-cat-pill.active .sched-cat-pill-text {

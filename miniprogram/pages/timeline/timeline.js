@@ -13,7 +13,6 @@ Page({
     hasRecords: false,
     hasChartData: false,   // 是否有任何记录（控制图表显示，比 hasRecords 更宽松）
     predictList: [],
-    hasPrediction: false,
     chartScale: 'day',      // hour | day | week | month
     summary: {
       feedCount: 0,
@@ -44,6 +43,8 @@ Page({
     this.setData({ todayLabel: `${today.getMonth() + 1}月${today.getDate()}日 周${weekNames[today.getDay()]}` })
     // 监听宝宝切换，自动刷新
     app.eventBus.on('babySwitched', this._onBabySwitched = () => {
+      this._allRecords = []
+      this._loadedDays = 0 // 重置数据范围标记：新宝宝需重新拉取
       this.updateBabyBar()
       this.loadData()
     })
@@ -101,10 +102,13 @@ Page({
    * 优先本地缓存，再拉云端
    */
   async loadData() {
+    // 本地缓存只有今日记录：仅用于首屏秒开，不覆盖已加载的更长范围数据
     const cached = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
-    this._allRecords = cached
-    this.renderSummary(cached)
-    this.updatePredictions()
+    if ((this._allRecords || []).length === 0 || this.data.chartScale === 'day' || this.data.chartScale === 'hour') {
+      this._allRecords = cached
+      this.renderSummary(cached)
+      this.updatePredictions()
+    }
 
     await this.fetchRecords()
   },
@@ -125,6 +129,7 @@ Page({
           timestamp: toMs(r.timestamp)
         }))
         this._allRecords = normalized
+        this._loadedDays = Math.max(this._loadedDays || 1, scaleDays)
         // 缓存只存今日记录（分享页/首页依赖 todayRecords 的语义）
         const todayRecords = normalized.filter(r => this.isSameDay(r.timestamp, Date.now()))
         storage.set(storage.CACHE_KEYS.TODAY_RECORDS, todayRecords)
@@ -244,6 +249,8 @@ Page({
 
   /**
    * 计算并刷新三栏预测卡
+   * 注：卡片区域随当日记录常驻（wxml 不再依据 hasPrediction 卸载），
+   * 数据不足的栏目显示「数据不足 / --」占位，避免区域闪卸导致图表区高度跳变
    */
   updatePredictions() {
     const detail = predictDetail(this._allRecords)
@@ -252,7 +259,7 @@ Page({
       { key: 'diaper', ...detail.diaper },
       { key: 'sleep', ...detail.sleep }
     ]
-    this.setData({ predictList, hasPrediction: predictList.some(p => p.available) })
+    this.setData({ predictList })
 
     this.stopCountdown()
     const hasAnyAvailable = predictList.some(p => p.available)
@@ -854,20 +861,28 @@ Page({
   },
 
   /**
-   * 切换刻度（日/周/月）
+   * 切换刻度（时/日/周/月）：只重绘画布，不触发整页数据重载，
+   * 避免预测卡内容随数据源切换闪变、图表区高度跳变。
+   * 周/月需要更多天数的数据时，才在后台静默拉取，回来后仅增量刷新预测文案。
    */
   switchScale(e) {
     const scale = e.currentTarget.dataset.scale
     if (scale === this.data.chartScale) return
 
     this.setData({ chartScale: scale })
-    // 立即清除旧气泡并重绘，避免切换刻度后残留上一次的提示
+    // 立即清除旧气泡并基于已有数据重绘（周/月视图即使记录少也会画空网格）
     this._activeTooltip = null
     if (this._chartCtx && this._chartW && this._chartH) {
       this.renderChart(this._chartCtx, this._chartW, this._chartH)
     }
-    // 重新加载数据（周/月需要更多天数）+ 重绘
-    this.loadData()
+
+    // 数据覆盖判断：已有数据天数足够当前刻度时无需再拉
+    const scaleDays = scale === 'hour' || scale === 'day' ? 1 : scale === 'week' ? 7 : 30
+    const currentDays = this._loadedDays || 1
+    if (currentDays >= scaleDays) return
+
+    // 后台静默补拉更长范围的数据：完成后只增量刷新预测与摘要，不重置数据源
+    this.fetchRecords()
   },
 
   /**

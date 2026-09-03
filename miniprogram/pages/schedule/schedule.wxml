@@ -355,13 +355,12 @@
   <view class="sheet-mask cat-editor-mask" wx:if="{{showCatEditor}}" bindtap="closeCatEditor" catchtouchmove="noop">
     <view class="sched-cat-editor" catchtap="noop">
       <view class="sched-cat-editor-title">{{catEditorEditingKey ? '重命名类别' : '新增自定义类别'}}</view>
-      <view class="sched-cat-editor-sub" wx:if="{{!catEditorEditingKey}}">起个名字，下次直接选，最多 6 个字</view>
+      <view class="sched-cat-editor-sub" wx:if="{{!catEditorEditingKey}}">起个名字，下次直接选，超长会自动省略展示</view>
       <input
         class="sched-cat-editor-input"
         placeholder="如：体检、早教、游泳…"
         value="{{catEditorValue}}"
         bindinput="onCatEditorInput"
-        maxlength="6"
         focus="{{true}}"
       />
       <view class="sched-cat-editor-error" wx:if="{{catEditorError}}">{{catEditorError}}</view>
