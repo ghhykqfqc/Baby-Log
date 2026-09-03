@@ -166,15 +166,36 @@
   gap: 4rpx;
 }
 
+/* 标题行：标签紧跟标题，同一行展示（inline 自适应，不独占整行） */
+.sched-tips-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  min-width: 0;
+}
+
 .sched-tips-label {
-  font-size: 20rpx;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  font-size: 18rpx;
   color: #C08A50;
   font-weight: 600;
-  letter-spacing: 2rpx;
-  align-self: flex-start;
+  letter-spacing: 1rpx;
+  line-height: 1;
+  padding: 4rpx 10rpx;
+  border-radius: 6rpx;
+  background: rgba(192, 138, 80, 0.12);
+}
+
+.sched-tips-label.is-important {
+  color: #E4493D;
+  background: rgba(228, 73, 61, 0.12);
 }
 
 .sched-tips-title {
+  flex: 1;
+  min-width: 0;
   font-size: 28rpx;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -819,12 +840,18 @@
 }
 
 .sched-form-sheet {
+  position: relative;
   width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
+  /* 限高 ~85vh：不全屏遮挡，又保留足够表单空间 */
+  height: 85vh;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   background: var(--color-bg);
   border-radius: 40rpx 40rpx 0 0;
-  padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 32rpx);
+  padding: 20rpx 32rpx 0;
+  box-sizing: border-box;
+  overflow: hidden;            /* 头/底固定，只有中间滚动 */
   animation: sheetUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -839,6 +866,7 @@
   border-radius: 4rpx;
   background: var(--color-divider);
   margin: 8rpx auto 20rpx;
+  flex-shrink: 0;
 }
 
 .sched-form-title {
@@ -846,7 +874,19 @@
   font-weight: 600;
   color: var(--color-text-primary);
   text-align: center;
-  margin-bottom: 20rpx;
+  margin-bottom: 16rpx;
+  flex-shrink: 0;
+}
+
+/* 中部表单滚动区：吃掉剩余高度，超高时内部滚动 */
+.sched-form-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sched-form-scroll-inner {
+  padding: 0 0 calc(env(safe-area-inset-bottom) + 24rpx);
 }
 
 .sched-form-item {
@@ -1297,11 +1337,16 @@
   left: 40rpx;
 }
 
-/* 操作按钮组 */
+/* 操作按钮组（固定底部，flex-shrink:0 不参与滚动） */
 .sched-form-actions {
+  flex-shrink: 0;
   display: flex;
   gap: 16rpx;
-  margin-top: 16rpx;
+  padding: 16rpx 0 calc(env(safe-area-inset-bottom) + 16rpx);
+  background: var(--color-bg);
+  /* 顶部分隔阴影：滚动内容与底部按钮区的视觉分割 */
+  box-shadow: 0 -4rpx 16rpx rgba(180, 150, 110, 0.06);
+  margin-top: 0;
 }
 
 .sched-form-cancel,

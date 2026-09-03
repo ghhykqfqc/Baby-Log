@@ -364,6 +364,8 @@
 
 .form-sheet {
   width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
   background: var(--color-bg);
   border-radius: 40rpx 40rpx 0 0;
   padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 32rpx);

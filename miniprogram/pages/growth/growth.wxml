@@ -88,7 +88,7 @@
   <!-- ========== 录入弹层 ========== -->
   <view class="sheet-mask" wx:if="{{showForm}}" bindtap="hideForm" catchtouchmove="noop">
     <view class="form-sheet" catchtap="noop">
-      <view class="sheet-handle"></view>
+      <view class="sheet-handle" data-close="hideForm" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="form-title">记录成长</view>
       <view class="form-sub">身高、体重至少填写一项</view>
 

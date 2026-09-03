@@ -1065,6 +1065,7 @@
 }
 
 .baby-panel {
+  width: 100%;
   background: #FAF6F0;
   border-top-left-radius: 40rpx;
   border-top-right-radius: 40rpx;

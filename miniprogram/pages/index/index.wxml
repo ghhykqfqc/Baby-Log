@@ -217,7 +217,7 @@
   <!-- ========== 喂奶量弹层（长按触发） ========== -->
   <view class="sheet-mask" wx:if="{{showFeedSheet}}" bindtap="hideFeedSheet" catchtouchmove="noop">
     <view class="sleep-sheet" catchtap="noop">
-      <view class="sheet-handle"></view>
+      <view class="sheet-handle" data-close="hideFeedSheet" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="sleep-sheet-title">记录喂奶</view>
       <view class="sheet-sub">选择常见喂奶量，或点「自定义」输入具体数值</view>
 
@@ -258,7 +258,7 @@
   <!-- ========== 尿布类型弹层（长按触发） ========== -->
   <view class="sheet-mask" wx:if="{{showDiaperSheet}}" bindtap="hideDiaperSheet" catchtouchmove="noop">
     <view class="sleep-sheet" catchtap="noop">
-      <view class="sheet-handle"></view>
+      <view class="sheet-handle" data-close="hideDiaperSheet" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="sleep-sheet-title">记录换尿布</view>
       <view class="sheet-sub">选择类型，不选也可记录时间点</view>
       <view class="diaper-type-grid">
@@ -276,7 +276,7 @@
   <!-- ========== 睡眠回忆记录弹层（长按触发） ========== -->
   <view class="sheet-mask" wx:if="{{showSleepSheet}}" bindtap="hideSleepSheet" catchtouchmove="noop">
     <view class="sleep-sheet" catchtap="noop">
-      <view class="sheet-handle"></view>
+      <view class="sheet-handle" data-close="hideSleepSheet" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="sleep-sheet-title">回忆记录睡眠</view>
       <view class="sheet-sub">选择刚刚结束的睡眠时长</view>
       <view class="duration-grid">
@@ -296,7 +296,7 @@
   <!-- ========== 上传 / 替换照片裁剪面板（固定 4:3 裁剪框 + 标签选择） ========== -->
   <view class="sheet-mask photo-crop-mask" wx:if="{{showUploadCropper}}" bindtap="cancelUploadCropper" catchtouchmove="noop">
     <view class="photo-crop-panel" catchtap="noop">
-      <view class="sheet-handle"></view>
+      <view class="sheet-handle" data-close="cancelUploadCropper" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="photo-crop-title">裁剪照片</view>
       <view class="photo-crop-sub">拖动图片调整位置，裁切后自动保存为 4:3 封面</view>
 
@@ -358,7 +358,7 @@
   <!-- ========== 照片编辑面板（替换照片 + 修改标签 + 删除） ========== -->
   <view class="sheet-mask photo-edit-mask" wx:if="{{showPhotoEditSheet}}" bindtap="hidePhotoEdit" catchtouchmove="noop">
     <view class="photo-edit-panel" catchtap="noop">
-      <view class="sheet-handle"></view>
+      <view class="sheet-handle" data-close="hidePhotoEdit" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="photo-edit-title">编辑照片</view>
 
       <!-- 当前照片预览 -->
@@ -410,7 +410,7 @@
   <!-- ========== 宝宝管理面板（切换 / 新建 / 加入 / 登出） ========== -->
   <view class="sheet-mask baby-panel-mask" wx:if="{{showBabySheet}}" bindtap="hideBabyPanel" catchtouchmove="noop">
     <view class="baby-panel" catchtap="noop">
-      <view class="sheet-handle"></view>
+      <view class="sheet-handle" data-close="hideBabyPanel" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="baby-panel-title">我的宝宝</view>
 
       <!-- 宝宝列表 -->

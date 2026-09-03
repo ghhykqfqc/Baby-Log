@@ -943,5 +943,32 @@ Page({
     const d = new Date(dateStr)
     const names = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
     return names[d.getDay()]
+  },
+
+  // ============================================
+  // 弹窗下滑关闭手势：拖动把手向下超过阈值即关闭
+  // 用法：在 .sheet-handle 上加 data-close="closeDaySheet" + bindtouchstart/move/end
+  // ============================================
+  _onSheetTouchStart(e) {
+    this._sheetDragStartY = e.touches[0].clientY
+    this._sheetDragCurrent = e.touches[0].clientY
+  },
+  _onSheetTouchMove(e) {
+    this._sheetDragCurrent = e.touches[0].clientY
+  },
+  _onSheetTouchEnd(e) {
+    const startY = this._sheetDragStartY
+    const endY = this._sheetDragCurrent
+    if (typeof startY !== 'number' || typeof endY !== 'number') return
+    this._sheetDragStartY = null
+    this._sheetDragCurrent = null
+    const delta = endY - startY
+    // 下滑超过 50px 即触发关闭
+    if (delta > 50) {
+      const handler = e.currentTarget.dataset.close
+      if (handler && typeof this[handler] === 'function') {
+        this[handler]()
+      }
+    }
   }
 })

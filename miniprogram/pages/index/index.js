@@ -1927,5 +1927,27 @@ loadAlbum(babyId) {
 
   onShareTimeline() {
     return { title: '我用贝贝log轻松记录宝宝作息' }
+  },
+
+  // ============================================
+  // 弹窗下滑关闭手势：拖动把手向下超过 50px 即关闭
+  // ============================================
+  _onSheetTouchStart(e) {
+    this._sheetDragStartY = e.touches[0].clientY
+    this._sheetDragCurrent = e.touches[0].clientY
+  },
+  _onSheetTouchMove(e) {
+    this._sheetDragCurrent = e.touches[0].clientY
+  },
+  _onSheetTouchEnd(e) {
+    const startY = this._sheetDragStartY
+    const endY = this._sheetDragCurrent
+    if (typeof startY !== 'number' || typeof endY !== 'number') return
+    this._sheetDragStartY = null
+    this._sheetDragCurrent = null
+    if (endY - startY > 50) {
+      const handler = e.currentTarget.dataset.close
+      if (handler && typeof this[handler] === 'function') this[handler]()
+    }
   }
 })
