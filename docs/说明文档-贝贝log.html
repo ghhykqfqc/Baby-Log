@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="mmSbty0WUArVAPrXXj5lFP">
+<head data-page-node-id="g4xEKh2vlsoXyzFnu680Zb">
+<meta charset="UTF-8" data-page-node-id="eQdBG6fifKviwcpt86iMdc">
+<title>贝贝log 小程序作品说明文档</title>
+<style>
+  :root {
+    --primary: #D4B896;
+    --primary-deep: #B08D63;
+    --bg: #FFFFFF;
+    --bg-soft: #FAF6F0;
+    --text: #3D3027;
+    --text-sub: #8A7A6A;
+    --line: #E8DFD2;
+    --danger: #E8554E;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: var(--text);
+    font-size: 13.5px;
+    line-height: 1.75;
+    background: var(--bg);
+  }
+  /* ============ 封面 ============ */
+  .cover {
+    height: 245mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background: linear-gradient(160deg, #FDF9F2 0%, #F4E9DB 55%, #EAD9C2 100%);
+    page-break-after: always;
+    position: relative;
+  }
+  .cover .badge {
+    display: inline-block;
+    padding: 4px 18px;
+    border: 1.5px solid var(--primary-deep);
+    border-radius: 999px;
+    color: var(--primary-deep);
+    font-size: 12px;
+    letter-spacing: 3px;
+    margin-bottom: 26px;
+  }
+  .cover h1 {
+    font-size: 52px;
+    letter-spacing: 6px;
+    color: var(--text);
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .cover .sub {
+    font-size: 17px;
+    color: var(--text-sub);
+    letter-spacing: 2px;
+    margin-bottom: 40px;
+  }
+  .cover .doc-type {
+    font-size: 15px;
+    color: var(--text-sub);
+    letter-spacing: 4px;
+    border-top: 1px solid rgba(176,141,99,.4);
+    border-bottom: 1px solid rgba(176,141,99,.4);
+    padding: 10px 34px;
+    display: inline-block;
+  }
+  .cover .meta {
+    position: absolute;
+    bottom: 40px;
+    width: 100%;
+    font-size: 12.5px;
+    color: var(--text-sub);
+    letter-spacing: 1px;
+    line-height: 2;
+  }
+  /* ============ 通用 ============ */
+  .page { padding: 0 4mm 12mm; }
+  h2 {
+    font-size: 20px;
+    color: var(--text);
+    border-left: 5px solid var(--primary);
+    padding-left: 12px;
+    margin: 26px 0 14px;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 15px;
+    color: var(--primary-deep);
+    margin: 18px 0 8px;
+    page-break-after: avoid;
+  }
+  h4 { font-size: 13.5px; margin: 10px 0 6px; color: var(--text); }
+  p { margin: 6px 0; text-align: justify; }
+  ul, ol { margin: 6px 0 6px 22px; }
+  li { margin: 3px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 12px;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #F0E6D7;
+    color: var(--text);
+    font-weight: 600;
+    border: 1px solid var(--line);
+    padding: 7px 10px;
+    text-align: left;
+  }
+  td { border: 1px solid var(--line); padding: 6px 10px; vertical-align: top; }
+  tr:nth-child(even) td { background: #FDFAF5; }
+  .note {
+    background: var(--bg-soft);
+    border-left: 4px solid var(--primary);
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 12.5px;
+    color: var(--text-sub);
+  }
+  .tag {
+    display: inline-block;
+    background: #F0E6D7;
+    color: var(--primary-deep);
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 11.5px;
+    margin-right: 4px;
+  }
+  /* ============ 架构图 ============ */
+  .arch {
+    margin: 14px 0;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--bg-soft);
+  }
+  .arch .layer {
+    border: 1.5px solid var(--primary);
+    border-radius: 8px;
+    background: #FFF;
+    padding: 10px 14px;
+    text-align: center;
+    margin: 0 auto;
+  }
+  .arch .layer .title { font-weight: 700; font-size: 13px; color: var(--primary-deep); }
+  .arch .layer .items { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+  .arch .connector {
+    width: 2px; height: 16px; background: var(--primary); margin: 0 auto;
+  }
+  .arch .connector-label {
+    text-align: center; font-size: 11px; color: var(--text-sub); margin-top: -13px; margin-bottom: 2px;
+  }
+  .arch .row { display: flex; gap: 10px; justify-content: center; }
+  .arch .cell {
+    flex: 1; border: 1px solid var(--line); border-radius: 8px; background: #FFF;
+    padding: 8px 10px; text-align: center; font-size: 12px;
+  }
+  .arch .cell b { display: block; color: var(--primary-deep); margin-bottom: 3px; }
+  /* ============ 声明框 ============ */
+  .declaration {
+    border: 1.5px solid var(--primary-deep);
+    border-radius: 10px;
+    padding: 16px 20px;
+    background: #FBF7F0;
+    margin: 14px 0;
+  }
+  .declaration h3 { margin-top: 0; }
+  .footer-note {
+    margin-top: 30px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    text-align: center;
+    color: var(--text-sub);
+    font-size: 11.5px;
+  }
+  .kv { display: flex; flex-wrap: wrap; margin: 8px 0; }
+  .kv .item { width: 33.3%; padding: 6px 12px 6px 0; font-size: 12.5px; }
+  .kv .item b { color: var(--primary-deep); display: block; font-size: 12px; }
+</style>
+</head>
+<body data-page-node-id="Jpp5Z0UB2QM3fRcxYkVsJH">
+
+<!-- ==================== 封面 ==================== -->
+<div class="cover" data-page-node-id="k9561KlzdSIBhjfvPVYadJ">
+  <div class="badge" data-page-node-id="qo4wn67K28vCXegEWQy94y">微信小程序 · 作品说明</div>
+  <h1 data-page-node-id="tf3Q7IrbV1VVqB5sKjWP4W">贝贝log</h1>
+  <div class="sub" data-page-node-id="l67x9mYD9axeMfP3VVRFC7">极简育儿记录 —— 让单手抱娃也能轻松记录</div>
+  <div class="doc-type" data-page-node-id="3LCcWArMHu8F0szVkzthtB">作品说明文档</div>
+  <div class="meta" data-page-node-id="Pv0YJ61xAUaAg6z6h9KO0M">
+    团队：贝贝log 开发团队<br data-page-node-id="aQweYm9FZtJQUyErFssli1">
+    版本：V1.0 ｜ 2026 年 9 月
+  </div>
+</div>
+
+<!-- ==================== 一、项目概述 ==================== -->
+<div class="page" data-page-node-id="GwjxRqbkbBR2ZbH3XREitA">
+<h2 data-page-node-id="5NzWY2eSFR6tkM2WiOXmS8">一、项目概述</h2>
+
+<h3 data-page-node-id="QDevcJVXYHDV8h4e0059aI">1.1 产品定位</h3>
+<p data-page-node-id="wdGiE5mjfGxYCb4jC2FwFF">「贝贝log」是一款面向新手父母的极简育儿记录微信小程序。它围绕"喂奶、换尿布、睡觉"三件日常高频琐事打造一键打卡体验，配合智能作息预测、时光轴回顾、成长曲线、家庭共享、天气皮肤与一键分享卡片，帮助家庭用<strong data-page-node-id="xiifrJO7Eo6nziRVTHh8oX">最少的操作成本</strong>沉淀宝宝的完整成长数据，让每一位照看者都能轻松接力、随时掌握宝宝状态。</p>
+
+<h3 data-page-node-id="xrWggE9ZQK1VTOz0HsZOPV">1.2 产品概况</h3>
+<table data-page-node-id="VKxpaXklGXVfKbQvykDSqy">
+  <tr data-page-node-id="26ZpnpPo8I5FChBB3FKWiK"><th style="width:22%" data-page-node-id="5tG4WbKEJZ3Fly4C07XhoO">项目</th><th data-page-node-id="A3l4aIcwDuRchhlDH0FiN1">内容</th></tr>
+  <tr data-page-node-id="bNnrSGHjljIpuSAKB8Xg3j"><td data-page-node-id="IXDiZF82KEB4xYcA3zi0vN">产品名称</td><td data-page-node-id="WCLTceurDKdf1qjA5lsR80">贝贝log（宝宝成长记录微信小程序）</td></tr>
+  <tr data-page-node-id="AnVDZP64JECUlCfhGfQv9m"><td data-page-node-id="sfzFHjR2DZo61lehHsz1Gk">运行平台</td><td data-page-node-id="OpWabnrGDmTgtBMOUTyTo1">微信小程序（基础库 ≥ 3.5.0），iOS / Android 双端适配</td></tr>
+  <tr data-page-node-id="OpvpKpRp980N5bj58GMVWb"><td data-page-node-id="NXLS3JgrZGoWaSwK1RIy0x">后端平台</td><td data-page-node-id="bceOoZtaLJBt2JjUS1Sq6B">微信云开发 CloudBase（云函数 + 云数据库 + 云存储，免运维、免鉴权配置自建）</td></tr>
+  <tr data-page-node-id="L4EI07qp7Ra6qBn3UQjwEL"><td data-page-node-id="3N9ACZ0amNePkR1X70EPrL">技术形态</td><td data-page-node-id="CIv34xPzbooOXeutakPYSF">微信原生小程序（WXML / WXSS / JavaScript），无第三方框架、无第三方 UI/图表库</td></tr>
+  <tr data-page-node-id="rvQOcOTMpDzlBYPUNnZGe6"><td data-page-node-id="0YZB1ERRHb9RXOTpOHck8M">项目规模</td><td data-page-node-id="5oC5NxiPozgAZqSQ8vzMkq">9 个页面、3 个公共组件、24 个云函数、6 类业务数据模型，主包体积约 600KB</td></tr>
+  <tr data-page-node-id="MZerKpJutamAj1czIZfoHx"><td data-page-node-id="uLgMZJXJq6LyK9S7PHWkUl">当前阶段</td><td data-page-node-id="dADgnwVbYWX5Pspaaf4YOq">V1.0 已完备核心链路，V1.2 功能（日程、多宝宝、历史页）完成；迭代路线图持续更新</td></tr>
+</table>
+
+<h3 data-page-node-id="A5sxPSURMNTtM8TkYJz2Yk">1.3 设计理念</h3>
+<ul data-page-node-id="YVGvx1m4BY8GR9QKOMiBxh">
+  <li data-page-node-id="TSHcxNH73Fft5701MEt0LM"><strong data-page-node-id="rMdl5fplXayGMewgoTSYS8">极简优先</strong>：核心操作一键直达、不切页、可单手完成；冷启动首屏使用本地缓存渲染，目标 &lt;300ms。</li>
+  <li data-page-node-id="23jfFJ4tErIcppBZN8W9mh"><strong data-page-node-id="B6C4gPsWugnMMrt738OX4b">离线可用</strong>：断网照常记录，网络恢复自动补传，不丢失任何一次数据。</li>
+  <li data-page-node-id="4O1nrB2b62eB3brsS8ruLS"><strong data-page-node-id="WZt88HXadOeFt38nIZTQhU">家人协作</strong>：以宝宝为共享单元，父母 / 祖辈分级权限，全员共同记录、共同查看。</li>
+  <li data-page-node-id="5jxaJounbWaOyaH1BC4LVX"><strong data-page-node-id="hFAaf6o5gSHu5IC8hz8dzt">健康温度</strong>：采用奶咖色系视觉规范，温暖、柔和、不打扰，适合深夜喂奶场景。</li>
+</ul>
+</div>
+
+<!-- ==================== 二、团队情况 ==================== -->
+<div class="page" data-page-node-id="iExlZnF50ColVOwrK02XpR">
+<h2 data-page-node-id="SGQRw9mJUISyuUzPFir075">二、团队情况</h2>
+
+<h3 data-page-node-id="6sLd2bujVhz1PXXTC4Sh7W">2.1 团队简介</h3>
+<p data-page-node-id="KMANaeot4Z1yuip6ZD5AhA">「贝贝log」由 <strong data-page-node-id="5CXs2aN9cxid4DqGRQDwVg">1 位个人创作者</strong>基于 <strong data-page-node-id="5CXs2aN9cxid4DqGRQDwVg">WorkBuddy</strong> 打造。作者本人负责整体规划、需求梳理、架构决策与最终验收；在开发过程中，通过 WorkBuddy <strong data-page-node-id="5CXs2aN9cxid4DqGRQDwVg">召唤 AI Agent 作为对应的产品、开发、测试、运营等团队成员</strong>，以「1 位创作者 + AI Agent 团队」的协作模式完成从需求分析、产品设计、视觉规范、前端开发、后端开发到测试发布的端到端闭环。团队采用 Git 版本管理协同开发，当前已有提交 35 次，按「需求拆解 — 功能分支开发 — 自测联调 — 验收合并」节奏推进，先后完成 V1.0 基础版（打卡 + 时光轴 + 成长档案 + 家庭共享）、V1.1（天气皮肤 + 相册 + 分享卡片）、V1.2（日程日历 + 多宝宝管理 + 历史页）三个里程碑。</p>
+
+<h3 data-page-node-id="T8k2Q9wE4vY7zR3mB6nXp">2.2 成员分工（创作者 + AI Agent 团队）</h3>
+<table data-page-node-id="E8kdX4oWvY2mQz9R6tHjN">
+  <tr><th style="width:20%">职能角色</th><th style="width:28%">由谁承担</th><th>负责模块 / 产物</th></tr>
+  <tr><td>产品策划</td><td>创作者 + 产品 Agent</td><td>产品定位、功能矩阵、验收标准清单、迭代路线图</td></tr>
+  <tr><td>视觉设计</td><td>创作者 + 设计 Agent</td><td>奶咖色系设计规范、设计令牌（CSS 变量）、scripts/ 图标生成脚本</td></tr>
+  <tr><td>前端开发</td><td>前端 Agent（创作者审核）</td><td>9 个业务页面、3 个公共组件、Canvas 自绘、离线同步与本地缓存、工具库</td></tr>
+  <tr><td>后端开发</td><td>后端 Agent（创作者审核）</td><td>24 个云函数、数据库建模与索引、权限与安全策略、云资源自愈</td></tr>
+  <tr><td>测试运维</td><td>测试 Agent（创作者验收）</td><td>真机适配（全面屏安全区）、断网 / 弱网联调、发布与提审自查</td></tr>
+  <tr><td>运营增长</td><td>运营 Agent（创作者审核）</td><td>用户引导文案、分享卡片传播策略、家长社区运营与推广素材</td></tr>
+</table>
+<p style="font-size:12px;color:var(--text-sub)">注：本作品由 1 位创作者使用 WorkBuddy、召唤 AI Agent 分别承担产品、开发、测试、运营等角色完成；所有 AI 生成内容均经创作者审核、验收后并入项目。团队成员姓名、学号等报名信息以实际注册名单为准。</p>
+
+<h3 data-page-node-id="x9k0EDntAYdhPx9hF9XEeT">2.3 协作与质量管理</h3>
+<ul data-page-node-id="vjPlXNlEgP0gd6g1IxtWzI">
+  <li data-page-node-id="qSlEjY0xk0CCzE7zBHMA1E"><strong data-page-node-id="fmYfDeYdgVw6Y63AHyDJzy">版本管理</strong>：Git 提交规范（feat / fix / 优化 / 重构），关键决策记录在提交说明与文档中；</li>
+  <li data-page-node-id="8m1XTfS5V9vQp9B8tlO6YM"><strong data-page-node-id="UjRBUCFYzm9yP0eST7dVUt">文档驱动</strong>：产出 README（功能 / 技术栈 / 数据模型 / 性能指标）、架构设计文档、验收清单，代码与文档同步更新；</li>
+  <li data-page-node-id="tLz1LHJBy52E5sNlFS1nx0"><strong data-page-node-id="NjPMwgQZAgigF3tWLaRyty">设计约定</strong>：全项目统一设计令牌（主色 #D4B896、背景 #FAF6F0、圆角梯度），页面开发不硬编码颜色；</li>
+  <li data-page-node-id="gchWDn4nr8iH0F6BeSZ2ym"><strong data-page-node-id="PGnva0ZJdstTm0GonMPFsM">诚信承诺</strong>：全部代码与资源均为团队原创，未引入任何非团队成员的开发成果（详见第八章原创性声明）。</li>
+</ul>
+</div>
+
+<!-- ==================== 三、功能简介 ==================== -->
+<div class="page" data-page-node-id="bqzpAX81cE8Hc2GJ7X1LIY">
+<h2 data-page-node-id="VshDSQhXYTqegpMQUKy92t">三、小程序功能简介</h2>
+
+<h3 data-page-node-id="iC3c6B42wJVRjkC4YpI63j">3.1 功能架构总览</h3>
+<p data-page-node-id="kx5iXDKiQQFnBxkBl6XWW4">小程序采用"4 个 Tab 主页面 + 5 个功能子页面"的轻量结构，顶部无冗余入口，只保留高频行为：</p>
+<table data-page-node-id="SwD0FYX6eqQvih7blNqQXJ">
+  <tr data-page-node-id="7RdvzGaDH77kPFDmv2e22y"><th style="width:18%" data-page-node-id="0g7d9puHwRJdjEG6JosVOF">模块</th><th style="width:30%" data-page-node-id="2ZXKMnz7Qf5WaDgAoyivaf">页面</th><th data-page-node-id="wGkcioaamfEsesFAWgZIFW">能力说明</th></tr>
+  <tr data-page-node-id="sOXGRZEKGukLGWzFXZS0IZ"><td data-page-node-id="X0YyrR3hRL4A21x6NZ1yoN">记录（首页）</td><td data-page-node-id="vtz2bdVGZYkCRPUjfe3n9a">pages/index</td><td data-page-node-id="YmGEux6XN5aGcpA4XklcIg">天气动态皮肤、宝宝资料条、智能作息预测、相册轮播、三大一键记录按钮、离线待同步队列提示</td></tr>
+  <tr data-page-node-id="hF5FeZ2Wyxl8SG5CTu3SQ6"><td data-page-node-id="KFEq0WAz2ZAqzzHCrwYtzp">时光</td><td data-page-node-id="FCBjwlTNQC132OnOYM5iZ6">pages/timeline + pages/timeline-records</td><td data-page-node-id="usgXdKYLFeF2gjCt21DS8Y">当日摘要（喂奶 / 尿布 / 睡眠三栏）、24 小时三泳道时间分布图、"预计下次"预测卡、按日期分组分页的记录列表、长按删除</td></tr>
+  <tr data-page-node-id="psBBrLQIWN9L54eI1joNCQ"><td data-page-node-id="l9fN9UKcbRRLQO36USMrGe">成长</td><td data-page-node-id="IHGHozfucUlrsLGrIIeFp8">pages/growth + pages/history</td><td data-page-node-id="UYHJ7Z25Rn0xl5Iyf4OOm0">焦点数据卡（身高 / 体重 / 年龄）、Canvas 生长曲线（叠加 WHO 标准曲线）、历史记录分页浏览与删除</td></tr>
+  <tr data-page-node-id="cfxUJdWHHymf6dzyJnrBDl"><td data-page-node-id="Qa94mQgqPmb4w4kZHJzPoY">日程</td><td data-page-node-id="af3YPRJeSIQxLxX6qwNxni">pages/schedule</td><td data-page-node-id="lDgfl5CelBQjQTzypdEp0D">日历视图 + 事项管理（疫苗 / 生日 / 预约 / 兴趣班 / 购物 / 礼物 / 红包 / 自定义）、类别色点标记、未来事项倒计时</td></tr>
+  <tr data-page-node-id="kStGRhEeRMYhG2aDYz8Uo1"><td data-page-node-id="C7D6wNeAhUYG7e4f1vtZQO">共享（资料）</td><td data-page-node-id="bvpRvkm8C5EEL6w6JsMVSo">pages/profile</td><td data-page-node-id="FF48AF9EvOEXp6sbNOTPbv">宝宝头像裁剪上传、多宝宝档案管理切换、宝宝 ID + 密码邀请家人、宝宝信息完整编辑</td></tr>
+  <tr data-page-node-id="DWuaytMvJuIm725PAkLz9F"><td data-page-node-id="bwL7B2z3GeVk9x4Ub92cI2">分享</td><td data-page-node-id="8C0oTafMBDgdllTPPEfvYq">pages/share</td><td data-page-node-id="fhHB0TB8pStLFXwjGCZxmg">Canvas 绘制 750×1334 每日小结分享卡片，内含当日统计、宝宝头像与小程序码，一键保存 / 转发</td></tr>
+  <tr data-page-node-id="BvX6WLAzo7B3DuOrEou19X"><td data-page-node-id="JnhehBrogsBFLQbJ4TjEN5">登录</td><td data-page-node-id="FXJIeM2ml9EUCvpYFsjDEE">pages/login</td><td data-page-node-id="7GtznQRQFzXRByxY4wJuHG">微信授权登录、家庭邀请接受入口（?invite=TOKEN）</td></tr>
+</table>
+
+<h3 data-page-node-id="F926MxcWf2wHlCpXM6cHw0">3.2 核心功能清单</h3>
+<ul data-page-node-id="E7VS75deI8WBwHATq7bZsu">
+  <li data-page-node-id="Bs452bJDNSpInm6PGdqVvu"><strong data-page-node-id="YFCZ9Tyg3Ewstwfe2gzaFr">一键打卡</strong>：喂奶（可带量 / 自定义）、换尿布（小便 / 大便 / 拉稀）、睡觉（带时长分钟），触感反馈 + 即时 Toast，保存不切页；</li>
+  <li data-page-node-id="w7qp4ZfOREquVtqobO1pvd"><strong data-page-node-id="NLkmtqfuE7vSP9zDBpSc7l">离线可用</strong>：点击瞬间落本地，离线写入待同步队列，网络恢复自动补传（onNetworkStatusChange 驱动）；</li>
+  <li data-page-node-id="fBXXAjBhyNeQDUflBqOr1s"><strong data-page-node-id="rtHr4Z3N0Fb0GhZlKAwcDZ">智能预测</strong>：基于近 7 天同类型记录的相邻间隔均值（过滤 >8 小时异常间隔，兼容二条边界）推"预计下次"时间与倒计时，数据不足时兜底显示；</li>
+  <li data-page-node-id="gCUEi6O7DZUjUxX7hIHIMh"><strong data-page-node-id="4Nd39bf9cGmNLBJ9LzAP9f">时光轴</strong>：三泳道 × 24h 横轴可视化时间分布图，Canvas 2D 绘制，含 tooltip 交互；</li>
+  <li data-page-node-id="mHq1BghRaZFetEZCXpspAF"><strong data-page-node-id="JNHLYPonNztwZpk7EbnIWt">成长曲线</strong>：身高 / 体重随时间曲线，叠加 WHO 国际标准发育曲线作对照参考；</li>
+  <li data-page-node-id="JS2ZF5CUBOMdeNcOoPuWzq"><strong data-page-node-id="hRaPHD1l5BHboHBSouinaJ">日程日历</strong>：按月切换的自绘日历，事项按类别上色，未来事项有倒计时提醒；</li>
+  <li data-page-node-id="OYejaajgXBKk5rOy8Y5jqz"><strong data-page-node-id="W70qzUPFrr7YZCM4b8BUWJ">家庭共享</strong>：发起人生成 6 位邀请码（24 小时内有效），受邀人凭邀请码接受邀请后关联到同一宝宝；父母与祖辈分角色权限；</li>
+  <li data-page-node-id="8b6jCFA63THHOFzZ4PdeNw"><strong data-page-node-id="l7uM0eEbgtFsYi7zT4tGw7">多宝宝</strong>：一个家庭可管理多个宝宝档案，一键切换；</li>
+  <li data-page-node-id="RiWMQWCKRPyQsQqxrYFxqB"><strong data-page-node-id="Nzcuc6Fs3BlrOrSyRGgy2j">天气沉浸皮肤</strong>：IP 定位（免授权）+ Open-Meteo 公开天气，五套皮肤（晴 / 阴 / 雨 / 雪 / 风），雨天带 Canvas 雨滴 + 足底涟漪动画；</li>
+  <li data-page-node-id="ZnwpYsf97YCwRpl6qrsAhO"><strong data-page-node-id="jYcGI8d6V3GVC5t12wfGyG">每日分享卡</strong>：自动汇总当日数据生成分享卡片，内置小程序码，便于家庭群与朋友圈传播。</li>
+</ul>
+</div>
+
+<!-- ==================== 四、应用场景 ==================== -->
+<div class="page" data-page-node-id="s4EtvTeUA1McHMMFC7iFyG">
+<h2 data-page-node-id="GZRtiqYxqpWcUqwi1Aorib">四、应用场景</h2>
+
+<table data-page-node-id="SP89mwBByLuKsmCT9PpmuM">
+  <tr data-page-node-id="QA3GSzDHoBy9wVWhZVJ8pA"><th style="width:22%" data-page-node-id="ZYqvN4pBL6cb4gMIsJPnIw">场景</th><th style="width:34%" data-page-node-id="2X7qEWSofAjsKEtDe54FkP">典型用户</th><th data-page-node-id="8hUnXUebR3QMsZ5b11jFhB">使用方式</th></tr>
+  <tr data-page-node-id="mbrFeDaCrAlYcbES00mENd">
+    <td data-page-node-id="joK5q1QtZfci1DLHMzbHka">凌晨喂奶</td>
+    <td data-page-node-id="MXRPoZnftPgzbleoYGinay">新手妈妈（单手抱娃）</td>
+    <td data-page-node-id="IhCU22vj0gv5xVcOdHrlm0">手机点亮直接点一下"喂奶"，无需输入时间、无需切页，眯着眼也能完成</td>
+  </tr>
+  <tr data-page-node-id="e0b2UXpllcJgkPRjsBDUrA">
+    <td data-page-node-id="7Y1MrvNAcnOGVxCzQxnApS">夫妻交接班</td>
+    <td data-page-node-id="tF6SLqi12eOEfdCtmIr3Qk">爸爸妈妈</td>
+    <td data-page-node-id="2kVmsSfGyBgOqUlftsgxmC">打开首页一眼看到"上次喂奶 2 小时前 / 预计 1 小时内"，交接无需口头询问</td>
+  </tr>
+  <tr data-page-node-id="vtghCKxDi3QVXveBcRfvWD">
+    <td data-page-node-id="479qXBXrgnPRiJzt8xElZh">长辈看护</td>
+    <td data-page-node-id="OW2CR09EFcV921hV19cQfL">爷爷奶奶、外公外婆</td>
+    <td data-page-node-id="Av6HIGJfmio2BqjW7L8Ynt">接受家庭成员邀请后只读取、只观看，可随时点头核实宝宝今天吃了多少、睡了多久</td>
+  </tr>
+  <tr data-page-node-id="RzSRE3kXQrcXLcth2GoMf7">
+    <td data-page-node-id="deTqhrhWNpX0Wqv4MXucNo">医院微量元素 / 儿保档案</td>
+    <td data-page-node-id="mbm9w1edGJE8faN6ggVTcB">所有家长</td>
+    <td data-page-node-id="iYhGWxn3IBQKLFT3MvkSQU">到点前在"日程"标记"疫苗"，倒计时提醒；测量后录入身高体重，自动生长曲线并对照 WHO 标准</td>
+  </tr>
+  <tr data-page-node-id="kQwlXihyLaeU80MuFbgsBd">
+    <td data-page-node-id="dH2fAhqRXODWNjFmO7Ismu">多人轮流看护</td>
+    <td data-page-node-id="IMKNmLTK5WkoZEVPX25r5Z">保姆 / 月嫂 / 假期托管</td>
+    <td data-page-node-id="MbCMOnyXkFEq4AESqRc1iY">同一宝宝 ID 共享，谁看了都能记录，避免传话出错</td>
+  </tr>
+  <tr data-page-node-id="lBDFyOGMpX2JF7WDUVhVDc">
+    <td data-page-node-id="SAqOxNNxpLt7Wu652jg4Tv">出差在外</td>
+    <td data-page-node-id="i3LPMEEFGILdSqC9WbJGEv">异地父母</td>
+    <td data-page-node-id="TzwG4j0Bh88PFiIQrAIQ3V">通过家庭共享远程查看宝宝饮食、作息、成长趋势，获得参与感</td>
+  </tr>
+  <tr data-page-node-id="mWHqIck167eErTXIK0BpHv">
+    <td data-page-node-id="IDOIqtXrtBnqTbedVZ7KlK">每日小结分享</td>
+    <td data-page-node-id="7L213ayGfFiHVKEHjbMsH7">家庭群 / 晒娃</td>
+    <td data-page-node-id="NICr8pGf60pdGBk9I5DMkQ">一键生成"宝宝今日"卡片分享，数据卡片自带小程序码，带来用户自传播增长</td>
+  </tr>
+  <tr data-page-node-id="IGUfQfw2v7KoGr2jJ79LI6">
+    <td data-page-node-id="Ic6MK7DXmFtOBimIrnrsnq">天气变化场景</td>
+    <td data-page-node-id="GxC1DpfAHNAFE5MShuVvZk">所有用户</td>
+    <td data-page-node-id="SyskkOfqck1ncZMRayh0lu">首页随天气自动切换皮肤，雨天动画提示出门注意，自然形成"每日打开"的理由</td>
+  </tr>
+</table>
+
+<h3 data-page-node-id="0qlWGe1HYOe2jxW14fO0eB">4.1 典型使用动线</h3>
+<p data-page-node-id="Ive2zIAbge2miCfI85qCQY">新用户：微信授权登录 → 输入宝宝资料（昵称 / 生日 / 头像） → 回家首页 → 打开"喂奶"记录 → 智能预测立即生效（数据积累后） → 打开成长页录入身高体重 → 打开日程页标记疫苗 → 把宝贝 ID + 邀请码发给家人 → 家人扫码加入协同记录 → 每天 21:00 生成今日小结分享给家族群。</p>
+</div>
+
+<!-- ==================== 五、解决的实际问题 ==================== -->
+<div class="page" data-page-node-id="kkccDOH3a8kvkQzci2Angf">
+<h2 data-page-node-id="0STzzVQdufMknJZK5vcPw2">五、解决的实际问题</h2>
+
+<h3 data-page-node-id="6A0el1bOHGlubxPndQfUnh">5.1 痛点 → 方案对照</h3>
+<table data-page-node-id="DC3h4UaZ3pkOR85wtn00Fx">
+  <tr data-page-node-id="9J11HOykx4VFcR9zUo8vaV"><th style="width:34%" data-page-node-id="Uu2tm5rPGLJYyPxDOBD4ll">育儿场景真实痛点</th><th data-page-node-id="6TOxhJaxGQXYvIMNM8FOxm">本小程序的解决方案</th></tr>
+  <tr data-page-node-id="s57IvOKWZw1EVP9HTgf81Y">
+    <td data-page-node-id="Mb2clGULjG6Jy30BI6FCGa"><strong data-page-node-id="OmePdHP68zaZwKO34hTBOi">记不住、懒得记</strong>：新生父母手忙脚乱，传统记账 app 步骤多、需要切页填写，坚持不下来</td>
+    <td data-page-node-id="DycQG6QvwkXBFprHIvLAZG">三个一键打卡按钮 + 本地即时响应（<50ms），操作路径 1 点击 ≈ 1 秒完成，不切页、不强弹窗</td>
+  </tr>
+  <tr data-page-node-id="CLMrXfv1FsYrYv8LV5G9Jz">
+    <td data-page-node-id="8NN5rpDsNOAq5WtTRSzXRA"><strong data-page-node-id="mZ54WcfoBVa0NpRdvrq6Xy">交接信息断裂</strong>：夫妻 / 跨代看护（口头传达），轮流带宝宝容易遗忘"上次喂奶几点"</td>
+    <td data-page-node-id="DVwzsnaTaFUlXEsDoMqH21">首页"上次 X 时间" + "预计下次"常驻卡片，任何人打开即获取最新状态；家庭共享全员可见</td>
+  </tr>
+  <tr data-page-node-id="wQi6T25EPHGDnrhOA5u8zA">
+    <td data-page-node-id="ltJEvgMf6FqVEYghdKWQR3"><strong data-page-node-id="hvGk0hNGhMrvdix05HtN3O">不会判断"正常"</strong>：宝宝食欲 / 睡眠节律紊乱，父母不确定是否要干涉</td>
+    <td data-page-node-id="CooFoQfl5B8YDOPXvsg5Br">基于自身记录自动学习平均间隔并主动预测提醒，异常间隔过滤（&gt;8 小时）避免误读</td>
+  </tr>
+  <tr data-page-node-id="mDjfGbR7kmncQhKiCuqazF">
+    <td data-page-node-id="ia8i8GryTeopurMjCCZDq6"><strong data-page-node-id="Y4Ct0DVKFBrR8xO2rTHQ7Y">成长是否达标</strong>：不会看懂生长曲线，担心矮 / 偏瘦 / 过快</td>
+    <td data-page-node-id="oIHBq3BLFOsPhEDT6282HZ">本地绘制生长曲线 + 叠加 WHO 国际标准，父母肉眼比对</td>
+  </tr>
+  <tr data-page-node-id="ECQi30S4xwWavKH2u9UmwJ">
+    <td data-page-node-id="GYu8mF6l8h3WfKVCAGHAGH"><strong data-page-node-id="rCRhpfXL5rcZWBkxcHa3l7">断网 / 弱网场景多</strong>：楼道、地库、乡下信号差窗口，记录流失</td>
+    <td data-page-node-id="HBtOlxLEoqJPWzfPZ5fHGf">本地优先存储 + pendingSync 待同步队列，网络恢复自动补传，数据零丢失</td>
+  </tr>
+  <tr data-page-node-id="v8A4g8BhD8Zj1062DdBCuq">
+    <td data-page-node-id="Bw4rHKQdjYu9s428vxmpOA"><strong data-page-node-id="PPWlLLsPNXB8KXo1C42kiP">跨家庭成员协作难</strong></td>
+    <td data-page-node-id="v5CWSzuNvMYjSb2eSQ6aBq">宝宝 ID + 6 位邀请码即入共享，parent / grandparent 两种角色，爸妈可写、祖辈可看</td>
+  </tr>
+  <tr data-page-node-id="eAwTGMIlZ1HXZsHUL1iwii">
+    <td data-page-node-id="YswtFUquxvvu0uhSC9QC8K"><strong data-page-node-id="dbGfuJAVyTdPp7Jt4r5djQ">家长平时忘记关键节点</strong>：疫苗接种日、体检预约、兴趣班</td>
+    <td data-page-node-id="ANFthS1BV50cS9f4nCn812">日程日历 8 类 + 自定义提醒，提前在日历上落点，未来事项倒计时</td>
+  </tr>
+  <tr data-page-node-id="aLjhrvo7NWz6tzmyDKTtoS">
+    <td data-page-node-id="A2CUI8T4hIH5YoEF0y2FXt"><strong data-page-node-id="yw6jzOg9LxC0JAbvA6dQPq">分享缺乏沉淀</strong>：晒娃只发照片，没有"数据感"的成长回看</td>
+    <td data-page-node-id="zVhW32vzyPDomXVdyGKm7V">每日小结卡片自动汇总（喂奶次数 / 睡觉时长 / 尿布次数），图文 + 小程序码一键转发</td>
+  </tr>
+</table>
+
+<h3 data-page-node-id="MyNenCvSTh06xc8qfeEc7R">5.2 实际价值小结</h3>
+<ul data-page-node-id="DstsKCRQYn89RaHgp6uCgZ">
+  <li data-page-node-id="oQ8Y9XBPgpvWZtYKupUcde">将"记录"从负担变为习惯：操作成本从分钟级降至 <strong data-page-node-id="pcWiNKZR91l4LcCCwerIwb">1 秒</strong>；</li>
+  <li data-page-node-id="RVEP75u3GZB9jrNDhkYMPk">用数据把家庭照护连接起来，避免"信息在中转中丢失"，守护宝宝喂养与睡眠节律；</li>
+  <li data-page-node-id="cHvJad1osyplxjcKRyF8cX">为医疗场景提供趋势依据：儿保医生问诊时可直接展示半年的身高体重曲线；</li>
+  <li data-page-node-id="GPJ74sJ2qA1YFh8G9wlm04">离线优先保障了弱网环境（乡村常驻长辈）的完整使用体验。</li>
+</ul>
+</div>
+
+<!-- ==================== 六、技术开发方案 ==================== -->
+<div class="page" data-page-node-id="DQNuPfzRhFiF8C0VJECmLV">
+<h2 data-page-node-id="GW07oM0G3tcHwlpwFfPHO6">六、技术开发方案</h2>
+
+<h3 data-page-node-id="fnZqr5GLayiUXaA4vMAL6r">6.1 总体架构</h3>
+<div class="arch" data-page-node-id="G1H9XagmhjjHfnQkEd2WtM">
+  <div class="layer" data-page-node-id="Hz9sDRvQXdSGCjV8lhM3M3">
+    <div class="title" data-page-node-id="g3zAsmQkHPXWL1qCdHAVFc">小程序客户端（微信原生框架，非 uniapp / Taro）</div>
+    <div class="items" data-page-node-id="mFED1qw0zjcIb6wVxDnyV0">9 个页面 ｜ 3 个公共组件（RecordButton / TimelineCard / EmptyState） ｜ 工具库（request / storage / predict / time / constants）</div>
+  </div>
+  <div class="connector" data-page-node-id="3LJ77m0gNFErZUFNoBHlKY"></div>
+  <div style="text-align:center;font-size:11px;color:var(--text-sub);margin:-14px 0 2px;" data-page-node-id="2JzZiDwEUTGrtHermRkMeh">wx.cloud.callFunction（统一请求层，自动离线降级）</div>
+  <div class="connector" data-page-node-id="97PnsWz8BGNkurP9omjtKO"></div>
+  <div class="row" data-page-node-id="3AutxHzflm4lxCKnLfz9f0">
+    <div class="cell" data-page-node-id="NJwrzYBUMzxHhcPf9gf23w"><b data-page-node-id="lk9I3z72vtTl3Yjg4I8eBg">云函数 × 24</b>记录 / 成长 / 日程 / 宝宝档案 / 家庭 / 天气 / 码等<br data-page-node-id="ZBjhReyP5AQXGrVQz1ycgN">统一 DYNAMIC_CURRENT_ENV + 集合自愈</div>
+    <div class="cell" data-page-node-id="VwHEUUhz94DgUKIpCXGZay"><b data-page-node-id="m4i2lHcfVRmBFG2aXKSxkO">云数据库（NoSQL）</b>records / growth_data / babies / family_members / invitations / schedules</div>
+    <div class="cell" data-page-node-id="8G9ukvH5c5NDWKk9fD0rfl"><b data-page-node-id="5UI09HTErTmL2dtGo2wGg6">云存储</b>头像 / 相册 / 分享卡片图</div>
+  </div>
+</div>
+
+<h3 data-page-node-id="dsfV82hszcS5oDeTQ8EeF8">6.2 技术选型与理由</h3>
+<table data-page-node-id="cejJGoadCJApyOaTnm1DVY">
+  <tr data-page-node-id="H0HVFl1vlPx8a7EGmNtBih"><th style="width:22%" data-page-node-id="horCmuruFe2WFJjkMiKtxR">层级</th><th style="width:30%" data-page-node-id="aqSGrlT5K0CS9AxVScMZgZ">选型</th><th data-page-node-id="qfdeU9yIns9BeGuEWDoH54">理由</th></tr>
+  <tr data-page-node-id="IJHk1cQfEcuZ6Tcc6NBNzI"><td data-page-node-id="FFbooEa9JArYOuyyqCydVe">前端框架</td><td data-page-node-id="Ndvry20jJ7Bk3mWPSzbFg2">微信原生小程序</td><td data-page-node-id="tinbEnkO3XutBVlAsm1Jte">零编译损耗、启动最快；免框架升级带来的兼容风险</td></tr>
+  <tr data-page-node-id="qBAVBzzwcjlIpikoTXfkrp"><td data-page-node-id="X4GhKaF6tkyQre0CKM5EUZ">UI / 图表</td><td data-page-node-id="Ifny1rPNGUAkxVsZRk6qmF">完全自研（WXSS + Canvas 2D）</td><td data-page-node-id="trudzbPEcmtckQHREQFk6c">生长曲线、时间分布图、分享卡片全部原生绘制，无第三方依赖，包体可控、风格统一</td></tr>
+  <tr data-page-node-id="WRb1lBi9DpW4xk5Rb6Pn1m"><td data-page-node-id="aWaCoen1iyzVnBoB5Aq3ap">后端</td><td data-page-node-id="fjF1QMGQVx9RHTd9ZGpnhz">微信云开发 CloudBase</td><td data-page-node-id="bTNbpqJkCVNoISiNsxHoAL">免运维 / 免服务器，天然鉴权，微信生态内闭环</td></tr>
+  <tr data-page-node-id="PePGmswgFGMRUWQfSYHdnt"><td data-page-node-id="Ec4Zi5u6qwPjgwW9CF2bTq">数据库</td><td data-page-node-id="h8ocUxveZOwOt0gBekTwd0">云数据库 NoSQL</td><td data-page-node-id="gZ69xxD0eDVXzGeIgpJjWU">schema-less，适合记录流数据，配合复合索引（babyId + 时间戳）</td></tr>
+  <tr data-page-node-id="CKtf2w8XCQauKLaKSWi64O"><td data-page-node-id="kWy1baKgIa93pbrVhcIHNJ">缓存 / 离线</td><td data-page-node-id="etph2TDF1IncAm463PjVKR">wx.Storage + 待同步队列</td><td data-page-node-id="6H2FFkOghk2atlEHPiD3aI">同步 API 首屏即出；网络监听事件自动同步</td></tr>
+  <tr data-page-node-id="qbwAqiwY5UcLkR8tiPXL8G"><td data-page-node-id="ZuRfjWzMVY6Csiy0WE0tGN">天气</td><td data-page-node-id="3TyyEXxMTDDRdCps3SbFZ1">IP 定位 + Open-Meteo 公开 API</td><td data-page-node-id="LRGF94eQ6A6p4DLE40t25D">免 Key、免授权、零成本，云函数侧调用，绕开小程序域名白名单限制</td></tr>
+  <tr data-page-node-id="HTnPGoeZkwzAG4TzpQ9Iia"><td data-page-node-id="CJl5ju3ZRf782l75zuec5E">图标 / 视觉资源</td><td data-page-node-id="Bp1K9J44kJ8iBmKDKDxR3K">Python（Pillow）脚本生成</td><td data-page-node-id="SBrG5V2I7fbgGkOVWbiMN5">tabBar 图标等由脚本按设计令牌（色值）程序化生成，保持成品统一、零外部素材</td></tr>
+</table>
+
+<h3 data-page-node-id="F328NzjrT7wPxDiQkMmzDj">6.3 前端关键技术实现</h3>
+<ul data-page-node-id="VwYHBQVTNQvFg3TGJMuleD">
+  <li data-page-node-id="9PzXqy4ufqo7z8wWzh5FBF"><strong data-page-node-id="FHpYiLO4lp3QcwEF1s1Mue">离联网优先架构</strong>：所有写操作先写本地（同步，几毫秒）→ 更新 UI → 根据网络状态决定立即上云或入队；'network status' 变化自动补传失败重试；云环境（cloud.init / 基础库不支持）降级为离线模式，绝不崩溃；</li>
+  <li data-page-node-id="89d8UVBbnHc809Zi5o1BKp"><strong data-page-node-id="MQhuWJsUhkZkTRqkT0mZlY">首屏性能</strong>：app.json 开启 lazyCodeLoading "requiredComponents"；首页 onShow 直接读取本地缓存渲染，异步请求回来后再局部 setData（最小化更新）；</li>
+  <li data-page-node-id="dL4cKCkwhrw5sNwMMsvL1z"><strong data-page-node-id="rcyYZ1HByjwDbCqxFehjyx">Canvas 自绘三件套</strong>：时间分布图（三泳道 × 24h）+ 生长曲线（坐标绘制 / 虚线 / 阴影参考带）+ 分享卡片（750×1334 设计稿坐标等比缩放），统一 canvas.requestAnimationFrame / 绘制缩放方案；</li>
+  <li data-page-node-id="cLRL50RZuao1DVUmfa9aoC"><strong data-page-node-id="t9l9SYWcdHoPJeWBMJzFuA">自定义 tabBar</strong>（z-index 1000 原生层）与弹层安全层级管理（全屏蒙层 z-index ≥ 10000），全面屏使用 env(safe-area-inset-bottom) 适配，避开 tabBar 遮挡；</li>
+  <li data-page-node-id="60VdiwWKeFL4T9hgJUJPOo"><strong data-page-node-id="dr70m6D1Md3V646RCXPM1s">设计令牌</strong>：全局 CSS 变量（--primary #D4B896 等），圆角梯度 12/24/40/60rpx，样式隔离、主题可扩展。</li>
+</ul>
+
+<h3 data-page-node-id="qEs05u4A9areNU6TRdKNlk">6.4 后端关键技术实现</h3>
+<ul data-page-node-id="qntRnACaWAeFTvuBt6KE49">
+  <li data-page-node-id="gfN65yvEgQ2OpB1ikngV8N"><strong data-page-node-id="Ok7BVDWIFH8Wl4qApHVDx9">24 个云函数微服务化</strong>：按业务拆（addRecord / getRecords / … / getWeather / getMiniProgramCode），单函数单一职责，参数白名单校验（如 addSchedule 的类别白名单），写操作全部在服务端（云函数侧）完成鉴权，不信任客户端；</li>
+  <li data-page-node-id="OZaEzMXcwcGs49VBKuK4MU"><strong data-page-node-id="GDngYi4oJPmtSAnaPs3xNn">集合自愈机制</strong>：云函数内嵌 safeDb / ensureCollections / isCollectionMissing 工具，检测到集合缺失时自动创建，有效规避常见"-502005"数据库异常，提升 demo 与正式部署的稳定性；</li>
+  <li data-page-node-id="ExDj0qFWFVOR4xfqKDJxSB"><strong data-page-node-id="a5IfCHWmdorkyIaeAaFJKZ">数据建模</strong>：6 个集合 — records（type / subType / duration / recordTime + index）、growth_data（height / weight / measureDate / monthAge）、babies（avatar / albumPhotos ≤9 张）、family_members（role：parent / grandparent）、invitations（token / status / expireAt 24h）、schedules；</li>
+  <li data-page-node-id="aaXCtsrSxE47bwGRHRBs6n"><strong data-page-node-id="Qw72BZapfqApd6d9Hl4LXF">家庭与安全</strong>：6 位邀请码 + 24 小时有效 + 一人不可重复加入，先验家人关系再记账，防止越权访问其它家庭数据；</li>
+  <li data-page-node-id="F4GfZsiBv6aXu8FeAivFyP"><strong data-page-node-id="qmKdu39XCqhpl5JBDlHhyI">双环境自动切换</strong>：按小程序运行版本（develop / trial → DEV_ENV，release → PROD_ENV）自动选择云环境，云函数统一 cloud.DYNAMIC_CURRENT_ENV，发版零配置；</li>
+  <li data-page-node-id="WN4yV5KUMg2r2Ryoc4A9IP"><strong data-page-node-id="WDuEQ3MpdFJpV017BKe0rY">天气数据通道</strong>：云函数侧 ipwho.is / ipapi.co 定位 → Open-Meteo 实时天气（免费无 Key），全链路失败兜底返回晴，前端 30 分钟缓存，杜绝白屏。</li>
+</ul>
+
+<h3 data-page-node-id="u79e99BxmaUNrqcUBdmApq">6.5 部署与发布</h3>
+<p data-page-node-id="ONtnflBsBwkpRJQuaTFFy1">微信开发者工具一键"上传并部署"云函数（云端安装依赖）→ 控制台建集合 + 索引 → 真机适配（全面屏、弱网、断网恢复）→ 提审自查清单（隐私、授权说明、内容安全、无诱导分享）。项目已按该流程完成线上线下联调，README 提供一键部署指引。</p>
+</div>
+
+<!-- ==================== 七、创新点 ==================== -->
+<div class="page" data-page-node-id="ZvFmycjxIzliD0XFjnMKnw">
+<h2 data-page-node-id="AZ6DoY4ls8ZNtTRLphQTEn">七、小程序创新点</h2>
+
+<h3 data-page-node-id="LYevPXKHNIUpVlDzz9OCU3">7.1 极致轻量的"一键打卡"交互模型</h3>
+<p data-page-node-id="8NQiNsECCUy95yIsgYdRzg">核心记录行为被压缩为"一屏、一按、一秒"：首页即操作台，三大圆角按钮拇指全覆盖，点击立即 Toast 反馈、绝不跳页。这一设计把育儿记录的目标时长期坚持，而归因于"愿意记"的前提——成本足够低。</p>
+
+<h3 data-page-node-id="MLOSHepgA3K3XYPnBV3HXZ">7.2 离线优先 + 待同步队列的韧性架构</h3>
+<p data-page-node-id="gKnGAt9eSF372iZ5L2Zbe1">所有记录先写本地再上云，断网期间数据零丢失，恢复后自动补全；云环境不可用自动降级为纯本地模式（devMode），前端永不因为后端异常而崩溃。在弱网 / 医院室内 / 乡下等育儿高频场景中提供"跟没有断电一样的流水账体验"。</p>
+
+<h3 data-page-node-id="AtY7pJZORkJEF5aSofY74T">7.3 自研自适应作息预测算法（含异常过滤与边界回退）</h3>
+<p data-page-node-id="TRyGOCOTmOkeEIg6ZIhFgm">不靠外部 ML 服务，纯本地 + 云端双端实现：取近 7 天同类记录间隔平均，过滤 &gt;8 小时疑似断记数据，两笔记录边界回退保证不误报"数据不足"，并区分"今天 / 明天 / 时:分"与倒计时 / 超时状态文案，让预测既准又温和。（见 utils/predict.js 及云函数 getPrediction）</p>
+
+<h3 data-page-node-id="nb4yI3jMv08lHSzDa2I53G">7.4 原生 Canvas 全自绘 · 零图表/绘图库依赖</h3>
+<p data-page-node-id="zHgCENkiYur9T2aemITzmn">生长曲线、24h 时间分布图、750×1334 分享卡片全部是团队手写 Canvas 2D 绘制（含坐标系、scale 缩放、阴影专带、小程序码合成），不引入 ECharts / F2 / html2canvas 等任何第三方图表或渲染库，包体更小（约 600KB）、视觉与品牌严格一致。</p>
+
+<h3 data-page-node-id="kLssLEpDgDiYdOPFsAH66H">7.5 沉浸式天气皮肤 + 程序动画</h3>
+<p data-page-node-id="s7vEH1RzdAhQ0HkcClVElA">通过云函数集成 IP 定位与 Open-Meteo（免 Key 免授权），把首页变成随天气变化的"心情页"：晴 / 阴 / 雨 / 雪 / 风 五套皮肤，其中雨天由 Canvas 自绘雨滴 + 落地涟漪动画（requestAnimationFrame 驱动、弹层共存时按 wx:if 卸载重绘策略）实现，一带而完整的"动效系统"自研闭环。</p>
+
+<h3 data-page-node-id="ryoxDhwytoBXzHaCJu4I0g">7.6 双角色家庭共享与邀请安全机制</h3>
+<p data-page-node-id="lBBQoNv651AB9CgQkLz9Qc">以 babyId 为共享单元，parent / grandparent 双角色权限隔离；6 位邀请码 24h 过期、防重复绑定，全部写操作服务端校验，第一次在个人级记录应用里落地了"爸爸可以记、奶奶只看"的家庭协作模型。</p>
+
+<h3 data-page-node-id="6QELdTOQ6yqoS8tut0SXPy">7.7 云函数"集合自愈"机制</h3>
+<p data-page-node-id="CsIxrFkSKKJBCljCOcpMQZ">针对云开发冷启动环境未建集合导致的经典错误（-502005），团队在官方模式之上封装了 safeDb 巡检：每次调用检测集合存在性并自动创建，部署即用、无运维负累，显著提升稳定性和体验版接入成功率——这是文档中服务端工程化的务实创新。</p>
+
+<h3 data-page-node-id="koe6ryVcCAnSR4lKbvSk4S">7.8 免 Key 免费天气方案</h3>
+<p data-page-node-id="YkrPCfRPwpTXsrQFHX0Ezp">天气能力不依赖任何付费 API Key：云函数以 IP 定位（双服务故障转移）+ Open-Meteo 开放接口完成，全程无用户授权、无域名白名单配置，成本趋近于零且开箱即用，契合个人作品与小型团队的开源心态。</p>
+
+<h3 data-page-node-id="5yvjNJomm0TKY2pInZIsf6">7.9 设计系统驱动（奶咖色令牌 + 程序化图标）</h3>
+<p data-page-node-id="1dGAolgaqd3IaZYNqMFYcP">全项目不由 CSS 变量统一管理配色、圆角、间距；tabBar 四枚图标由 Python 脚本按设计令牌程序化生成 PNG，保证在任何分辨率下锐利一致，实现"设计即代码"。</p>
+</div>
+
+<!-- ==================== 八、原创性声明 ==================== -->
+<div class="page" data-page-node-id="zgzzkGgoGIcpAtgyc7DXhA">
+<h2 data-page-node-id="sWzK3xcFFmQmCNC6WGKl9j">八、原创性声明</h2>
+
+<div class="declaration" data-page-node-id="LyF2ezPBUyIjPGW7COztT9">
+  <h3 data-page-node-id="BkJlOPJjc0HOvTBgmBlUMa">关于作品原创性的声明</h3>
+  
+  <p style="margin-bottom:8px;"><strong>团队定义</strong>：本声明所称「贝贝log 开发团队」，即由 1 位创作者使用 WorkBuddy、召唤 AI Agent 分别承担产品 / 开发 / 测试 / 运营等角色所构成的项目团队，不包含任何其他个人 / 团队 / 组织成员。AI Agent 在创作者监督下辅助完成编码与调研，全部产出物均接受创作者审核与验收。</p><ul data-page-node-id="qbZN9iktLeo4ZDwJESDqM1">
+    <li data-page-node-id="aAUNAWf6u4uxuDHmLcr6Ss"><strong data-page-node-id="5mDkzM2kLNSNIl9iM5l2J7">1. 代码原创</strong>：本小程序的全部源代码（前端页面、公共组件、工具库、24 个云函数）均由本团队独立设计、编写与测试完成，不存在引用、复制或改编其他个人 / 团队 / 组织开发的代码、功能模块或项目的成果；</li>
+    <li data-page-node-id="skchTWaJcnz8VLJHuOIzkA"><strong data-page-node-id="evQKSoCXtU8wXPA065CCQ9">2. 算法原创</strong>：作息预测算法、时钟分布绘图方案、生成卡片布局等核心算法与实现方案均为本团队自主设计，并在项目内留存完整实现与文档（docs/architecture.md、README.md）；</li>
+    <li data-page-node-id="cMuHKxkyz5rUKLkBMCdRp6"><strong data-page-node-id="jkEP7XcBTkFBJ2HaASwf7I">3. 视觉资源原创</strong>：页面视觉效果、奶咖色系设计令牌、tabBar 图标（由脚本自绘生成）、分享卡片模板均为团队原创设计，不使用任何未经授权的第三方图标、图片、插画与字体素材（系统默认字体除外）；</li>
+    <li data-page-node-id="sybraX1AUWRb4zXb2FdUJi"><strong data-page-node-id="CGi3J5f5IBK9d4wVqv5PhI">4. 仅使用平台官方的标准能力</strong>：本项目运行于微信小程序与微信云开发平台。微信小程序框架、微信云开发（CloudBase）及其官方 SDK（wx-server-sdk）属于平台方（腾讯）向所有开发者公开提供的基础开发能力与标准工具，不属于任意第三方的"开发成果引用"，不构成对他人成果的借鉴；</li>
+    <li data-page-node-id="ZNoDKQQ3DJNs0d46Kfww1H"><strong data-page-node-id="9PgASwE6cTJu4XEF1dlenv">5. 数据来源说明</strong>：天气功能通过公开免费的公共 API（Open-Meteo、ipwho.is / ipapi.co）进行数据查询，仅作实时天气数据读取，不包含任何第三方软件功能，符合各接口公开授权条款；</li>
+    <li data-page-node-id="velW1aRObCcAmgELiQzeOk"><strong data-page-node-id="HbU7YJFe4fZ5nZ4cPOKSPA">6. 诚信承诺</strong>：本团队郑重声明，本作品不存在直接或变相使用、引用其他非团队成员开发成果（包括但不限于：其他参赛作品、开源项目的同名实现、付费或长期复用）的情形。如在宣读或评审过程中发现不实之处，愿承担相应责任。</li>
+  </ul>
+  <p style="margin-top:10px;text-align:right;color:var(--text-sub)" data-page-node-id="I02jf7J04qo6NYD7crgZcv">—— 贝贝log 开发团队</p>
+</div>
+
+<h3 data-page-node-id="gGU3KZjDgF4E6s8ePnvrpv">8.1 技术洁癖及开源依赖清单</h3>
+<table data-page-node-id="fxPMZwKgpNyFweTpQWYKfx">
+  <tr data-page-node-id="Sippz6FpJpGzjYzE9or19p"><th data-page-node-id="6KJrZEp6DGLS0ypXb02h29">类别</th><th data-page-node-id="GpHaPcETi99OcloNoVtFuH">具体内容</th><th data-page-node-id="HdfDUSzMWe69oGQAe2dRNs">是否为本团队原创</th></tr>
+  <tr data-page-node-id="bdlST36thNUV1QthvP3E1E"><td data-page-node-id="bJ4B54FFqRC2rUVzF3gUw3">前端框架</td><td data-page-node-id="wnbwAvIMBiKByGPOHwniNT">微信原生小程序（WXML / WXSS / JS）</td><td data-page-node-id="ttqWyDctK5Mn2uZMo9ANIN">平台官方标准能力</td></tr>
+  <tr data-page-node-id="cXCUC5fw8ekj6gUA9xcfiT"><td data-page-node-id="BY7aGYm3HR7KrY5C6UnAj1">图表 / 绘制</td><td data-page-node-id="TFnM3uUttCNpfNYzhr2QsX">Canvas 2D 手写绘制（曲线 / 时间轴 / 分享卡）</td><td data-page-node-id="YrNb5F7mAHqeFTApiQZJzD">团队原创</td></tr>
+  <tr data-page-node-id="Gp1FRT15gHje2biug34AwG"><td data-page-node-id="tq4p7HGCfkU8dex9XOFd3k">算法</td><td data-page-node-id="yc3JmKYfM6D0w5HuGCzsCQ">作息预测、异常过滤、边界回退</td><td data-page-node-id="6KwGXC3i10kPGs7TdpVDTo">团队原创</td></tr>
+  <tr data-page-node-id="RtnSGAAZ1gIFh0Slg4TfoL"><td data-page-node-id="6SpPFlyouB0rMSl2bpc3dL">后端 SDK</td><td data-page-node-id="8bImMHcsJoup2EWUBLQ9pL">wx-server-sdk（云开发官方 Node SDK）</td><td data-page-node-id="j15AVLEsDOTaAOg15puhLq">平台官方标准能力</td></tr>
+  <tr data-page-node-id="TPtImJPTI4b0LcemHbr1yr"><td data-page-node-id="EqfQ6HKy6ILVB2tO9QKKbG">第三方 UI 库</td><td data-page-node-id="luXDHvj6d3MEiSQY46tTEP">无（不使用 vant / tdesign / colorui 等任何库）</td><td data-page-node-id="30jj1s1YvH8Vxu0FjLFoX0">—</td></tr>
+  <tr data-page-node-id="yvn5BX12hJSyAGChDUOsR1"><td data-page-node-id="FnUGLqYXnpDSmvGSaUAGPa">第三方图表库</td><td data-page-node-id="tlobIEINdk7FO8CieHEjh3">无（不使用 echarts / F2 等任何库）</td><td data-page-node-id="IgYMaijEx4kMfaJXCXy0ic">—</td></tr>
+  <tr data-page-node-id="hLzf4cHG6owyubApEM5wAG"><td data-page-node-id="zaJYXQ5snE8Qic7SLQ9g9A">图标 / 插画</td><td data-page-node-id="TLFHu9xXHwKN4YFmXNuvwx">脚本程序化生成的 PNG（Pillow）</td><td data-page-node-id="D32dU8ct1Y89w8bFluFtVE">团队原创</td></tr>
+  <tr data-page-node-id="YcvA4SxCm6RQMfPu92SUG3"><td data-page-node-id="6pr60Y9I7jNbTwtnwUtPdN">天气数据</td><td data-page-node-id="iUUJ2qPBx27VuNI2nPGpgA">Open-Meteo / ipwho.is 公开 API 数据</td><td data-page-node-id="ISnDKstPw9FwqnqovzNQeC">公开数据，仅读取</td></tr>
+</table>
+<p style="font-size:12px;color:var(--text-sub)" data-page-node-id="7MZqm223yEdmbo8cyDkUWX">综上：本项目 ≤除平台官方标准 SDK 能力外，零第三方运行时依赖，全部逻辑与视觉均由团队自主完成。</p>
+</div>
+
+<!-- ==================== 九、附录 ==================== -->
+<div class="page" data-page-node-id="BOJyiPOvA9Hbd9Mk53waJb">
+<h2 data-page-node-id="c6nEgtkWG4g6QUVkmGzB9l">九、附录</h2>
+
+<h3 data-page-node-id="7EkdqcTixsO2nn8tebl8Wq">9.1 云函数清单（24 个）</h3>
+<table data-page-node-id="4CsC0UdwB5kbxaZ33RHUip">
+  <tr data-page-node-id="GX7WezkoMGDZrpGmjm0Vhn"><th style="width:30%" data-page-node-id="yh2D9HGhvWDRDC9vqcGkLB">函数名</th><th data-page-node-id="rD6hgIPyNTHQtldLGe9pPY">职责</th></tr>
+  <tr data-page-node-id="21E6FDM8sS4w5xutVfPHgF"><td data-page-node-id="rPZIpPBiKAaL8Ls39TfErq">userLogin / getOpenId</td><td data-page-node-id="6LCC83FTLwMvFMGMyjlO19">登录与身份获取</td></tr>
+  <tr data-page-node-id="AgHNDmiFjXB3V02LYUsmGn"><td data-page-node-id="H26G0WbaPYYSRIFIMhjtxn">addRecord / updateRecord / deleteRecord / getRecords</td><td data-page-node-id="sYZo1KVJuxEUSrJy0C4oiB">作息记录 CRUD</td></tr>
+  <tr data-page-node-id="hHAaHGAF1WfjGvO5BBRgds"><td data-page-node-id="pcXYIWPG6iy3GA5cHrAiat">getDailySummary / getPrediction</td><td data-page-node-id="qGdeEcJqwnoSwz7HpAshMF">当日汇总 / 作息预测（云端）</td></tr>
+  <tr data-page-node-id="Dvkae1brc6LaUT4NC827bH"><td data-page-node-id="CvwdFmnmEQNyDkgHJK3dTD">addGrowthData / updateGrowthData / deleteGrowthData / getGrowthData</td><td data-page-node-id="bZvanLAbk6pmxrHK0ADOju">成长数据 CRUD</td></tr>
+  <tr data-page-node-id="2ufBC5NsmGs58nXWlaPfLU"><td data-page-node-id="WtmrflvUBgniUlX9QEczM2">addSchedule / updateSchedule / deleteSchedule / getSchedules</td><td data-page-node-id="z0PFbcfbIDmjXXVJxMPKaf">日程事项 CRUD（类别白名单校验）</td></tr>
+  <tr data-page-node-id="CTt14pnPGMzPJGVmgyjvjb"><td data-page-node-id="sVVXd613A4FUxTWbH4fwGU">createBaby / saveBabyInfo / deleteBaby / listBabies</td><td data-page-node-id="B7tXmIgKi2bz48NTioSaRL">宝宝档案管理（多宝宝）</td></tr>
+  <tr data-page-node-id="r9KoO3uL3GswsiW802r009"><td data-page-node-id="4LkTgly4LD7R1IWWCCCyjD">joinBaby / inviteFamily / acceptInvite</td><td data-page-node-id="H0mpHdswQpi8dedGwSjy9m">家庭共享（ID+密码 / 邀请码 24h）</td></tr>
+  <tr data-page-node-id="DQlQ7dOEsN2UHvDjjYubzW"><td data-page-node-id="Oyoa35LP2d8HO8ViZGJhDe">getMiniProgramCode</td><td data-page-node-id="0Qio5jaETaTTpfkZidxXCF">小程序码生成（分享卡）</td></tr>
+  <tr data-page-node-id="B2UVsYBBhkOf4I3pGPUPad"><td data-page-node-id="e1k5kK6ie5XDsAEHLtc8GC">getWeather</td><td data-page-node-id="Cnu3EszgNxeiUYwjxbcvQa">IP 定位 + Open-Meteo 天气</td></tr>
+</table>
+
+<h3 data-page-node-id="EVDTNw2Ceyo8T0IR8xaZLk">9.2 迭代记录</h3>
+<table data-page-node-id="NGQpL9UhB953JJZRBu8bDB">
+  <tr data-page-node-id="QWAPJOpP0AjcLpMj8NVHD1"><th style="width:18%" data-page-node-id="ozhVKNuQlEYGBUYvPd3ymw">版本</th><th data-page-node-id="SJdjzBbaIV7jJeAw3DZ7Bh">发布时间段</th><th data-page-node-id="n1JiBCu3FC1rDQdovSzs9i">里程碑内容</th></tr>
+  <tr data-page-node-id="jbI4vgJQxdFYYvBd4JvIUT"><td data-page-node-id="HzXmjshzFs3hZ8YMOUfUWX">V1.0</td><td data-page-node-id="P4qOSm9pbrAAaiCg0roXXQ">立项 — 基础版</td><td data-page-node-id="yUyqNzdDxRZbjhkmFLjI1w">一键打卡 + 智能预测 + 时光轴 + 成长曲线（WHO 对照）+ 家庭共享 + 离线同步</td></tr>
+  <tr data-page-node-id="JUrrfRuKBW4V5V3sBbpKbL"><td data-page-node-id="7lKzGXysZDYUJLV8HseRDT">V1.1</td><td data-page-node-id="f2CMv78iovufSzi4fy0Qns">体验版</td><td data-page-node-id="K4TUAJBEXd7V8xikFVUSZc">天气沉浸皮肤（含雨/雪动画）+ 相册 + 分享卡片 + 云环境自动切换</td></tr>
+  <tr data-page-node-id="LzCoMr0vfZ3PXHlrkSVELM"><td data-page-node-id="4PwFwrouu3FWNUu6rhOruc">V1.2（当前）</td><td data-page-node-id="E7pflk3UcUI33Dg2rzqAuJ">完善版</td><td data-page-node-id="Rb2AAUb4IiSV02hsE7fJhy">日程日历（8 类自定义）+ 多宝宝管理 + 历史记录页 + 成长页重构</td></tr>
+  <tr data-page-node-id="4n6AKbZZEWP1XTYiwXuCNh"><td data-page-node-id="o1dFxLWEMN1DLIrcpvtb7P">规划中</td><td data-page-node-id="DWkz9X6WoItfi96lEg6TF5">V1.3+</td><td data-page-node-id="oYJIktPzQEl8NCGhqEAKtu">数据导出（CSV/PDF）、喂养周报 / 月报、AI 育儿助手</td></tr>
+</table>
+
+<h3 data-page-node-id="uGDjFpNcbvakg5U7hI7GNJ">9.3 核心交付物速览</h3>
+<table data-page-node-id="r4g0F55aG2Ftid7sQmgzBo">
+  <tr data-page-node-id="zxulrTvBp7XZuDKX3v11cz"><th data-page-node-id="6nVDwyfEcGLEJ51iMrANit">交付物</th><th data-page-node-id="Pl98t8Dwf7YKA61OWbtGbG">路径 / 说明</th></tr>
+  <tr data-page-node-id="qmEKfeQGWnHHKeB3Yh7Pql"><td data-page-node-id="HR7lkEcmX4Hj7vMi0D2VUd">小程序源码</td><td data-page-node-id="cFCiqRPm8DHhy0tAWCywqb">miniprogram/（前端） + cloudfunctions/（后端 24 个云函数）</td></tr>
+  <tr data-page-node-id="S0HQHlSvhGIn1Dbedgsd4o"><td data-page-node-id="EhcX6aCG5C2Kg9lcfMQokX">架构设计文档</td><td data-page-node-id="N4xjxEJ9rPJ9dqRN0zg1aQ">docs/architecture.md（含需求分析、数据模型、性能方案）</td></tr>
+  <tr data-page-node-id="AQ4Qo0TQQEkw1nXTCbf2VT"><td data-page-node-id="jLQFmMk3gPUxQYwyxm8faM">工程说明</td><td data-page-node-id="Nxpo2vGEecMUOOtDN1ooEb">README.md（快速开始 / 数据模型 / 性能目标 / 验收标准 / 部署检查清单）</td></tr>
+  <tr data-page-node-id="JNs7oReKdjsLZTJY3ubope"><td data-page-node-id="BQCkH0T3aAOk8xKkCEBTGQ">图标生成器</td><td data-page-node-id="dBP4eB6VzOZOoPnbTI5Xrw">scripts/*.py（设计令牌 → PNG 一键生成）</td></tr>
+</table>
+
+<p style="font-size:12px;color:var(--text-sub);margin-top:16px;" data-page-node-id="vArNJjH5zn1SNS8sizTXj1">文档版本 V1.0 ｜ 2026-09-09 ｜ 贝贝log 开发团队。</p>
+</div>
+
+</body>
+</html>
