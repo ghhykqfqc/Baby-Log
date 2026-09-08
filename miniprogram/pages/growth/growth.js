@@ -10,31 +10,46 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
 // 图表内边距（bottom 40：容纳 X 轴两行标签——「日」刻度 + 年月单位，互不遮挡）
 const CHART_PADDING = { left: 44, right: 16, top: 16, bottom: 40 }
 
-// WHO 生长参考标准锚点（月龄 → 中位参考值）
-const WHO_WEIGHT = [
-  { month: 0, val: 3.3 }, { month: 3, val: 6.0 }, { month: 6, val: 7.9 },
-  { month: 12, val: 9.6 }, { month: 24, val: 12.2 }, { month: 36, val: 14.3 }
-]
-const WHO_HEIGHT = [
-  { month: 0, val: 50 }, { month: 3, val: 61 }, { month: 6, val: 67 },
-  { month: 12, val: 76 }, { month: 24, val: 87 }, { month: 36, val: 95 }
-]
+// WHO 生长参考标准：月龄锚点 → 中位参考值（0~60 个月，近似 WHO Child Growth Standards 中位数）
+// - 0~12 月逐月（早期生长快、曲率大，线性插值时必须用密锚点），13 月后按季度；
+// - 分性别 M/F 两套，未知性别时用两套均值（避免男女混同导致的参考线偏移）；
+// - 延伸到 60 月，避免 >36 月龄时虚线钳制成水平线（旧版 bug）。
+const WHO_MONTHS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 18, 21, 24, 30, 36, 48, 60]
+const WHO_HEIGHT = {
+  M: [49.9, 54.7, 58.4, 61.4, 63.9, 65.9, 67.6, 69.2, 70.6, 72.0, 73.3, 74.5, 75.7, 79.1, 82.3, 85.0, 87.1, 90.7, 95.8, 102.7, 109.9],
+  F: [49.4, 53.7, 58.0, 59.9, 62.3, 64.4, 65.9, 67.3, 68.7, 69.9, 71.2, 72.2, 74.0, 77.4, 80.7, 83.3, 86.4, 89.8, 95.1, 100.4, 107.9]
+}
+const WHO_WEIGHT = {
+  M: [3.3, 4.5, 5.6, 6.4, 7.0, 7.5, 7.9, 8.3, 8.6, 8.9, 9.2, 9.4, 9.6, 10.3, 10.7, 11.1, 12.2, 13.0, 14.3, 15.5, 17.8],
+  F: [3.2, 4.2, 5.1, 5.8, 6.4, 6.9, 7.3, 7.7, 8.0, 8.3, 8.5, 8.8, 9.0, 9.6, 10.1, 10.6, 11.5, 12.8, 13.9, 15.4, 17.5]
+}
 
-/** 月龄 → WHO 参考值（相邻锚点线性插值，超出 0~36 月取端点值） */
-function whoValAt(month, isWeight) {
-  const anchors = isWeight ? WHO_WEIGHT : WHO_HEIGHT
-  if (month <= anchors[0].month) return anchors[0].val
-  const lastA = anchors[anchors.length - 1]
-  if (month >= lastA.month) return lastA.val
-  for (let i = 1; i < anchors.length; i++) {
-    if (month <= anchors[i].month) {
-      const a = anchors[i - 1]
-      const b = anchors[i]
-      const t = (month - a.month) / (b.month - a.month)
-      return a.val + (b.val - a.val) * t
+/** 选择当前宝宝对应的 WHO 数据表（未知性别取男女均值） */
+function whoTable(isWeight, gender) {
+  let male = false
+  let female = false
+  if (gender === 'male' || gender === 'M') male = true
+  else if (gender === 'female' || gender === 'F') female = true
+  const table = (isWeight ? WHO_WEIGHT : WHO_HEIGHT)
+  if (male) return table.M
+  if (female) return table.F
+  // 未知性别：男女均值，避免向某一性别系统性偏移
+  return WHO_MONTHS.map((_, i) => (table.M[i] + table.F[i]) / 2)
+}
+
+/** 月龄 → WHO 参考值（相邻锚点线性插值；超过 0~60 月取端点值） */
+function whoValAt(month, isWeight, gender) {
+  const vals = whoTable(isWeight, gender)
+  if (month <= WHO_MONTHS[0]) return vals[0]
+  const lastIdx = WHO_MONTHS.length - 1
+  if (month >= WHO_MONTHS[lastIdx]) return vals[lastIdx]
+  for (let i = 1; i < WHO_MONTHS.length; i++) {
+    if (month <= WHO_MONTHS[i]) {
+      const t = (month - WHO_MONTHS[i - 1]) / (WHO_MONTHS[i] - WHO_MONTHS[i - 1])
+      return vals[i - 1] + (vals[i] - vals[i - 1]) * t
     }
   }
-  return lastA.val
+  return vals[lastIdx]
 }
 
 Page({
@@ -448,15 +463,17 @@ Page({
       if (r[type]) vals.push(Number(r[type]))
     })
     // 窗口内 WHO 参考值（有生日才换算月龄；无生日取 0 月龄锚点值）
+    // 性别兼容：旧数据 gender 可能为 male/female 或 M/F，whoTable 内部已处理
+    const gender = babyInfo.gender
     if (range) {
       if (birthTs !== null) {
         const startM = (range.startTs - birthTs) / (DAYS_PER_MONTH * MS_PER_DAY)
         const endM = (range.endTs - birthTs) / (DAYS_PER_MONTH * MS_PER_DAY)
-        vals.push(whoValAt(startM, isWeight), whoValAt(endM, isWeight))
+        vals.push(whoValAt(startM, isWeight, gender), whoValAt(endM, isWeight, gender))
         // WHO 在区间内非单调时（凸增），中点也要采样，避免包络偏窄
-        vals.push(whoValAt((startM + endM) / 2, isWeight))
+        vals.push(whoValAt((startM + endM) / 2, isWeight, gender))
       } else {
-        vals.push(whoValAt(0, isWeight))
+        vals.push(whoValAt(0, isWeight, gender))
       }
     }
     if (vals.length === 0) {
@@ -472,7 +489,9 @@ Page({
     const step = isWeight ? 0.5 : 2
     min = Math.floor(min / step) * step
     max = Math.ceil(max / step) * step
-    if (max - min < step * 4) max = min + step * 4 // 至少 4 格，防止过窄
+    // 至少 2 格：保证 WHO 参考线在 1 个月窗口内的上升肉眼可辨（旧 4 格会把 WHO 上升压成水平）
+    // 注意：网格线数量仍是 4 条，只缩窄取值跨度，不改变坐标轴展示
+    if (max - min < step * 2) max = min + step * 2
     return { min, max }
   },
 
@@ -669,10 +688,12 @@ Page({
     const birthTs = babyInfo.birthDate && !isNaN(new Date(babyInfo.birthDate.replace(/-/g, '/')).getTime())
       ? new Date(babyInfo.birthDate.replace(/-/g, '/')).getTime()
       : null
+    const gender = babyInfo.gender
 
     ctx.strokeStyle = '#E8DCC9'
     ctx.lineWidth = 1.5
-    ctx.setLineDash([4, 4])
+    // 虚线间隔放宽（[6,5]）：上升斜率的断点间隙更短，视觉上更连贯，避免“颗粒感”
+    ctx.setLineDash([6, 5])
     ctx.beginPath()
 
     let labelAnchor = null // 用于「WHO 参考线」标注定位
@@ -686,7 +707,7 @@ Page({
       for (let d = 0; d <= totalDays; d += stepDays) {
         const ts = dayStart.getTime() + d * MS_PER_DAY
         const monthAge = (ts - birthTs) / (DAYS_PER_MONTH * MS_PER_DAY)
-        const val = whoValAt(monthAge, isWeight)
+        const val = whoValAt(monthAge, isWeight, gender)
         const x = this.xOfTs(ts, chartW)
         const y = padding.top + chartH - chartH * (val - yMin) / (yMax - yMin)
         if (!started) { ctx.moveTo(x, y); started = true; labelAnchor = { x, y } }
@@ -697,7 +718,7 @@ Page({
       const midTs = (range.startTs + range.endTs) / 2
       const x1 = this.xOfTs(range.startTs, chartW)
       const x2 = this.xOfTs(range.endTs, chartW)
-      const val = whoValAt(0, isWeight)
+      const val = whoValAt(0, isWeight, gender)
       const y = padding.top + chartH - chartH * (val - yMin) / (yMax - yMin)
       ctx.moveTo(x1, y)
       ctx.lineTo(x2, y)
