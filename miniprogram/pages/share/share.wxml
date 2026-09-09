@@ -1,5 +1,17 @@
 <!-- pages/share/share.wxml - 每日小结分享卡片（3 套主题 + Canvas 修复） -->
 <view class="page-share safe-bottom">
+
+  <!-- 游客拦截占位：分享卡含宝宝数据，游客不可生成 -->
+  <view class="guest-block" wx:if="{{guestBlocked}}">
+    <view class="guest-block-icon">🔒</view>
+    <view class="guest-block-title">登录后才能生成分享卡</view>
+    <view class="guest-block-sub">分享卡包含宝宝信息与今日记录，游客模式不可查看</view>
+    <view class="guest-block-btn" bindtap="guestGoLogin">去登录</view>
+    <view class="guest-block-back" bindtap="guestGoBack">返回</view>
+  </view>
+
+  <!-- 正常内容（仅登录态显示） -->
+  <block wx:if="{{!guestBlocked}}">
   <!-- 顶部标题栏 -->
   <view class="share-header">
     <view class="title">每日小结</view>
@@ -55,4 +67,5 @@
   <view class="tip">
     <text>保存图片后可分享到朋友圈或家族群</text>
   </view>
+  </block>
 </view>

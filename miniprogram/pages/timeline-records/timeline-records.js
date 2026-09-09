@@ -46,8 +46,7 @@ Page({
   },
 
   onShow() {
-    // 登录态校验
-    if (!app.requireLogin()) return
+    // 「先体验、后授权」：游客可自由浏览记录列表
     // 从时光轴页跳转来，或从首页记录后返回，都刷新
     this.loadData()
   },

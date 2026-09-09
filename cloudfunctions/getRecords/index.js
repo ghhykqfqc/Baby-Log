@@ -53,9 +53,38 @@ async function safeDb(fn, fallback, collectionNames) {
 }
 // ==================================================
 
+/**
+ * 数据访问控制：只有该 babyId 的成员（或创建者）才能读取。
+ * 游客/非成员一律返回空数据（不暴露任何宝宝信息）。
+ * - 旧数据兼容：babies.userId = OPENID 视为创建者
+ * - babyId='default'（游客本地默认宝宝）放行，保持旧体验
+ */
+async function isPermitted(OPENID, babyId) {
+  if (!OPENID || !babyId) return false
+  if (babyId === 'default') return true
+  try {
+    const member = await db.collection('baby_members').where({ babyId, openid: OPENID }).count()
+    if (member.total > 0) return true
+    const owner = await db.collection('babies').where({ babyId }).get()
+    if (owner.data && owner.data[0]) {
+      const b = owner.data[0]
+      return b.userId === OPENID || b.createdBy === OPENID
+    }
+    return false
+  } catch (err) {
+    // 集合缺失等容错：放行（由前端隔离兜底）
+    return true
+  }
+}
+
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
   const { babyId = 'default', days = 1, recordType } = event
+
+  // 服务端访问控制：非成员/游客不返回任何云端记录
+  if (!(await isPermitted(OPENID, babyId))) {
+    return { code: 0, data: { records: [], total: 0 } }
+  }
 
   // 计算时间范围
   const now = Date.now()

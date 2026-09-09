@@ -30,8 +30,7 @@ Page({
   },
 
   onShow() {
-    // 登录态校验
-    if (!app.requireLogin()) return
+    // 「先体验、后授权」：游客可自由浏览历史记录
   },
 
   onUnload() {
@@ -44,10 +43,19 @@ Page({
    * 拉取全部成长数据，前端分页切片
    */
   async loadData() {
-    // 先用本地缓存秒开
+    // 游客数据隔离：游客不展示任何历史宝宝档案/成长数据
+    const isGuest = !app.isLoggedIn()
+
+    // 先用本地缓存秒开（游客态缓存已被 clearGuestVisibleCache 过滤，仅存本人 local_ 记录）
     const cached = storage.get(storage.CACHE_KEYS.GROWTH_DATA) || []
     if (cached.length > 0) {
       this.applyRecords(cached)
+    }
+
+    // 游客：不请求云端成长数据（request.js 拦截兜底，这里显式短路）
+    if (isGuest) {
+      this.setData({ loading: false })
+      return
     }
 
     try {
@@ -69,7 +77,10 @@ Page({
    * 处理记录：排序、装饰展示字段、重置分页
    */
   applyRecords(rawRecords) {
-    const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+    // 游客隔离：不读取历史宝宝档案（出生日期用于月龄展示）
+    const babyInfo = app.isLoggedIn()
+      ? (storage.get(storage.CACHE_KEYS.BABY_INFO) || {})
+      : {}
     const birthDate = babyInfo.birthDate ? new Date(babyInfo.birthDate.replace(/-/g, '/')) : null
 
     // 按测量日期降序（最新在最上）

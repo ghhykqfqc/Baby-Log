@@ -38,6 +38,27 @@ async function safeDb(fn, fallback, collectionNames) {
 // =========================
 
 /**
+ * 数据访问控制：只有该 babyId 的成员（或创建者）才能读取日程。
+ * 游客/非成员一律返回空数据（不暴露任何宝宝的日程安排）。
+ */
+async function isPermitted(OPENID, babyId) {
+  if (!OPENID || !babyId) return false
+  if (babyId === 'default') return true
+  try {
+    const member = await db.collection('baby_members').where({ babyId, openid: OPENID }).count()
+    if (member.total > 0) return true
+    const owner = await db.collection('babies').where({ babyId }).get()
+    if (owner.data && owner.data[0]) {
+      const b = owner.data[0]
+      return b.userId === OPENID || b.createdBy === OPENID
+    }
+    return false
+  } catch (err) {
+    return true
+  }
+}
+
+/**
  * event:
  *  - babyId: string
  *  - startDate: string YYYY-MM-DD 月份查询起始
@@ -51,6 +72,11 @@ exports.main = async (event, context) => {
 
   if (!startDate || !endDate) {
     return { code: -1, message: '参数缺失：startDate/endDate 必填' }
+  }
+
+  // 服务端访问控制：非成员/游客不返回任何日程
+  if (!(await isPermitted(OPENID, babyId))) {
+    return { code: 0, data: { schedules: [] } }
   }
 
   const FALLBACK = { code: 0, data: { schedules: [] } }

@@ -45,8 +45,47 @@ async function safeDb(fn, fallback, collectionNames) {
 }
 // ==================================================
 
+/**
+ * 数据访问控制：只有该 babyId 的成员（或创建者）才能读取。
+ * 游客/非成员一律返回空统计（不暴露任何宝宝信息）。
+ */
+async function isPermitted(OPENID, babyId) {
+  if (!OPENID || !babyId) return false
+  if (babyId === 'default') return true
+  try {
+    const member = await db.collection('baby_members').where({ babyId, openid: OPENID }).count()
+    if (member.total > 0) return true
+    const owner = await db.collection('babies').where({ babyId }).get()
+    if (owner.data && owner.data[0]) {
+      const b = owner.data[0]
+      return b.userId === OPENID || b.createdBy === OPENID
+    }
+    return false
+  } catch (err) {
+    return true
+  }
+}
+
 exports.main = async (event, context) => {
+  const { OPENID } = cloud.getWXContext()
   const { babyId = 'default', date } = event
+
+  // 服务端访问控制：非成员/游客不返回任何云端统计
+  if (!(await isPermitted(OPENID, babyId))) {
+    return {
+      code: 0,
+      data: {
+        date,
+        feedCount: 0,
+        diaperCount: 0,
+        sleepDuration: 0,
+        sleepCount: 0,
+        firstFeedTime: null,
+        lastFeedTime: null,
+        records: []
+      }
+    }
+  }
 
   // 计算当日时间范围
   const targetDate = date ? new Date(date) : new Date()

@@ -4,12 +4,46 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 
+/**
+ * 访问控制：记录归属的宝宝须属于该用户（成员/创建者）；default 放行。
+ */
+async function canAccess(OPENID, babyId) {
+  if (!OPENID || !babyId) return false
+  if (babyId === 'default') return true
+  try {
+    const member = await db.collection('baby_members').where({ babyId, openid: OPENID }).count()
+    if (member.total > 0) return true
+    const owner = await db.collection('babies').where({ babyId }).get()
+    if (owner.data && owner.data[0]) {
+      const b = owner.data[0]
+      return b.userId === OPENID || b.createdBy === OPENID
+    }
+    return false
+  } catch (err) {
+    return true
+  }
+}
+
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
   const { id, timestamp, duration, amount, subType, note } = event
 
   if (!id) {
     return { code: -1, message: '缺少记录 ID' }
+  }
+
+  // 服务端访问控制：先取记录归属，非成员不得修改
+  try {
+    const doc = await db.collection('records').doc(id).get()
+    const ownerBabyId = (doc.data && doc.data.babyId) || ''
+    if (!(await canAccess(OPENID, ownerBabyId))) {
+      return { code: -403, message: '无权修改该记录' }
+    }
+  } catch (err) {
+    const msg = String((err && (err.errMsg || err.message)) || '')
+    if (msg.includes('not exist') || msg.includes('DOCUMENT_NOT_FOUND') || msg.includes('-502001')) {
+      return { code: -1, message: '记录不存在或已被删除' }
+    }
   }
 
   // 构建更新字段（只更新传入的字段）

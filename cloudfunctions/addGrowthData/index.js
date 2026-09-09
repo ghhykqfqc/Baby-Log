@@ -44,12 +44,36 @@ async function safeDb(fn, fallback, collectionNames) {
 }
 // ==================================================
 
+/**
+ * 访问控制：仅该宝宝成员（或创建者）可写入；babyId='default'（游客本地默认）放行。
+ */
+async function isPermitted(OPENID, babyId) {
+  if (!OPENID || !babyId) return false
+  if (babyId === 'default') return true
+  try {
+    const member = await db.collection('baby_members').where({ babyId, openid: OPENID }).count()
+    if (member.total > 0) return true
+    const owner = await db.collection('babies').where({ babyId }).get()
+    if (owner.data && owner.data[0]) {
+      const b = owner.data[0]
+      return b.userId === OPENID || b.createdBy === OPENID
+    }
+    return false
+  } catch (err) {
+    return true
+  }
+}
+
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
   const { babyId, height, weight, measureDate, headCircumference } = event
 
   if (!babyId || (!height && !weight)) {
     return { code: -1, message: '参数缺失' }
+  }
+  // 服务端访问控制：非成员/游客不得写入云端成长数据
+  if (!(await isPermitted(OPENID, babyId))) {
+    return { code: -403, message: '无权操作该宝宝的成长数据' }
   }
 
   const data = {

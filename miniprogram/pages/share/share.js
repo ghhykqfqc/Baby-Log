@@ -8,6 +8,7 @@ Page({
     todayLabel: '',
     weekdayText: '',
     loading: true,
+    guestBlocked: false,   // 游客不可生成分享卡（含宝宝数据，必须隔离）
     dataSource: '',
     canvasReady: false,
     tempFilePath: '',
@@ -36,9 +37,23 @@ Page({
   _dpr: 1,
   _avatarPath: '',   // 宝宝头像本地临时路径（空 = 未上传，回退简笔笑脸）
   _avatarImg: null,  // 已加载进 canvas 的头像 Image 对象
-  _qrPath: '',       // 小程序码缓存（避免每次重绘都调云函数）
+  _qrPath: '',       // 小程序码临时路径缓存
+  _qrImg: null,      // 已加载进 canvas 的小程序码 Image 对象
+
+  /**
+   * 本地小程序码静态资源路径
+   * 258×258 圆角 PNG（由设计稿 300×533 页脚右下角预留位换算）
+   * 优先使用静态图，避免每次绘制都调云函数&依赖网络；云函数作为降级兜底
+   */
+  QR_PATH: '/assets/qr-code.png',
 
   onLoad() {
+    // 游客禁止进入分享页：分享卡包含宝宝姓名/头像/记录数据，属于云端宝宝信息，
+    // 游客模式彻底隔离（不读取任何历史 babyInfo，不生成含宝宝信息的图）
+    if (!app.isLoggedIn()) {
+      this.setData({ guestBlocked: true, loading: false })
+      return
+    }
     const today = new Date()
     const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     this.setData({
@@ -46,6 +61,14 @@ Page({
       weekdayText: `星期${weekdays[today.getDay()]}`
     })
     this.loadSummary()
+  },
+
+  // ===== 游客拦截占位 =====
+  guestGoLogin() {
+    wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/index/index' }) })
+  },
+  guestGoBack() {
+    wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/index/index' }) })
   },
 
   /**
@@ -716,9 +739,17 @@ Page({
   },
 
   /**
-   * 绘制小程序码（固定右下角页脚位置，带缓存与降级占位）
+   * 绘制小程序码（固定右下角页脚位置，贴入本地静态码，云函数降级）
+   * 优先用项目内置的 assets/qr-code.png（258×258 圆角 PNG，不依赖网络）；
+   * 若本地图加载失败，再尝试云端 getMiniProgramCode 动态获取。
+   * 绘制尺寸与页脚预留位完全一致（qrSize=56 设计稿坐标），精确填满。
    */
   async drawQRCode(ctx, cx, cy, size) {
+    // 1) 优先：本地静态小程序码
+    const localOk = await this.tryDrawLocalQR(ctx, cx, cy, size)
+    if (localOk) return
+
+    // 2) 降级：云函数动态获取小程序码
     try {
       if (!app.globalData.isOnline) throw new Error('离线状态')
 
@@ -759,7 +790,7 @@ Page({
       }
       throw new Error('画布未就绪')
     } catch (err) {
-      // 降级：绘制占位框（同样固定在右下角，不遮挡正文）
+      // 3) 最终兜底：绘制占位框（同样固定在右下角，不遮挡正文）
       ctx.fillStyle = '#F5EBDD'
       this.roundRect(ctx, cx - size / 2 - 5, cy - size / 2 - 5, size + 10, size + 10, 10)
       ctx.fill()
@@ -771,6 +802,44 @@ Page({
       ctx.font = '10px sans-serif'
       ctx.textAlign = 'center'
       ctx.fillText('小程序码', cx, cy + 4)
+    }
+  },
+
+  /**
+   * 尝试用本地静态小程序码绘制（assets/qr-code.png）
+   * @returns {Boolean} true=绘制成功；false=本地图不可用（调用方降级）
+   */
+  async tryDrawLocalQR(ctx, cx, cy, size) {
+    try {
+      if (!this._canvasNode) return false
+
+      // 缓存已加载的 Image 对象，避免重复解码
+      if (!this._qrImg) {
+        const img = this._canvasNode.createImage()
+        await new Promise((resolve) => {
+          img.onload = resolve
+          img.onerror = resolve
+          img.src = this.QR_PATH
+        })
+        if (!img.width || !img.height) return false
+        this._qrImg = img
+      }
+
+      // 白底卡片（覆盖二维码，保证与页脚融为一体）
+      ctx.fillStyle = '#FFFFFF'
+      this.roundRect(ctx, cx - size / 2 - 5, cy - size / 2 - 5, size + 10, size + 10, 10)
+      ctx.fill()
+
+      // 按 cover 等比填满预留位（码本体 56×56，白边自然形成卡片，不拉伸变形）
+      const img = this._qrImg
+      const scale = Math.max(size / img.width, size / img.height)
+      const dw = img.width * scale
+      const dh = img.height * scale
+      ctx.drawImage(img, cx - dw / 2, cy - dh / 2, dw, dh)
+      return true
+    } catch (err) {
+      console.warn('本地小程序码绘制失败:', (err && err.message) || err)
+      return false
     }
   },
 

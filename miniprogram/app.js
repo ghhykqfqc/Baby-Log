@@ -85,6 +85,11 @@ App({
     // 恢复本地缓存
     this.restoreFromStorage()
 
+    // 游客启动：清掉「上一个登录账号」遗留的业务缓存，保证游客只见自己的本地数据
+    if (!this.isLoggedIn()) {
+      this.clearGuestVisibleCache()
+    }
+
     // 监听网络状态
     wx.onNetworkStatusChange((res) => {
       this.globalData.isOnline = res.isConnected
@@ -101,14 +106,25 @@ App({
 
   restoreFromStorage() {
     try {
-      const openid = wx.getStorageSync('openid')
+      // 仅「已授权登录」状态下才还原宝宝上下文；
+      // 游客（无 userInfo）一律不还原 babyId/babyInfo/babies，
+      // 避免「游客模式」看到上一个登录账号遗留的宝宝信息（数据隔离）
       const userInfo = wx.getStorageSync('userInfo')
+      const openid = wx.getStorageSync('openid')
+      if (!userInfo || !userInfo.openid || !openid) {
+        this.globalData.userInfo = null
+        this.globalData.openid = ''
+        this.globalData.babyId = ''
+        this.globalData.babyInfo = null
+        this.globalData.babies = []
+        return
+      }
+      this.globalData.userInfo = userInfo
+      this.globalData.openid = openid
       const babyId = wx.getStorageSync('babyId')
       const babyInfo = wx.getStorageSync('babyInfo')
       const babies = wx.getStorageSync('babies')
       const familyRole = wx.getStorageSync('familyRole')
-      if (openid) this.globalData.openid = openid
-      if (userInfo) this.globalData.userInfo = userInfo
       if (babyId) this.globalData.babyId = babyId
       if (babyInfo) this.globalData.babyInfo = babyInfo
       if (babies) this.globalData.babies = babies
@@ -126,18 +142,16 @@ App({
   },
 
   /**
-   * 登录态校验：未登录则跳转登录页，调用方页面在 onShow 中调用
-   * 返回 true 表示已登录，false 表示正在跳转
+   * 登录态校验：未登录时不再强制跳登录页（「先体验、后授权」游客模式）。
+   * @param {boolean} [redirectOnFail=true] 未登录时是否弹出引导 toast
+   *   页面级静默判断（如游客不拉云端）请传 false，避免打扰。
+   * 返回 true=已登录；false=游客（页面应保持可浏览，关键操作另行引导登录）
    */
   requireLogin(redirectOnFail = true) {
     if (this.isLoggedIn()) return true
     if (redirectOnFail) {
-      // 避免登录页自身重复跳转
-      const pages = getCurrentPages()
-      const current = pages[pages.length - 1]
-      if (!current || current.route !== 'pages/login/login') {
-        wx.reLaunch({ url: '/pages/login/login' })
-      }
+      // 仅做引导提示，绝不强制跳转（审核合规：先体验后授权）
+      wx.showToast({ title: '登录后可永久保存数据', icon: 'none' })
     }
     return false
   },
@@ -155,7 +169,8 @@ App({
   },
 
   /**
-   * 登出：清空用户与宝宝状态，跳回登录页
+   * 登出：清空用户与宝宝状态，回到游客模式（不再强制跳登录页）
+   * 注：退出登录不删除云端数据，仅清除本地登录态与「游客可见」的业务缓存。
    */
   logout() {
     this.globalData.userInfo = null
@@ -171,9 +186,71 @@ App({
       wx.removeStorageSync('babies')
       wx.removeStorageSync('familyRole')
     } catch (e) {}
-    // 通知所有页面用户已切换
+    // 游客态不可见任何已登录账号的业务数据（宝宝记录/成长/相册/预测）
+    // 这些缓存在登录后会由各页面从云端重新拉取，无需保留
+    this.clearGuestVisibleCache()
+    // 通知所有页面用户已切换（游客模式：留在当前页，不强制跳转）
     this.eventBus.emit('babySwitched', { babyId: '', babyInfo: null })
-    wx.reLaunch({ url: '/pages/login/login' })
+    wx.showToast({ title: '已退出登录（本地数据保留）', icon: 'none' })
+  },
+
+  /**
+   * 清除游客模式下不应可见的「账号历史」业务缓存。
+   * 原则：游客自己产生的本地记录（_id 以 local_/_local 开头）予以保留
+   * （它们在登录后会合并上云，属于游客本人数据）；云端拉取缓存的
+   * 历史记录 / 成长 / 预测 / 相册一律清除，保证游客看到不到已登录账号的
+   * 任何宝宝数据。
+   */
+  clearGuestVisibleCache() {
+    // 1) 今日记录：仅保留本地临时记录，清掉云端缓存的历史
+    try {
+      const today = wx.getStorageSync('todayRecords')
+      if (Array.isArray(today) && today.length > 0) {
+        const own = today.filter(r => r && r._id && (String(r._id).indexOf('local_') === 0 || String(r._id).indexOf('_local') === 0))
+        if (own.length > 0) {
+          wx.setStorageSync('todayRecords', own)
+        } else {
+          wx.removeStorageSync('todayRecords')
+        }
+      } else {
+        wx.removeStorageSync('todayRecords')
+      }
+    } catch (e) {}
+
+    // 2) 成长数据：同样只保留本地临时记录
+    try {
+      const growth = wx.getStorageSync('growthData')
+      if (Array.isArray(growth) && growth.length > 0) {
+        const own = growth.filter(r => r && r._id && String(r._id).indexOf('local_') === 0)
+        if (own.length > 0) {
+          wx.setStorageSync('growthData', own)
+        } else {
+          wx.removeStorageSync('growthData')
+        }
+      } else {
+        wx.removeStorageSync('growthData')
+      }
+    } catch (e) {}
+
+    // 3) 最近记录时间戳：仅当本地仍有游客记录时保留，否则清除
+    try {
+      const ownToday = wx.getStorageSync('todayRecords')
+      const hasOwn = Array.isArray(ownToday) && ownToday.some(r => r && r._id && String(r._id).indexOf('local_') === 0)
+      if (!hasOwn) {
+        wx.removeStorageSync('lastRecords')
+      }
+    } catch (e) {}
+
+    // 4) 预测缓存：基于云端历史计算，直接清除（首页会用本地记录重算）
+    try { wx.removeStorageSync('prediction') } catch (e) {}
+
+    // 5) 相册按宝宝维度存储：游客不可见任何历史相册
+    try {
+      const info = wx.getStorageInfoSync()
+      ;(info.keys || []).forEach(k => {
+        if (k.indexOf('albumPhotos_') === 0) wx.removeStorageSync(k)
+      })
+    } catch (e) {}
   },
 
   /**
@@ -273,6 +350,188 @@ App({
     if (this.globalData.pendingSync.length > 0) {
       try { wx.setStorageSync('pendingSync', this.globalData.pendingSync) } catch (e) {}
     }
+  },
+
+  /**
+   * 游客数据合并（登录成功后调用，幂等）：
+   * openid 从游客到登录不变，游客期间写入云端的记录天然归属同一用户。
+   * 这里把「本地暂存但未成功入库」的数据补写入云端：
+   * 1. pendingSync 队列（云端写入失败的记录）
+   * 2. 本地 todayRecords / growthData 缓存中标记 _local 的记录
+   * 3. 未上传的本地相册照片（临时路径 → 云存储）
+   * 返回 true 表示完成（失败不阻断登录）
+   */
+  async mergeGuestDataAfterLogin() {
+    // 1. 同步 pendingSync 队列
+    await this.syncPendingRecords()
+
+    // 2. 本地缓存中的本地临时记录（_id 以 local_ 开头且非 pendingSync 成员）
+    const { call } = require('./utils/request')
+    const babyId = this.globalData.babyId || 'default'
+
+    // 2.1 今日记录缓存（含本地生成的记录）
+    try {
+      const todayRecords = wx.getStorageSync('todayRecords') || []
+      const pendingKeys = new Set((this.globalData.pendingSync || []).map(r => `${r.recordType}_${r.timestamp}`))
+      for (const record of todayRecords) {
+        const isLocal = record._id && (String(record._id).startsWith('_local') || String(record._id).startsWith('local_'))
+        if (!isLocal) continue
+        const key = `${record.recordType}_${record.timestamp}`
+        if (pendingKeys.has(key)) continue
+        try {
+          await call('addRecord', {
+            babyId: record.babyId || babyId,
+            recordType: record.recordType,
+            timestamp: record.timestamp,
+            duration: record.duration || 0,
+            amount: record.amount || 0,
+            subType: record.subType || ''
+          })
+        } catch (err) {
+          this.enqueuePendingSync({
+            babyId: record.babyId || babyId,
+            recordType: record.recordType,
+            timestamp: record.timestamp,
+            duration: record.duration || 0,
+            amount: record.amount || 0,
+            subType: record.subType || ''
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('游客记录合并异常:', err)
+    }
+
+    // 2.2 成长数据缓存（本地生成的)
+    try {
+      const growthCache = wx.getStorageSync('growthData') || []
+      if (Array.isArray(growthCache) && growthCache.length > 0) {
+        const cloudIds = new Set()
+        try {
+          const cloudData = await call('getGrowthData', { babyId })
+          ;((cloudData && cloudData.records) || []).forEach(r => cloudIds.add(r._id))
+        } catch (e) { /* 忽略 */ }
+        for (const record of growthCache) {
+          // 非本地临时 ID 且云端已有 → 跳过（避免重复）
+          if (record._id && !String(record._id).startsWith('local_') && cloudIds.has(record._id)) continue
+          try {
+            await call('addGrowthData', {
+              babyId,
+              height: record.height,
+              weight: record.weight,
+              measureDate: record.measureDate,
+              headCircumference: record.headCircumference || null
+            })
+          } catch (e) {
+            console.warn('成长数据合并失败（保留本地）:', e && e.message)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('游客成长数据合并异常:', err)
+    }
+
+    // 2.3 相册：游客期本地上传的照片（临时路径）→ 上传云存储并更新 babies.albumPhotos
+    try {
+      const helper = require('./utils/storage')
+      const babyIdForAlbum = this.globalData.babyId || 'default'
+      const albumKey = helper.albumKey(babyIdForAlbum)
+      const album = wx.getStorageSync(albumKey) || []
+      let changed = false
+      for (let i = 0; i < album.length; i++) {
+        const p = album[i]
+        // 已是 cloud:// 或 http(s) 的不处理
+        if (!p.src || p.src.indexOf('cloud://') === 0 || /^https?:\/\//.test(p.src)) continue
+        try {
+          const up = await wx.cloud.uploadFile({
+            cloudPath: `album/${babyIdForAlbum}/${Date.now()}_${i}.jpg`,
+            filePath: p.src
+          })
+          if (up && up.fileID) {
+            album[i] = { ...p, src: up.fileID, id: up.fileID }
+            changed = true
+          }
+        } catch (e) {
+          console.warn('相册照片上传失败（保留本地路径）:', e)
+        }
+      }
+      if (changed) {
+        try { wx.setStorageSync(albumKey, album) } catch (e) {}
+        // 同步到云端 babies 列表
+        try {
+          const albumSrcs = album.map(p => p.src)
+          await call('saveBabyInfo', {
+            babyId: babyIdForAlbum,
+            name: (this.globalData.babyInfo && this.globalData.babyInfo.name) || '',
+            albumPhotos: albumSrcs
+          })
+        } catch (e) {
+          console.warn('相册云端同步失败:', e)
+        }
+      }
+    } catch (err) {
+      console.warn('游客相册合并异常:', err)
+    }
+
+    // 2.4 游客日程缓存（schedules_guest_*）→ 合并到当前宝宝的云端日程
+    // 游客在「游客模式」下新增的日程只存本机，登录后一并上云，保证数据不丢
+    try {
+      const { call } = require('./utils/request')
+      const schedulePrefix = 'schedules_guest_'
+      const guestKeys = []
+      try {
+        const info = wx.getStorageInfoSync()
+        ;(info.keys || []).forEach(k => {
+          if (k.indexOf(schedulePrefix) === 0) guestKeys.push(k)
+        })
+      } catch (e) {}
+
+      for (const key of guestKeys) {
+        let cached = []
+        try { cached = wx.getStorageSync(key) || [] } catch (e) {}
+        const remain = []
+        for (const s of cached) {
+          if (!s || !s._id || String(s._id).indexOf('local_') !== 0) {
+            remain.push(s) // 非本地临时记录（可能是云端返回的），保留
+            continue
+          }
+          // 游客日程 → 云端 addSchedule（若已是成员自动放行；默认宝宝也放行）
+          try {
+            await call('addSchedule', {
+              babyId: s.babyId || babyId,
+              title: s.title,
+              category: s.category || 'other',
+              date: s.date,
+              startTime: s.startTime || '',
+              endTime: s.endTime || '',
+              location: s.location || '',
+              note: s.note || '',
+              important: !!s.important
+            })
+            // 同步成功：标记待删除（合并完成后统一清理游客缓存）
+            s._merged = true
+          } catch (e) {
+            // 失败保留，等下次登录再试
+            console.warn('游客日程合并失败（保留本地）:', e && e.message)
+            remain.push(s)
+          }
+        }
+        if (remain.length > 0) {
+          try { wx.setStorageSync(key, remain) } catch (e) {}
+        } else {
+          try { wx.removeStorageSync(key) } catch (e) {}
+        }
+      }
+    } catch (err) {
+      console.warn('游客日程合并异常:', err)
+    }
+
+    return true
+  },
+
+  /** 入队待同步（兼容 pendingSync 别名） */
+  enqueuePendingQueue(record) {
+    this.enqueuePendingSync(record)
   },
 
   eventBus: {

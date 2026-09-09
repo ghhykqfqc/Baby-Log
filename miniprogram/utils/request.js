@@ -1,5 +1,44 @@
 // utils/request.js - 统一云函数调用封装（带云环境容错）
 
+// ============================================================
+// 游客数据隔离：以下「数据读取」类云函数，游客（未登录）一律不调用。
+// 数据库中的 records / growth_data / schedules / baby 档案 均属于
+// 已登录账号的云端宝宝数据，游客不得触达（问题 2 修复核心）。
+// 游客仍可调用：写入/创建类（addRecord 等，走 openid 归属 + 登录后合并）、
+// 工具类（getWeather/getOpenId 等）。
+// ============================================================
+const GUEST_READ_BLOCKLIST = new Set([
+  'getRecords',
+  'getGrowthData',
+  'getDailySummary',
+  'getSchedules',
+  'getPrediction',
+  'listBabies',
+  'getBabyInfo'
+])
+
+// ============================================================
+// 游客「写入」拦截：游客模式下一律不得向云端写入业务数据。
+// 游客产生的记录/成长/日程统一先落本机（local_ 前缀），
+// 登录后由 mergeGuestDataAfterLogin 批量合并上云。
+// （防护：growth 页等入口已显式短路游客，这里做纵深兜底，
+//   防止未来新入口漏判；登录后 openid 存在，不受影响。）
+// ============================================================
+const GUEST_WRITE_BLOCKLIST = new Set([
+  'addGrowthData',
+  'updateGrowthData',
+  'deleteGrowthData',
+  'addRecord',
+  'updateRecord',
+  'deleteRecord',
+  'addSchedule',
+  'updateSchedule',
+  'deleteSchedule',
+  'createBaby',
+  'joinBaby',
+  'saveBabyInfo'
+])
+
 /**
  * 判断是否为「云环境不存在」类错误（重试无意义，直接降级）
  */
@@ -34,6 +73,18 @@ const call = (name, data = {}, enableRetry = true) => {
     // 云开发未就绪，直接 reject（调用方应处理）
     if (!app || !app.globalData.cloudReady) {
       reject({ code: -501000, message: '云环境未就绪' })
+      return
+    }
+
+    // 游客数据隔离：游客不得读取云端宝宝数据（本地空态/留白）
+    if (GUEST_READ_BLOCKLIST.has(name) && !app.isLoggedIn()) {
+      reject({ code: -403, message: '游客模式暂不读取云端数据', guestBlocked: true })
+      return
+    }
+
+    // 游客数据隔离：游客不得向云端写入业务数据（统一先本地暂存，登录后合并）
+    if (GUEST_WRITE_BLOCKLIST.has(name) && !app.isLoggedIn()) {
+      reject({ code: -403, message: '游客模式暂不写入云端，已保存到本机', guestBlocked: true })
       return
     }
 
