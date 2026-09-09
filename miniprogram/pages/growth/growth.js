@@ -2,6 +2,7 @@
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
+const auth = require('../../utils/auth')
 
 // 月份常量（按 30.44 天/月 计算平均月龄）
 const DAYS_PER_MONTH = 30.44
@@ -60,6 +61,7 @@ Page({
     ageText: null,       // 当前月龄 { num, unit }
     birthLabel: '',      // 出生信息文案
     hasRecords: false,
+    isGuest: false,          // 游客模式（未登录）：展示本地暂存提示条
     showSkeleton: true,      // 首屏骨架占位（有缓存/云端数据即消失）
     heightAnimText: '--',    // 身高数值动画显示文本
     weightAnimText: '--',    // 体重数值动画显示文本
@@ -93,8 +95,7 @@ Page({
   },
 
   onShow() {
-    // 登录态校验
-    if (!app.requireLogin()) return
+    // 「先体验、后授权」：游客可自由浏览成长数据
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/growth/growth')
     }
@@ -129,19 +130,31 @@ Page({
    */
   async loadData() {
     const cached = storage.get(storage.CACHE_KEYS.GROWTH_DATA) || []
-    // 合并全局与本地缓存的宝宝资料：缓存可能缺 birthDate（旧数据），
-    // 缺失时用 globalData 补齐——否则 WHO 虚线会退化为水平参考线
-    const globalInfo = app.globalData.babyInfo || {}
-    const storedInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+    // 游客数据隔离：游客不展示任何历史宝宝档案/成长数据。
+    // 云端已不可达（request.js 拦截），本地缓存中仅保留游客自己的 local_ 记录
+    // （clearGuestVisibleCache 已过滤），这里不再合并历史 babyInfo。
+    const isGuest = !app.isLoggedIn()
+    const globalInfo = isGuest ? {} : (app.globalData.babyInfo || {})
+    const storedInfo = isGuest ? {} : (storage.get(storage.CACHE_KEYS.BABY_INFO) || {})
     const babyInfo = { ...globalInfo, ...storedInfo }
-    if (!babyInfo.birthDate && globalInfo.birthDate) babyInfo.birthDate = globalInfo.birthDate
-    this.setData({ babyInfo })
+    if (isGuest) {
+      this.setData({ babyInfo: {}, isGuest: true })
+    } else {
+      if (!babyInfo.birthDate && globalInfo.birthDate) babyInfo.birthDate = globalInfo.birthDate
+      this.setData({ babyInfo, isGuest: false })
+    }
 
     // 有缓存 → 立即渲染数据卡并结束骨架，不等云端（卡片首先出现，图表随后）
     if (cached.length > 0) {
       this.setData({ showSkeleton: false })
     }
     this.applyRecords(cached)
+
+    // 游客：不请求云端成长数据（request.js 拦截兜底，这里显式短路）
+    if (isGuest) {
+      this.setData({ showSkeleton: false })
+      return
+    }
 
     try {
       const result = await call('getGrowthData', {
@@ -349,6 +362,45 @@ Page({
 
   // ===== 表单 =====
   showAddForm() {
+    // 关键操作：新增成长记录（数据落云）→ 登录引导；可暂不登录（本地暂存）
+    // 交互优化（2026-09-10）：登录成功后【不自动打开表单】——用户再点一次「＋」即打开；
+    // 已登录状态下点击则直接打开
+    if (app.isLoggedIn()) {
+      this._openAddForm()
+      return
+    }
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        // 刷新登录态数据（云端数据可见），但不弹窗，引导用户再点一次
+        this.loadData()
+        // 延迟提示：避免被登录面板的「登录成功」toast 覆盖
+        setTimeout(() => {
+          wx.showToast({ title: '已登录，再次点击＋即可记录', icon: 'none' })
+        }, 400)
+      },
+      onGuestClose: () => this._openAddForm()
+    })
+  },
+
+  /**
+   * 游客提示条「去登录」：拉起登录面板，登录成功后刷新为云端模式
+   */
+  onGuestLogin() {
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        this.loadData()
+        setTimeout(() => {
+          wx.showToast({ title: '已登录～', icon: 'none' })
+        }, 400)
+      },
+      onGuestClose: () => {}  // 仍停留游客模式
+    })
+  },
+
+  /**
+   * 真正打开表单（登录/游客通用）
+   */
+  _openAddForm() {
     this.setData({ showForm: true, 'formData.height': '', 'formData.weight': '', focusHeight: true })
   },
 
@@ -366,6 +418,15 @@ Page({
   },
 
   noop() {},
+
+  /**
+   * 登录面板开合：卸载/恢复曲线 canvas（避免真机同层渲染遮挡）
+   */
+  onLoginPanelChange(e) {
+    const visible = e.detail && e.detail.visible
+    this.setData({ showLoginPanel: !!visible })
+    if (!visible) this.redrawChartSoon()
+  },
 
   /**
    * 跳转到历史记录页（独立页：滚动 + 分页加载）
@@ -405,21 +466,49 @@ Page({
     }
 
     this.setData({ submitting: true })
-    try {
-      await call('addGrowthData', {
-        babyId: app.globalData.babyId || 'default',
-        height: height ? parseFloat(height) : null,
-        weight: weight ? parseFloat(weight) : null,
-        measureDate
-      })
+    const record = {
+      babyId: app.globalData.babyId || 'default',
+      height: height ? parseFloat(height) : null,
+      weight: weight ? parseFloat(weight) : null,
+      measureDate
+    }
 
+    // 游客：不触达云端，直接本地暂存（登录后 mergeGuestDataAfterLogin 自动同步到云端）
+    const isGuest = !app.isLoggedIn()
+
+    try {
+      if (!isGuest && app.globalData.cloudReady && app.globalData.isOnline) {
+        await call('addGrowthData', record)
+      } else {
+        // 游客或云端不可用：抛出统一错误 → 走本地暂存
+        throw new Error(isGuest ? '游客模式，本地暂存' : '云端不可用，本地暂存')
+      }
       this.setData({ showForm: false, 'formData.height': '', 'formData.weight': '' })
       await this.loadData()
       // canvas 重建后确保曲线重绘（loadData 内部 50ms 可能早于节点就绪）
       this.redrawChartSoon()
       wx.showToast({ title: '已保存', icon: 'success' })
     } catch (err) {
-      wx.showToast({ title: '保存失败，请重试', icon: 'none' })
+      // 游客/云端失败：写入本地缓存（游客模式数据不丢失）
+      try {
+        const cached = storage.get(storage.CACHE_KEYS.GROWTH_DATA) || []
+        cached.push({
+          // 本地临时 id：登录后 mergeGuestDataAfterLogin 按 local_ 前缀识别合并
+          _id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          babyId: record.babyId,
+          height: record.height,
+          weight: record.weight,
+          measureDate: record.measureDate,
+          createdAt: new Date().toISOString()
+        })
+        storage.set(storage.CACHE_KEYS.GROWTH_DATA, cached)
+        this.setData({ showForm: false, 'formData.height': '', 'formData.weight': '' })
+        await this.loadData()
+        this.redrawChartSoon()
+        wx.showToast({ title: isGuest ? '已保存（游客暂存本机）' : '已保存（离线暂存）', icon: 'none' })
+      } catch (e2) {
+        wx.showToast({ title: '保存失败，请重试', icon: 'none' })
+      }
     } finally {
       this.setData({ submitting: false })
     }

@@ -122,6 +122,58 @@
 }
 
 /* ============================================
+   游客引导条（未登录：本地暂存提示）
+   ============================================ */
+.sched-guest-tip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  background: #FFF6E8;
+  border: 2rpx solid rgba(233, 155, 95, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16rpx 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.sched-guest-tip-icon {
+  font-size: 28rpx;
+  flex-shrink: 0;
+}
+
+.sched-guest-tip-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  color: #B07A4D;
+  line-height: 1.5;
+}
+
+.sched-guest-tip-btn {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #E89B5F;
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  padding: 8rpx 20rpx;
+  border: 2rpx solid rgba(233, 155, 95, 0.4);
+}
+
+.sched-guest-tip-hover {
+  opacity: 0.85;
+}
+
+/* ============================================
+   可滚动内容区（游客提示条出现时防止超高无法滚动）
+   ============================================ */
+.sched-scroll {
+  flex: 1;
+  min-height: 0;
+  height: 0; /* 兼容旧基础库：确保有明确高度约束 */
+}
+
+/* ============================================
    最近未来事项倒计时 tips
    ============================================ */
 .sched-tips {
@@ -576,10 +628,11 @@
   line-height: 1;
 }
 
-/* 底部弹性留白（整页不滚动，多余空间留白） */
+/* 底部弹性留白（并入滚动区末尾，超高时可随内容滚动） */
 .sched-flex-spacer {
-  flex: 1;
+  height: 20rpx;
   min-height: 20rpx;
+  flex-shrink: 0;
 }
 
 /* ============================================

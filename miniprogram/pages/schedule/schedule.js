@@ -1,6 +1,7 @@
 // pages/schedule/schedule.js - 日程页（日历视图 + 事项 CRUD + 倒计时 tips + 常用事项）
 const app = getApp()
 const { call } = require('../../utils/request')
+const auth = require('../../utils/auth')
 
 // 事项类别配置：key/icon/label/color（日历标记颜色）
 // 注：无「其他」预设类别，用户可通过「＋」自定义（custom_ 前缀，本地维护）
@@ -44,6 +45,7 @@ CATEGORY_OPTIONS.forEach(c => { CATEGORY_MAP[c.key] = c })
 
 // 缓存键
 const CACHE_KEY_PREFIX = 'schedules_'
+const GUEST_CACHE_KEY_PREFIX = 'schedules_guest_'  // 游客专属缓存（未登录时与云端隔离）
 const FAV_KEY_PREFIX = 'schedule_favs_'
 const CUSTOM_CAT_KEY_PREFIX = 'schedule_custom_cats_'
 
@@ -69,6 +71,7 @@ function catCssKey(category) {
 Page({
   data: {
     babyInfo: {},
+    isGuest: true,            // 游客模式标记（未登录时 true：本地暂存 + 引导登录）
     // 当前视图月份
     viewYear: 0,
     viewMonth: 0,
@@ -126,7 +129,8 @@ Page({
       viewYear: today.getFullYear(),
       viewMonth: today.getMonth() + 1,
       selectedDate: todayStr,
-      'formData.date': todayStr
+      'formData.date': todayStr,
+      isGuest: !app.isLoggedIn()
     })
     this._refreshCalendar()
     this._loadFavorites()
@@ -140,11 +144,14 @@ Page({
   },
 
   onShow() {
-    if (!app.requireLogin()) return
+    // 「先体验、后授权」：游客可自由浏览日程
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/schedule/schedule')
     }
-    this.setData({ babyInfo: app.globalData.babyInfo || {} })
+    this.setData({
+      babyInfo: app.globalData.babyInfo || {},
+      isGuest: !app.isLoggedIn()
+    })
     this.loadMonthSchedules()
     // 页面重新可见：恢复倒计时，并立即校正一次（处理后台期间的时间流逝）
     this._startCountdownTimer()
@@ -153,6 +160,22 @@ Page({
 
   onHide() {
     this._stopCountdownTimer()
+  },
+
+  /**
+   * 登录面板开关：关闭后刷新游客标记（登录成功则引导条消失、数据切换云端）
+   */
+  onLoginPanelChange(e) {
+    const wasVisible = e.detail && e.detail.visible
+    if (!wasVisible) {
+      const isGuest = !app.isLoggedIn()
+      this.setData({ isGuest })
+      // 登录成功后从游客缓存切换到宝宝云端缓存
+      if (!isGuest) {
+        this.setData({ babyInfo: app.globalData.babyInfo || {} })
+        this.loadMonthSchedules()
+      }
+    }
   },
 
   onUnload() {
@@ -275,6 +298,12 @@ Page({
   /** 拉取未来 90 天内的事项（只用于倒计时 tips，不影响日历） */
   async _loadUpcomingPool() {
     const babyId = app.globalData.babyId || 'default'
+    // 游客：不拉云端，仅用本月本地数据（_refreshUpcoming 已覆盖）
+    if (!app.isLoggedIn()) {
+      this._upcomingPool = []
+      this._refreshUpcoming()
+      return
+    }
     if (!app.globalData.cloudReady || !app.globalData.isOnline) return
     const today = new Date()
     const start = this._fmtDate(today)
@@ -629,19 +658,21 @@ Page({
     const startDate = this._fmtDate(start)
     const endDate = this._fmtDate(end)
     const babyId = app.globalData.babyId || 'default'
+    // 游客模式：读写独立「游客缓存」，绝不触达云端（未登录不展示已同步账号数据）
+    const isGuest = !app.isLoggedIn()
 
     this.setData({ loadingSchedules: true })
 
-    // 优先读本地缓存（即时回显）
-    const cacheKey = CACHE_KEY_PREFIX + babyId + '_' + startDate + '_' + endDate
+    // 优先读本地缓存（即时回显）：游客专用 key，登录后使用宝宝维度 key
+    const cacheKey = (isGuest ? GUEST_CACHE_KEY_PREFIX : CACHE_KEY_PREFIX) + babyId + '_' + startDate + '_' + endDate
     let cached = []
     try { cached = wx.getStorageSync(cacheKey) || [] } catch (e) {}
 
     this._applySchedules(cached)
     this.setData({ loadingSchedules: false })
 
-    // 拉云端
-    if (app.globalData.cloudReady && app.globalData.isOnline) {
+    // 仅登录后拉云端（游客不触达云端，避免「无登录却看到已有宝宝日程/把宝宝同步回来」）
+    if (!isGuest && app.globalData.cloudReady && app.globalData.isOnline) {
       try {
         const data = await call('getSchedules', { babyId, startDate, endDate })
         const schedules = (data && data.schedules) || []
@@ -653,7 +684,7 @@ Page({
       }
     }
 
-    // 倒计时数据源：本月 + 未来 90 天
+    // 倒计时数据源：本月 + 未来 90 天（游客不拉云端，仅用本地本月数据）
     this._loadUpcomingPool()
   },
 
@@ -743,6 +774,31 @@ Page({
   // ============================================
 
   openAddSheet() {
+    // 新增日程：先引导登录（登录后数据长存）；「暂不登录」仍可本机暂存使用
+    // 交互优化（2026-09-10）：登录成功后【不自动打开表单】——用户再点一次「＋添加」即打开；
+    // 已登录状态下点击则直接打开
+    if (!app.isLoggedIn()) {
+      auth.ensureLogin(this, {
+        onSuccess: () => {
+          // 登录成功：刷新游客标记与云端日程，但不弹窗，引导用户再点
+          this.setData({ isGuest: false })
+          this.loadMonthSchedules()
+          // 延迟提示：避免被登录面板的「登录成功」toast 覆盖
+          setTimeout(() => {
+            wx.showToast({ title: '已登录，再次点击＋即可添加', icon: 'none' })
+          }, 400)
+        },
+        onGuestClose: () => {
+          // 暂不登录：仍可本机暂存（游客模式），打开表单
+          this._openAddSheet()
+        }
+      })
+      return
+    }
+    this._openAddSheet()
+  },
+
+  _openAddSheet() {
     // 默认选中第一个可选类别（自定义在前，若无则第一个内置）
     const firstCat = this.data.categoryOptions.find(c => !c.isAdd)
     this.setData({
@@ -879,6 +935,16 @@ Page({
       important: f.important
     }
 
+    // 游客模式：仅本地暂存（未登录不触达云端，登录后再合并）
+    if (!app.isLoggedIn()) {
+      this._saveScheduleLocal(payload)
+      wx.showToast({ title: '已暂存本机 · 登录后自动同步', icon: 'none' })
+      this.setData({ showForm: false, editingId: '', favManageMode: false })
+      this.loadMonthSchedules()
+      this.setData({ submitting: false })
+      return
+    }
+
     try {
       if (this.data.editingId) {
         await call('updateSchedule', { scheduleId: this.data.editingId, updates: payload })
@@ -892,10 +958,49 @@ Page({
       this.loadMonthSchedules()
     } catch (err) {
       console.error('save schedule failed', err)
-      wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+      // 离线：本地缓存放行
+      if (!app.globalData.cloudReady || !app.globalData.isOnline) {
+        this._saveScheduleLocal(payload)
+        wx.showToast({ title: '已暂存（联网后自动同步云端）', icon: 'none' })
+      } else {
+        wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
+      }
     } finally {
       this.setData({ submitting: false })
     }
+  },
+
+  /**
+   * 游客/离线本地暂存日程：只写入游客缓存（未登录时绝不触达云端）
+   */
+  _saveScheduleLocal(payload) {
+    const babyId = payload.babyId || 'default'
+    const [startDate, endDate] = this._currentRange()
+    const isGuest = !app.isLoggedIn()
+    const cacheKey = (isGuest ? GUEST_CACHE_KEY_PREFIX : CACHE_KEY_PREFIX) + babyId + '_' + startDate + '_' + endDate
+    const fake = { ...payload, _id: `local_${Date.now()}`, createdAt: new Date().toISOString() }
+    const cached = (() => { try { return wx.getStorageSync(cacheKey) || [] } catch (e) { return [] } })()
+    cached.push(fake)
+    try { wx.setStorageSync(cacheKey, cached) } catch (e) {}
+    // 也并入本月运行时数据，日历标记即时生效
+    const monthKey = payload.date || this.data.selectedDate
+    if (!this._monthSchedules) this._monthSchedules = {}
+    if (!this._monthSchedules[monthKey]) this._monthSchedules[monthKey] = []
+    this._monthSchedules[monthKey].push(fake)
+    // 刷新视图（本地缓存即时回显）
+    this._applySchedules(this._monthSchedules[this.data.selectedDate] || [])
+    this.loadMonthSchedules()
+  },
+
+  /**
+   * 当前查询范围的起止日期（YYYY-MM-DD 数组）
+   */
+  _currentRange() {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth() + 1
+    const pad = (n) => String(n).padStart(2, '0')
+    return [`${y}-${pad(m)}-01`, `${y}-${pad(m)}-${pad(new Date(y, m, 0).getDate())}`]
   },
 
   deleteSchedule() {
@@ -907,6 +1012,27 @@ Page({
       confirmColor: '#E8554E',
       success: r => {
         if (!r.confirm) return
+        // 游客：仅删除本地游客缓存
+        if (!app.isLoggedIn()) {
+          const [startDate, endDate] = this._currentRange()
+          const cacheKey = GUEST_CACHE_KEY_PREFIX + (app.globalData.babyId || 'default') + '_' + startDate + '_' + endDate
+          const target = this.data.editingId
+          let cached = []
+          try { cached = wx.getStorageSync(cacheKey) || [] } catch (e) {}
+          cached = cached.filter(s => s._id !== target)
+          try { wx.setStorageSync(cacheKey, cached) } catch (e) {}
+          // 同步运行时数据
+          if (this._monthSchedules) {
+            const sel = this.data.selectedDate
+            if (this._monthSchedules[sel]) {
+              this._monthSchedules[sel] = this._monthSchedules[sel].filter(s => s._id !== target)
+            }
+          }
+          wx.showToast({ title: '已删除（仅本机）', icon: 'none' })
+          this.setData({ showForm: false, editingId: '' })
+          this.loadMonthSchedules()
+          return
+        }
         call('deleteSchedule', { scheduleId: this.data.editingId }).then(() => {
           wx.showToast({ title: '已删除', icon: 'success' })
           // 删除成功：关闭表单，回到当日事项弹层

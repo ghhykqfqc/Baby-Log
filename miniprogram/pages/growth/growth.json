@@ -1,6 +1,7 @@
 {
   "usingComponents": {
-    "empty-state": "../../components/empty-state/empty-state"
+    "empty-state": "../../components/empty-state/empty-state",
+    "login-panel": "../../components/login-panel/login-panel"
   },
   "navigationBarTitleText": "成长",
   "enablePullDownRefresh": true,

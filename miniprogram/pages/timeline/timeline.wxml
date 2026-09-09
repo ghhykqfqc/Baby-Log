@@ -81,7 +81,7 @@
       </view>
     </view>
     <view class="chart-canvas-wrap">
-      <canvas type="2d" id="timelineChart" class="timeline-chart" bindtap="onChartTap"></canvas>
+      <canvas type="2d" id="timelineChart" class="timeline-chart" bindtap="onChartTap" wx:if="{{!showLoginPanel}}"></canvas>
     </view>
     <!-- 图例（仅日视图显示） -->
     <view class="chart-legend" wx:if="{{chartScale === 'day'}}">
@@ -102,4 +102,7 @@
       <text>📸 生成分享卡片</text>
     </view>
   </view>
+
+  <!-- 登录引导面板（游客点击「生成分享卡片」时弹出） -->
+  <login-panel id="loginPanel" bind:change="onLoginPanelChange" />
 </view>

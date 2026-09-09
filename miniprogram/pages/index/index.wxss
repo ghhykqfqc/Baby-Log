@@ -981,6 +981,15 @@
   white-space: nowrap;
 }
 
+/* 游客登录提示（奶咖色高亮，鼓励登录） */
+.user-login-tip {
+  font-size: 22rpx;
+  color: var(--color-primary-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 第二行：宝宝：XXX ▾ 切换入口 */
 .baby-switch-row {
   display: flex;
@@ -1398,6 +1407,186 @@
   justify-content: center;
   font-size: 30rpx;
   font-weight: 500;
+}
+
+/* 意见反馈入口 */
+.feedback-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: #FFFFFF;
+  border: 2rpx solid rgba(212, 184, 150, 0.35);
+  border-radius: 24rpx;
+  padding: 24rpx 28rpx;
+  margin-bottom: 16rpx;
+}
+
+.feedback-row-hover {
+  background: #FDFBF7;
+  transform: scale(0.99);
+}
+
+.feedback-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.feedback-text {
+  flex: 1;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.feedback-arrow {
+  font-size: 32rpx;
+  color: var(--color-text-hint);
+  flex-shrink: 0;
+}
+
+/* ===== 意见反馈弹层 ===== */
+.feedback-mask {
+  z-index: 12000;
+}
+
+.feedback-panel {
+  width: 100%;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 20rpx 32rpx calc(env(safe-area-inset-bottom) + 24rpx);
+  box-sizing: border-box;
+  animation: sheetUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.feedback-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+  margin-bottom: 8rpx;
+  flex-shrink: 0;
+}
+
+.feedback-sub {
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  text-align: center;
+  margin-bottom: 24rpx;
+  flex-shrink: 0;
+}
+
+.feedback-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.feedback-inner {
+  padding-bottom: 8rpx;
+}
+
+.feedback-type-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+
+.feedback-type-btn {
+  flex: 1;
+  height: 76rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-card);
+  border: 2rpx solid rgba(212, 184, 150, 0.35);
+  border-radius: 20rpx;
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
+.feedback-type-btn.active {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+.feedback-label {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  margin-bottom: 10rpx;
+}
+
+.feedback-textarea {
+  width: 100%;
+  min-height: 200rpx;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+  line-height: 1.5;
+}
+
+.feedback-count {
+  text-align: right;
+  font-size: 20rpx;
+  color: var(--color-text-hint);
+  margin: 8rpx 8rpx 20rpx;
+}
+
+.feedback-input {
+  width: 100%;
+  height: 88rpx;
+  background: var(--color-bg-card);
+  border-radius: 20rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  color: var(--color-text-primary);
+}
+
+.feedback-privacy-tip {
+  font-size: 20rpx;
+  color: var(--color-text-hint);
+  margin: 12rpx 8rpx 28rpx;
+  line-height: 1.5;
+}
+
+.feedback-actions {
+  display: flex;
+  gap: 20rpx;
+}
+
+.feedback-cancel,
+.feedback-submit {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.feedback-cancel {
+  background: var(--color-primary-light);
+  color: var(--color-text-secondary);
+}
+
+.feedback-submit {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: var(--shadow-button);
+}
+
+.feedback-submit.disabled {
+  opacity: 0.6;
 }
 
 /* ============================================

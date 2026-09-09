@@ -3,5 +3,8 @@
   "navigationBarTitleText": "日程",
   "navigationBarBackgroundColor": "#FAF6F0",
   "navigationBarTextStyle": "black",
-  "disableScroll": true
+  "disableScroll": true,
+  "usingComponents": {
+    "login-panel": "../../components/login-panel/login-panel"
+  }
 }

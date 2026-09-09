@@ -60,9 +60,19 @@
     <view class="metric-empty-sub">定格身高与体重的起点，见证每一次长大</view>
   </view>
 
+  <!-- 游客模式提示条：仅游客且暂无本地暂存数据时展示，已有数据则直接展示数据 -->
+  <view class="guest-note" wx:if="{{isGuest && !hasRecords}}">
+    <text class="guest-note-icon">🔒</text>
+    <view class="guest-note-body">
+      <view class="guest-note-title">游客模式 · 数据暂存本机</view>
+      <view class="guest-note-sub">身高体重先记在本机，登录后自动同步不丢失</view>
+    </view>
+    <view class="guest-note-btn" bindtap="onGuestLogin" hover-class="guest-note-btn-hover">去登录</view>
+  </view>
+
   <!-- ========== 生长曲线 ==========
-       弹窗打开期间卸载 canvas：部分真机同层渲染失效，canvas 会浮在弹层之上 -->
-  <view class="chart-card" wx:if="{{hasRecords && !showForm}}">
+       弹窗/登录面板打开期间卸载 canvas：部分真机同层渲染失效，canvas 会浮在弹层之上 -->
+  <view class="chart-card" wx:if="{{hasRecords && !showForm && !showLoginPanel}}">
     <view class="chart-head">
       <view class="chart-title">生长曲线</view>
       <view class="chart-tabs">
@@ -151,4 +161,7 @@
       </view>
     </view>
   </view>
+
+  <!-- 登录引导面板（游客点击「＋ 记录成长」时弹出） -->
+  <login-panel id="loginPanel" bind:change="onLoginPanelChange" />
 </view>

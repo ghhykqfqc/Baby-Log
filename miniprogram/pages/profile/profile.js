@@ -1,6 +1,7 @@
 // pages/profile/profile.js - 宝宝资料（自定义头像 + 昵称，含裁剪）
 const app = getApp()
 const storage = require('../../utils/storage')
+const auth = require('../../utils/auth')
 
 Page({
   data: {
@@ -29,8 +30,7 @@ Page({
   },
 
   onLoad(options) {
-    // 登录态校验
-    if (!app.requireLogin()) return
+    // 「先体验、后授权」：游客也可进入编辑页（保存时引导登录）
 
     // 计算裁剪舞台尺寸（屏幕宽度 * 0.8，不超过 360）
     try {
@@ -50,7 +50,10 @@ Page({
     // 从 babies 列表中查找对应宝宝的完整资料
     const babies = app.globalData.babies || []
     const matched = targetBabyId ? babies.find(b => b.babyId === targetBabyId) : null
-    const babyInfo = matched || app.globalData.babyInfo || storage.get(storage.CACHE_KEYS.BABY_INFO) || {}
+    // 游客数据隔离：游客不读取任何历史宝宝档案（不让游客在编辑页看到上个账号的宝宝资料）
+    const babyInfo = app.isLoggedIn()
+      ? (matched || app.globalData.babyInfo || storage.get(storage.CACHE_KEYS.BABY_INFO) || {})
+      : (matched || {})
 
     this.setData({
       babyId: targetBabyId,
@@ -285,6 +288,19 @@ Page({
    * - 有 babyId：调 saveBabyInfo 更新资料，若 babyCode 变更则同步更新密码
    */
   async save() {
+    // 保存宝宝资料（新建/编辑）是持久化关键操作：游客先引导登录；
+    // 即便选择「暂不登录」也放行（游客 openid 已静默获取，登录后数据自动归属本人）
+    if (!app.isLoggedIn()) {
+      auth.ensureLogin(this, {
+        onSuccess: () => this.doSave(),
+        onGuestClose: () => this.doSave()
+      })
+      return
+    }
+    this.doSave()
+  },
+
+  async doSave() {
     const { babyId, babyCode, babyName, avatarUrl, originalAvatar, birthDate, gender } = this.data
     const trimmed = (babyName || '').trim()
     if (!trimmed) {

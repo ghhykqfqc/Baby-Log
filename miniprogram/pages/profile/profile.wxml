@@ -118,4 +118,7 @@
 
   <!-- 隐藏的裁剪导出 canvas（不参与布局） -->
   <canvas type="2d" id="cropCanvas" class="crop-canvas-hidden"></canvas>
+
+  <!-- 登录引导面板（游客保存宝宝资料时弹出） -->
+  <login-panel id="loginPanel" />
 </view>

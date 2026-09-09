@@ -2,6 +2,7 @@
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
+const auth = require('../../utils/auth')
 const { formatElapsedSmart, formatRemainingSmart, formatDurationSmart } = require('../../utils/time')
 const { predictAll } = require('../../utils/predict')
 const { RECORD_TYPES } = require('../../utils/constants')
@@ -109,6 +110,17 @@ Page({
     joinBabyCode: '',
     newBabyId: '',
     newBabyCode: '',
+    // 意见反馈弹层
+    showFeedbackSheet: false,
+    feedbackTypes: [
+      { key: 'bug', label: '🐛 问题反馈' },
+      { key: 'suggest', label: '💡 功能建议' },
+      { key: 'other', label: '✉️ 其他' }
+    ],
+    feedbackType: 'bug',
+    feedbackContent: '',
+    feedbackContact: '',
+    feedbackSending: false,
     // 照片编辑面板
     showPhotoEditSheet: false,
     currentAlbumIndex: 0,        // 当前 swiper 索引
@@ -154,9 +166,7 @@ Page({
   },
 
   onShow() {
-    // 登录态校验：未登录直接跳登录页
-    if (!app.requireLogin()) return
-
+    // 「先体验、后授权」：游客可自由浏览，不再强制登录
     this.setData({ cloudReady: app.globalData.cloudReady })
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/index/index')
@@ -168,24 +178,29 @@ Page({
     this.loadWeather()
     if (app.globalData.cloudReady) {
       this.fetchCloudData()
-      // 异步刷新宝宝列表（不阻塞渲染）
-      app.refreshBabies().then(babies => {
-        // 自愈：补齐当前宝宝的空昵称（见 syncGlobalToView）
-        const healed = (babies || []).map(b => {
-          if (!b.name && b.babyId === app.globalData.babyId && app.globalData.babyInfo && app.globalData.babyInfo.name) {
-            return { ...b, name: app.globalData.babyInfo.name }
+      // 仅登录后刷新云端宝宝列表（游客不触达云端，避免把已登录账号的宝宝自动同步进来）
+      if (app.isLoggedIn()) {
+        app.refreshBabies().then(babies => {
+          // 自愈：补齐当前宝宝的空昵称（见 syncGlobalToView）
+          const healed = (babies || []).map(b => {
+            if (!b.name && b.babyId === app.globalData.babyId && app.globalData.babyInfo && app.globalData.babyInfo.name) {
+              return { ...b, name: app.globalData.babyInfo.name }
+            }
+            return b
+          })
+          this.setData({ babies: healed, currentBabyId: app.globalData.babyId })
+          // 如果当前没有选中宝宝且有宝宝列表，自动选中第一个
+          if (!app.globalData.babyId && healed.length > 0) {
+            app.setCurrentBaby(healed[0])
           }
-          return b
-        })
-        this.setData({ babies: healed, currentBabyId: app.globalData.babyId })
-        // 如果当前没有选中宝宝且有宝宝列表，自动选中第一个
-        if (!app.globalData.babyId && healed.length > 0) {
-          app.setCurrentBaby(healed[0])
-        }
-        // 云端自愈：如果当前宝宝在 babies 里 name 为空但在 babyInfo 里有名字，
-        // 说明历史 bug 曾把云端 name 清空，静默修复一次（避免换设备后仍显示未命名）
-        this.healBabyNameIfNeeded()
-      }).catch(() => {})
+          // 云端自愈：如果当前宝宝在 babies 里 name 为空但在 babyInfo 里有名字，
+          // 说明历史 bug 曾把云端 name 清空，静默修复一次（避免换设备后仍显示未命名）
+          this.healBabyNameIfNeeded()
+        }).catch(() => {})
+      } else {
+        // 游客：本地缓存可能有残留，列表置空（只保留本机构建，不展示云端已登录账号的宝宝）
+        this.setData({ babies: [], currentBabyId: app.globalData.babyId || '' })
+      }
     }
     this._timer = setInterval(() => this.updateCardTexts(), 30000)
     this.startSleepTick()
@@ -197,12 +212,18 @@ Page({
    * 用 babyInfo.name 补上，保证列表/标签/管理面板显示正确昵称
    */
   syncGlobalToView() {
-    const babies = (app.globalData.babies || []).map(b => {
+    const isGuest = !app.isLoggedIn()
+    // 游客：宝宝列表强制为空（不展示云端/本地残留的已登录账号宝宝），
+    // 只展示「新建 / 加入」入口；登录后自动恢复云端列表
+    const babies = isGuest ? [] : (app.globalData.babies || []).map(b => {
       if (!b.name && b.babyId === app.globalData.babyId && app.globalData.babyInfo && app.globalData.babyInfo.name) {
         return { ...b, name: app.globalData.babyInfo.name }
       }
       return b
     })
+    // 游客：宝宝档案信息一并置空（不展示上一个登录账号的宝宝昵称/头像），
+    // 顶栏显示「点此添加」引导新建/登录
+    const babyInfo = isGuest ? {} : (app.globalData.babyInfo || {})
     // 若补齐过，回写 globalData，让全局状态保持一致
     if (JSON.stringify(babies) !== JSON.stringify(app.globalData.babies || [])) {
       app.globalData.babies = babies
@@ -211,8 +232,8 @@ Page({
     this.setData({
       userInfo: app.globalData.userInfo || {},
       babies,
-      babyInfo: app.globalData.babyInfo || {},
-      currentBabyId: app.globalData.babyId || ''
+      babyInfo,
+      currentBabyId: isGuest ? '' : (app.globalData.babyId || '')
     })
   },
 
@@ -531,8 +552,27 @@ loadAlbum(babyId) {
 
   /**
    * 上传照片到相册：先选图 → 固定 4:3 裁剪 → 选择标签 → 上传
+   * 游客可先浏览，上传相册属于「关键操作」（数据落云），触发登录引导；
+   * 选择暂不登录则仍然放行（本地暂存），登录后自动同步。
+   * 交互优化（2026-09-10）：登录后【不自动打开系统选图】，用户再点一次即上传
    */
   addAlbumPhoto() {
+    if (app.isLoggedIn()) {
+      this._pickAlbumPhoto()
+      return
+    }
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        setTimeout(() => { wx.showToast({ title: '已登录，再次点击＋即可上传照片', icon: 'none' }) }, 400)
+      },
+      onGuestClose: () => this._pickAlbumPhoto()
+    })
+  },
+
+  /**
+   * 打开系统选图（登录/游客均可用；游客本地暂存）
+   */
+  _pickAlbumPhoto() {
     const remain = ALBUM_MAX - this.data.albumPhotos.length
     if (remain <= 0) {
       wx.showToast({ title: `最多 ${ALBUM_MAX} 张`, icon: 'none' })
@@ -555,8 +595,10 @@ loadAlbum(babyId) {
   /**
    * 获取当前宝宝昵称（多级兜底，防止缓存被历史 bug 清空后取到空名）
    * 优先级：babies 列表 → globalData.babyInfo → 本地缓存 babyInfo
+   * 游客态：一律返回空（不读取历史账号的宝宝昵称）
    */
   getCurrentBabyName() {
+    if (!app.isLoggedIn()) return ''
     const babies = app.globalData.babies || []
     const current = babies.find(b => b.babyId === app.globalData.babyId)
     if (current && current.name) return current.name
@@ -1179,7 +1221,10 @@ loadAlbum(babyId) {
 
   // 从本地缓存刷新（首屏/记录事件/切宝宝后）
   refreshFromCache() {
-    const babyInfo = storage.get(storage.CACHE_KEYS.BABY_INFO) || { name: '宝宝', age: '新生儿' }
+    // 游客数据隔离：游客不读取历史宝宝档案缓存，顶栏显示「点此添加」空态
+    const babyInfo = app.isLoggedIn()
+      ? (storage.get(storage.CACHE_KEYS.BABY_INFO) || { name: '宝宝', age: '新生儿' })
+      : {}
     const lastRecords = storage.getLastRecords()
     this._allRecords = storage.get(storage.CACHE_KEYS.TODAY_RECORDS) || []
 
@@ -1271,9 +1316,25 @@ loadAlbum(babyId) {
   },
 
   // ============================================
+  // 登录守卫（「先体验、后授权」关键操作拦截）
+  // ============================================
+
+  /**
+   * 登录面板打开状态变化（用于卸载雨天 canvas，避免真机同层渲染遮挡）
+   */
+  onLoginPanelChange(e) {
+    const visible = e.detail && e.detail.visible
+    this.setData({ showLoginPanel: !!visible })
+    if (!visible) this._resumeRainIfNeeded()
+  },
+
+  // ============================================
   // 记录操作：喂奶 / 尿布 / 睡觉
   // ============================================
-  // 记录操作：单击 = 记录时间点，长按 = 弹层填详情
+  // 策略（「先体验、后授权」）：
+  // - 游客点击直接本地暂存记录（不弹登录框，体验零打断），toast 轻提示「登录后自动同步」
+  // - 记录会同时尝试写云端（openid 游客期已静默获取，默认宝宝可直接写）
+  // - 保存类强操作（新建宝宝/加入/分享卡）才弹登录引导面板
   // ============================================
 
   async handleFeed() {
@@ -1285,7 +1346,7 @@ loadAlbum(babyId) {
   },
 
   /**
-   * 睡眠单击：切换入睡/醒来
+   * 睡眠单击：切换入睡/醒来（游客也可用，本地记录）
    */
   handleSleepTap() {
     if (this.data.sleeping) {
@@ -1459,7 +1520,11 @@ loadAlbum(babyId) {
 
     this.setData({ sleepSuccess: true })
     setTimeout(() => this.setData({ sleepSuccess: false }), 1000)
-    wx.showToast({ title: '已记录入睡', icon: 'none' })
+    if (!app.isLoggedIn()) {
+      wx.showToast({ title: '已记录入睡 · 登录后自动同步', icon: 'none' })
+    } else {
+      wx.showToast({ title: '已记录入睡', icon: 'none' })
+    }
   },
 
   /**
@@ -1505,7 +1570,11 @@ loadAlbum(babyId) {
       app.enqueuePendingSync(record)
     }
 
-    wx.showToast({ title: `本次睡眠 ${this.minutesToText(minutes)}`, icon: 'success' })
+    if (!app.isLoggedIn()) {
+      wx.showToast({ title: `本次睡眠 ${this.minutesToText(minutes)} · 登录后同步`, icon: 'none' })
+    } else {
+      wx.showToast({ title: `本次睡眠 ${this.minutesToText(minutes)}`, icon: 'success' })
+    }
   },
 
   /**
@@ -1566,6 +1635,7 @@ loadAlbum(babyId) {
   // ============================================
 
   showBabyPanel() {
+    // 游客模式：先访问「我的」面板；点面板内登录按钮再授权（不强制）
     this.syncGlobalToView()
     this.setData({ showBabySheet: true, formMode: '' })
   },
@@ -1607,10 +1677,26 @@ loadAlbum(babyId) {
    */
   editBaby(e) {
     const babyId = e.currentTarget.dataset.babyId
-    this.hideBabyPanel()
-    setTimeout(() => {
+    // 编辑宝宝是持久化操作：游客先引导登录。
+    // 交互优化（2026-09-10）：登录成功后【不自动跳转资料页】——用户再点一次即进入；
+    // 已登录状态下点击则直接进入
+    if (app.isLoggedIn()) {
+      this.hideBabyPanel()
       wx.navigateTo({ url: `/pages/profile/profile?babyId=${babyId}` })
-    }, 200)
+      return
+    }
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        this.syncGlobalToView()
+        if (app.globalData.cloudReady && app.isLoggedIn()) {
+          app.refreshBabies().then(() => this.syncGlobalToView()).catch(() => {})
+        }
+        setTimeout(() => { wx.showToast({ title: '已登录，再次点击即可编辑', icon: 'none' }) }, 400)
+      },
+      onGuestClose: () => {
+        wx.showToast({ title: '登录后即可编辑宝宝', icon: 'none' })
+      }
+    })
   },
 
   /**
@@ -1684,6 +1770,29 @@ loadAlbum(babyId) {
 
   // ===== 新建宝宝 =====
   startCreateBaby() {
+    // 创建宝宝是云端持久化操作（本地无法暂存）：游客必须登录后才能创建。
+    // 游客点「暂不登录」时中断创建（数据隔离：游客不操作云端宝宝实体）。
+    // 交互优化（2026-09-10）：登录成功后【不自动打开创建表单】——用户再点一次按钮即打开；
+    // 已登录状态下点击则直接打开（不中断流程）
+    if (app.isLoggedIn()) {
+      this._openCreateForm()
+      return
+    }
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        this.syncGlobalToView()
+        if (app.globalData.cloudReady && app.isLoggedIn()) {
+          app.refreshBabies().then(() => this.syncGlobalToView()).catch(() => {})
+        }
+        setTimeout(() => { wx.showToast({ title: '已登录，再次点击即可创建宝宝', icon: 'none' }) }, 400)
+      },
+      onGuestClose: () => {
+        wx.showToast({ title: '登录后即可创建宝宝', icon: 'none' })
+      }
+    })
+  },
+
+  _openCreateForm() {
     this.setData({
       formMode: 'create',
       formAvatar: '',
@@ -1791,6 +1900,29 @@ loadAlbum(babyId) {
 
   // ===== 加入宝宝 =====
   startJoinBaby() {
+    // 加入宝宝是云端持久化操作（加入家庭成员关系）：游客不能操作。
+    // 游客点「暂不登录」时中断（数据隔离：不把游客身份写入云端家庭关系）。
+    // 交互优化（2026-09-10）：登录成功后【不自动打开加入表单】——用户再点一次即打开；
+    // 已登录状态下点击则直接打开
+    if (app.isLoggedIn()) {
+      this._openJoinForm()
+      return
+    }
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        this.syncGlobalToView()
+        if (app.globalData.cloudReady && app.isLoggedIn()) {
+          app.refreshBabies().then(() => this.syncGlobalToView()).catch(() => {})
+        }
+        setTimeout(() => { wx.showToast({ title: '已登录，再次点击即可加入宝宝', icon: 'none' }) }, 400)
+      },
+      onGuestClose: () => {
+        wx.showToast({ title: '登录后即可加入家人共享', icon: 'none' })
+      }
+    })
+  },
+
+  _openJoinForm() {
     this.setData({
       formMode: 'join',
       joinBabyId: '',
@@ -1884,8 +2016,125 @@ loadAlbum(babyId) {
     })
   },
 
+  // ============================================
+  // 意见反馈（宝宝管理面板入口；游客/登录均可用）
+  // ============================================
+
+  /** 打开反馈弹层（收起宝宝面板，避免双层叠压） */
+  openFeedback() {
+    // 游客可直接反馈（无需登录）：反馈是用户与运营方的沟通渠道
+    this.setData({ showBabySheet: false })
+    this.setData({ showFeedbackSheet: true })
+  },
+
+  closeFeedback() {
+    this.setData({ showFeedbackSheet: false })
+    this._resumeRainIfNeeded()
+  },
+
+  onFeedbackTypeTap(e) {
+    this.setData({ feedbackType: e.currentTarget.dataset.key })
+  },
+
+  onFeedbackInput(e) {
+    this.setData({ feedbackContent: e.detail.value })
+  },
+
+  onFeedbackContactInput(e) {
+    this.setData({ feedbackContact: e.detail.value })
+  },
+
+  /**
+   * 提交反馈：
+   * 云函数就绪 → 调 feedback 云函数（提交到 feedbacks 集合）；
+   * 云函数不存在/失败 → 降级为复制文案（保证用户反馈不丢失入口）。
+   */
+  async submitFeedback() {
+    const content = (this.data.feedbackContent || '').trim()
+    if (!content) {
+      wx.showToast({ title: '请填写反馈内容', icon: 'none' })
+      return
+    }
+    if (this.data.feedbackSending) return
+
+    this.setData({ feedbackSending: true })
+
+    const payload = {
+      type: this.data.feedbackType,
+      content,
+      contact: (this.data.feedbackContact || '').trim(),
+      page: 'index',
+      // 附加基础信息（便于定位问题；非敏感）
+      userAgent: 'mini-program'
+    }
+
+    try {
+      // 优先云端（eedback 云函数需在云开发控制台部署；未部署时走降级）
+      const res = await wx.cloud.callFunction({
+        name: 'feedback',
+        data: payload
+      })
+      if (res.result && res.result.code === 0) {
+        this.setData({ showFeedbackSheet: false, feedbackContent: '', feedbackContact: '' })
+        wx.showToast({ title: '感谢你的反馈 🌱', icon: 'none' })
+      } else {
+        this._feedbackLocalFallback(payload)
+      }
+    } catch (err) {
+      this._feedbackLocalFallback(payload)
+    } finally {
+      this.setData({ feedbackSending: false })
+    }
+  },
+
+  /**
+   * 云端反馈不可用时的本地降级：
+   * 提示用户通过联系邮箱发送（保证合规的反馈渠道仍可达）
+   */
+  _feedbackLocalFallback(payload) {
+    this.setData({ showFeedbackSheet: false, feedbackContent: '', feedbackContact: '' })
+    wx.showModal({
+      title: '反馈提交暂不可用',
+      content: '云端反馈通道暂未开通，你可以将反馈内容发送至联系邮箱 2662481663@qq.com，我们会尽快查看。',
+      showCancel: false,
+      confirmText: '知道了'
+    })
+  },
+
+  /**
+   * 宝宝面板内的「登录」入口（游客态展示）
+   * 交互优化（2026-09-09）：先收起当前宝宝面板再弹登录引导，
+   * 避免「宝宝面板 + 登录面板」双层叠压；
+   * 登录完成【不自动恢复宝宝面板】（2026-09-10）：用户需要时可再点头像/名字打开，
+   * 避免登录后突然弹出一堆功能面板，干扰当前浏览
+   */
+  showLoginInPanel() {
+    // 先收起当前宝宝面板，让登录引导获得完整视觉焦点
+    const wasBabySheetOpen = this.data.showBabySheet
+    if (wasBabySheetOpen) {
+      this.setData({ showBabySheet: false })
+    }
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        this.syncGlobalToView()
+        // 登录成功：拉取云端宝宝列表（游客期被置空，登录后恢复）
+        if (app.globalData.cloudReady && app.isLoggedIn()) {
+          app.refreshBabies().then(() => this.syncGlobalToView()).catch(() => {})
+        }
+        // 不再恢复宝宝面板：用户可自行再点「宝宝管理」入口（login-panel 已提示「登录成功」）
+      },
+      onGuestClose: () => {
+        // 用户「暂不登录」：恢复宝宝面板，避免误关（未登录不弹面板）
+        if (wasBabySheetOpen) {
+          this.setData({ showBabySheet: true, formMode: '' })
+        }
+      }
+    })
+  },
+
   /**
    * 通用记录动作（喂奶 / 尿布）
+   * 游客模式：直接本地记录 + 尝试写云端（openid 游客期已获取），不弹登录框（先体验）
    */
   async recordAction(type, pressKey, successKey) {
     this.setData({ [pressKey]: true })
@@ -1915,6 +2164,11 @@ loadAlbum(babyId) {
       try { await call('addRecord', record) } catch (err) { app.enqueuePendingSync(record) }
     } else {
       app.enqueuePendingSync(record)
+    }
+
+    // 游客轻提示（非阻断）：已记录 + 登录后自动同步
+    if (!app.isLoggedIn()) {
+      wx.showToast({ title: '已记录 · 登录后自动同步云端', icon: 'none' })
     }
   },
 

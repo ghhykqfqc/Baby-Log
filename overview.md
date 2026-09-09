@@ -252,3 +252,54 @@
 - 主页面日历下方换成「选中日摘要条」：短日期（今天/明天/X月X日）+ 周几 + 事项数/空提示 +「＋添加」快捷按钮（catchtap 防冒泡）
 - 点日历日期即弹出当日弹层；弹层头部有 ✕ 关闭；保存/删除成功后回到当日弹层而非直接关闭
 - 表单弹层 z-index 上调至 11000，保证叠加在当日弹层之上；日历格子加大至 108rpx
+
+---
+
+# 2026-09-09 深夜：协议合规第二轮 — 邮箱替换 + 意见反馈 + 游客数据隔离
+
+## 一、联系邮箱替换 + 协议文案更新
+- `agreement.js`：`CONTACT_EMAIL = 'PRIVACY_EMAIL_PLACEHOLDER'` → **`2662481663@qq.com`**（移除「上线前必改」TODO）
+- 用户协议联系句从「通过小程序内意见反馈入口反馈（若有）」→ **「宝宝管理」面板中的「意见反馈」入口提交**
+
+## 二、意见反馈功能（新增）
+- 首页宝宝管理面板新增「💬 意见反馈 ›」入口 → 全屏反馈弹层（类型：🐛问题反馈 / 💡功能建议 / ✉️其他；200 字 textarea + 选填联系方式 + 隐私提示 + 提交）
+- 提交调新增云函数 `cloudfunctions/feedback/` 写入 `feedbacks` 集合；失败兜底弹窗引导用户截图发 `2662481663@qq.com`
+
+## 三、游客模式数据隔离（问题2 修复，核心）
+
+### 前端（4 道防线）
+1. `app.js`：未登录不还原 `babyId/babyInfo/babies`；onLaunch / logout 清空云端历史缓存（`todayRecords/growthData/prediction/albumPhotos*`），但**保留 `local_` 前缀的游客自有记录**（登录后 merge 上传）
+2. `utils/request.js`：`GUEST_READ_BLOCKLIST`（getRecords/getGrowthData/getDailySummary/getSchedules/getPrediction/listBabies/getBabyInfo）游客调用直接 reject `code:-403`
+3. 分享卡页：游客硬拦截（锁图标占位 + 去登录/返回按钮），无法再生成含历史宝宝名的分享图
+4. 各页游客态 babyInfo 置空（index/growth/history/profile/timeline），分享卡入口游客提示「需先登录」
+
+**后端（纵深防御）**：4 个读函数 + 3 个写函数全加权限校验
+- `isPermitted(OPENID, babyId)`：`baby_members` 成员表 + `babies.userId/createdBy` 归属校验（兼容历史直接存储，default 放行）
+- 读函数（getRecords/getGrowthData/getDailySummary/getSchedules）未授权 → 返回空数据
+- 写函数（addGrowthData/updateGrowthData/updateRecord）未授权 → 返回 `-403`
+
+## 四、问题1 结论（游客可用的分层策略）
+| 层 | 功能 | 决策 |
+|----|------|------|
+| 游客自有数据（本地生成） | 记录喂奶/尿布/睡眠、日程暂存、成长录入、相册本地图片 | ✅ 游客可用（登录后合并） |
+| 云端已有数据 | 历史记录、生长曲线、分享卡、成员列表 | ⛔ 游客不可见（前端拦截 + 云端校验） |
+| 云端实体创建 | 新建宝宝 / 加入家人共享 | 🔒 必须登录 |
+
+**结论**：不需要给游客更多开关，当前「先体验、后授权」+ 数据隔离是合理状态。
+
+## 五、问题3 修复（日程页超高无法滑动）
+- 日程页把「悬浮提示 + 日历 + 当日摘要」包进 `scroll-view`（flex:1; min-height:0）独立滚动；顶部提示条与标题固定
+- `.sched-flex-spacer` 尺寸改用 height + flex-shrink:0，避免撑破布局
+
+## 本次改动文件（节选）
+| 文件 | 改动 |
+|------|------|
+| `miniprogram/pages/agreement/agreement.js` | 邮箱替换 + 协议文案更新 |
+| `miniprogram/pages/index/index.*` | 意见反馈入口 + 反馈 sheet |
+| `cloudfunctions/feedback/*` | 新增反馈云函数 |
+| `miniprogram/app.js` | 游客缓存/上下文隔离 |
+| `miniprogram/utils/request.js` | GUEST_READ_BLOCKLIST |
+| `miniprogram/pages/share/*` | 游客拦截 |
+| 8 个云函数（getRecords/getGrowthData/getDailySummary/getSchedules/addGrowthData/updateGrowthData/updateRecord/feedback） | 权限校验 / 新增 |
+
+**待用户操作**：在微信开发者工具「云开发 → 云函数」中重新部署以上 8 个云函数（npm 安装依赖），前端改动上传后真机验证：游客模式分享/生成图/记录/日程不可见云端数据，登录后数据正常。

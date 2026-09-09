@@ -329,6 +329,51 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* 游客模式提示条：成长页首屏游客看到「暂存本机」说明 + 去登录，避免无数据时误以为功能不可用 */
+.guest-note {
+  margin: 24rpx 32rpx 0;
+  padding: 20rpx 28rpx;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(212, 184, 150, 0.16), rgba(232, 138, 111, 0.10));
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+.guest-note-icon {
+  font-size: 34rpx;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.guest-note-body {
+  flex: 1;
+  min-width: 0;
+}
+.guest-note-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+.guest-note-sub {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-top: 2rpx;
+}
+.guest-note-btn {
+  flex-shrink: 0;
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.guest-note-btn-hover {
+  opacity: 0.8;
+}
+
 .fab-hover {
   transform: scale(0.92);
   box-shadow: 0 4rpx 16rpx rgba(212, 184, 150, 0.35);

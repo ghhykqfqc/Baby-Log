@@ -2,6 +2,7 @@
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
+const auth = require('../../utils/auth')
 const { formatTime, minutesToText, toMs } = require('../../utils/time')
 const { predictDetail } = require('../../utils/predict')
 
@@ -50,11 +51,26 @@ Page({
     })
   },
 
+  onLoginPanelChange(e) {
+    const visible = e.detail && e.detail.visible
+    this.setData({ showLoginPanel: !!visible })
+    // 面板关闭后若图表 canvas 被卸载过，延迟重绘
+    if (!visible) {
+      setTimeout(() => this.redrawChart(), 150)
+    }
+  },
+
   /**
    * 更新 baby-bar 的出生信息：出生日期 · 性别（参照成长页档案区 buildBirthLabel）
+   * 游客态：宝宝档案已隔离（globalData.babyInfo 置空），不展示任何历史宝宝信息
    */
   updateBabyBar() {
     const info = app.globalData.babyInfo || {}
+    // 游客：不展示上一个账号的宝宝出生信息（数据隔离）
+    if (!app.isLoggedIn()) {
+      this.setData({ birthMeta: '' })
+      return
+    }
     const parts = []
     if (info.birthDate) parts.push(`出生 ${info.birthDate}`)
     if (info.gender) parts.push(info.gender === 'male' || info.gender === 'M' ? '男宝' : '女宝')
@@ -62,13 +78,12 @@ Page({
   },
 
   onShow() {
-    // 登录态校验
-    if (!app.requireLogin()) return
+    // 「先体验、后授权」：游客可自由浏览时光轴
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/timeline/timeline')
     }
-    // 同步当前宝宝信息到视图 + baby-bar 档案信息
-    this.setData({ babyInfo: app.globalData.babyInfo || {} })
+    // 同步当前宝宝信息到视图 + baby-bar 档案信息（游客态为隔离空态）
+    this.setData({ babyInfo: app.isLoggedIn() ? (app.globalData.babyInfo || {}) : {} })
     this.updateBabyBar()
     this.loadData()
   },
@@ -907,7 +922,36 @@ Page({
   },
 
   goShareCard() {
-    wx.navigateTo({ url: '/pages/share/share' })
+    // 关键操作：生成分享卡（云函数取小程序码 + 聚合宝宝数据）→ 登录引导
+    // 游客「暂不登录」不进入分享页：分享卡含宝宝姓名/头像/记录，属于云端宝宝数据，
+    // 游客模式必须隔离，避免把历史宝宝信息体现在分享图中（问题 2 修复）
+    // 交互优化（2026-09-10）：登录成功后【不自动跳转】——用户再点一次即进入；已登录直接进入
+    if (app.isLoggedIn()) {
+      wx.navigateTo({ url: '/pages/share/share' })
+      return
+    }
+    auth.ensureLogin(this, {
+      onSuccess: () => {
+        // 延迟提示：避免被登录面板的「登录成功」toast 覆盖
+        setTimeout(() => {
+          wx.showToast({ title: '已登录，再次点击即可生成分享卡', icon: 'none' })
+        }, 400)
+      },
+      onGuestClose: () => {
+        wx.showToast({ title: '生成分享卡需要先登录哦', icon: 'none' })
+      }
+    })
+  },
+
+  /**
+   * 图表重绘（面板关闭恢复 canvas 后用）
+   */
+  redrawChart() {
+    if (this._chartCtx && this._chartW && this._chartH) {
+      this.renderChart(this._chartCtx, this._chartW, this._chartH)
+    } else {
+      this.drawTimelineChart()
+    }
   },
 
   onShareAppMessage() {

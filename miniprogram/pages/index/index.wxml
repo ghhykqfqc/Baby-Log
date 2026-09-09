@@ -29,7 +29,7 @@
         type="2d"
         id="rainCanvas"
         class="rain-canvas"
-        wx:if="{{!showFeedSheet && !showDiaperSheet && !showSleepSheet && !showBabySheet && !showUploadCropper && !showPhotoEditSheet}}"
+        wx:if="{{!showFeedSheet && !showDiaperSheet && !showSleepSheet && !showBabySheet && !showUploadCropper && !showPhotoEditSheet && !showLoginPanel}}"
       ></canvas>
     </block>
     <!-- 雪 -->
@@ -60,8 +60,9 @@
         <view wx:else class="user-avatar user-avatar-default">👤</view>
         <view class="user-text">
           <view class="user-nickname-row">
-            <text class="user-nickname">{{userInfo.nickName || '未登录'}}</text>
-            <text class="user-count" wx:if="{{babies.length > 0}}">· 共{{babies.length}}个宝宝</text>
+            <text class="user-nickname">{{userInfo.nickName || '游客'}}</text>
+            <text class="user-login-tip" wx:if="{{!userInfo.openid}}">· 登录享永久保存</text>
+            <text class="user-count" wx:elif="{{babies.length > 0}}">· 共{{babies.length}}个宝宝</text>
           </view>
           <view class="baby-switch-row">
             <text class="baby-switch-label">宝宝：</text>
@@ -509,12 +510,71 @@
         </view>
       </view>
 
-      <!-- 登出按钮 -->
-      <view class="logout-row" wx:if="{{formMode === ''}}">
+      <!-- 登出按钮（游客不显示，显示登录入口） -->
+      <view class="logout-row" wx:if="{{formMode === '' && userInfo.openid}}">
         <view class="logout-btn" bindtap="handleLogout" hover-class="btn-hover">退出登录</view>
+      </view>
+      <view class="logout-row" wx:elif="{{formMode === '' && !userInfo.openid}}">
+        <view class="logout-btn logout-btn-login" bindtap="showLoginInPanel" hover-class="btn-hover">登录以永久保存数据</view>
+      </view>
+
+      <!-- 意见反馈入口（登录/游客均可用，符合《用户协议》「联系渠道」声明） -->
+      <view class="feedback-row" wx:if="{{formMode === ''}}" bindtap="openFeedback" hover-class="feedback-row-hover">
+        <text class="feedback-icon">💬</text>
+        <text class="feedback-text">意见反馈</text>
+        <text class="feedback-arrow">›</text>
       </view>
 
       <view class="sleep-cancel-link" bindtap="hideBabyPanel">关闭</view>
     </view>
   </view>
+
+  <!-- 意见反馈弹层（半屏表单：反馈类型 + 内容 + 联系方式） -->
+  <view class="sheet-mask feedback-mask" wx:if="{{showFeedbackSheet}}" bindtap="closeFeedback" catchtouchmove="noop">
+    <view class="feedback-panel" catchtap="noop">
+      <view class="sheet-handle" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
+      <view class="feedback-title">意见反馈</view>
+      <view class="feedback-sub">你的建议会帮助我们做得更好 🌱（约1-2个工作日查看）</view>
+
+      <scroll-view class="feedback-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+        <view class="feedback-inner">
+          <!-- 反馈类型 -->
+          <view class="feedback-type-row">
+            <view
+              class="feedback-type-btn {{feedbackType === item.key ? 'active' : ''}}"
+              wx:for="{{feedbackTypes}}" wx:key="key"
+              data-key="{{item.key}}"
+              bindtap="onFeedbackTypeTap"
+              hover-class="btn-hover"
+            >{{item.label}}</view>
+          </view>
+
+          <!-- 反馈内容 -->
+          <view class="feedback-label">反馈内容</view>
+          <textarea
+            class="feedback-textarea"
+            placeholder="请描述你遇到的问题或建议（必填）"
+            value="{{feedbackContent}}"
+            bindinput="onFeedbackInput"
+            maxlength="500"
+          ></textarea>
+          <view class="feedback-count">{{feedbackContent.length}}/500</view>
+
+          <!-- 联系方式（选填） -->
+          <view class="feedback-label">联系方式（选填）</view>
+          <input class="feedback-input" placeholder="微信号 / 手机号 / 邮箱" value="{{feedbackContact}}" bindinput="onFeedbackContactInput" maxlength="50" />
+
+          <view class="feedback-privacy-tip">仅用于就本次反馈与你沟通，不会用作其他用途</view>
+
+          <view class="feedback-actions">
+            <view class="feedback-cancel" bindtap="closeFeedback" hover-class="btn-hover">取消</view>
+            <view class="feedback-submit {{feedbackSending ? 'disabled' : ''}}" bindtap="submitFeedback" hover-class="btn-hover">{{feedbackSending ? '提交中…' : '提交反馈'}}</view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <!-- 登录引导面板（半屏弹层，游客关键操作时弹出） -->
+  <login-panel id="loginPanel" bind:change="onLoginPanelChange" />
 </view>

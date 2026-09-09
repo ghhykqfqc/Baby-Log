@@ -20,6 +20,16 @@
     </view>
   </view>
 
+  <!-- 游客引导条：本地暂存提示 → 点击弹登录面板（登录后数据长存） -->
+  <view class="sched-guest-tip" wx:if="{{isGuest}}" bindtap="openAddSheet" hover-class="sched-guest-tip-hover">
+    <text class="sched-guest-tip-icon">🔒</text>
+    <text class="sched-guest-tip-text">游客模式：新增的日程只保存在本机，登录后可永久同步到云端</text>
+    <text class="sched-guest-tip-btn">去登录</text>
+  </view>
+
+  <!-- ========== 可滚动内容区（游客提示条出现时页面超高也能纵向滚动） ========== -->
+  <scroll-view class="sched-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+
   <!-- ========== 最近未来事项倒计时 tips ========== -->
   <view class="sched-tips" wx:if="{{upcoming}}">
     <view class="sched-tips-icon">
@@ -127,6 +137,8 @@
 
   <!-- 底部弹性留白 -->
   <view class="sched-flex-spacer"></view>
+
+  </scroll-view>
 
   <!-- ========== 当日事项弹层 ========== -->
   <view class="sheet-mask" wx:if="{{showDaySheet}}" bindtap="closeDaySheet" catchtouchmove="noop">
@@ -382,4 +394,7 @@
       </view>
     </view>
   </view>
+
+  <!-- 登录引导面板（游客点击「＋ 添加日程」时弹出） -->
+  <login-panel id="loginPanel" bind:change="onLoginPanelChange" />
 </view>
