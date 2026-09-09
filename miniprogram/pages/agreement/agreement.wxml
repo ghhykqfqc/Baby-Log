@@ -1,0 +1,66 @@
+<!-- pages/agreement/agreement.wxml - 《用户协议》/《隐私政策》详情页
+  通过查询参数 type=user | privacy 复用同一页面展示两份协议 -->
+<view class="agreement-page">
+  <!-- 顶部品牌条 -->
+  <view class="doc-head">
+    <view class="doc-logo">👶</view>
+    <text class="doc-title">{{ title }}</text>
+    <text class="doc-sub">贝贝log · 极简育儿记录</text>
+  </view>
+
+  <!-- 正文滚动区 -->
+  <scroll-view class="doc-body" scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{scrollInto}}" bindscroll="onScroll">
+    <view class="doc-inner">
+      <view class="doc-meta">
+        <text class="doc-version">版本号：{{ version }}</text>
+        <text class="doc-date">更新日期：{{ updateDate }}</text>
+      </view>
+
+      <!-- 目录（点击可跳转章节） -->
+      <view class="doc-toc" wx:if="{{ sections.length > 0 }}">
+        <view class="toc-title">目 录</view>
+        <view
+          class="toc-item"
+          wx:for="{{ sections }}"
+          wx:key="anchor"
+          data-anchor="sec-{{ item.anchor }}"
+          bindtap="onTocTap"
+        >
+          <text class="toc-no">{{ item.no }}</text>
+          <text class="toc-name">{{ item.name }}</text>
+        </view>
+      </view>
+
+      <!-- 章节内容 -->
+      <view wx:for="{{ sections }}" wx:key="anchor" class="doc-section" id="sec-{{ item.anchor }}">
+        <view class="sec-title">
+          <text class="sec-no">{{ item.no }}</text>
+          <text class="sec-name">{{ item.name }}</text>
+        </view>
+        <view class="sec-body">
+          <block wx:for="{{ item.content }}" wx:for-item="para" wx:key="index">
+            <!-- 段落 -->
+            <text class="para" wx:if="{{ para.type === 'p' }}">{{ para.text }}</text>
+            <!-- 带缩进的多行条款（如 1.1.1） -->
+            <view class="para-indent" wx:elif="{{ para.type === 'li' }}">
+              <text class="para-li-prefix" wx:if="{{ para.prefix }}">{{ para.prefix }}</text>
+              <text class="para-li-text">{{ para.text }}</text>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <!-- 底部落款 -->
+      <view class="doc-tail">
+        <view class="tail-line"></view>
+        <text class="tail-text">感谢您选择「贝贝log」，愿我们一起守护宝宝成长的每一天。</text>
+        <text class="tail-copy">© {{ year }} 贝贝log 团队</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 回到顶部 -->
+  <view class="back-top" wx:if="{{ showBackTop }}" bindtap="scrollToTop">
+    <text class="back-top-icon">▲</text>
+  </view>
+</view>

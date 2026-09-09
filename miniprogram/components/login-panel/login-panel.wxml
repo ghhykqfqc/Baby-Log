@@ -1,0 +1,60 @@
+<!-- components/login-panel/login-panel.wxml - 登录引导面板（半屏弹层，非全屏遮挡） -->
+<view class="lp-mask" wx:if="{{visible}}" bindtap="onMaskTap" catchtouchmove="noop">
+  <!-- 半屏卡片（点击卡片自身不关闭） -->
+  <view class="lp-card" catchtap="noop">
+    <!-- 顶部把手 -->
+    <view class="lp-grabber"></view>
+
+    <!-- Logo 与标题 -->
+    <view class="lp-head">
+      <view class="lp-logo">👶</view>
+      <view class="lp-title">登录后数据永久保存</view>
+      <view class="lp-subtitle">现在登录，本地已有的记录会一并同步到云端，换手机也不丢</view>
+    </view>
+
+    <!-- 微信一键登录（官方推荐：open-type=getPhoneNumber 获取手机号） -->
+    <button
+      class="lp-btn-primary {{logging ? 'lp-btn-disabled' : ''}}"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+      disabled="{{logging}}"
+      hover-class="lp-btn-hover"
+    >
+      <text wx:if="{{!logging}}">微信一键登录</text>
+      <text wx:else>登录中...</text>
+    </button>
+
+    <!-- 协议勾选（合规：默认不勾选，未勾选点登录会提示） -->
+    <view class="lp-agree-row">
+      <view
+        class="lp-agree-check {{agreed ? 'lp-agree-checked' : ''}}"
+        bindtap="onToggleAgreement"
+        hover-class="lp-check-hover"
+        aria-role="checkbox"
+        aria-checked="{{agreed}}"
+        aria-label="同意用户协议和隐私政策"
+      >
+        <text class="lp-check-mark" wx:if="{{agreed}}">✓</text>
+      </view>
+      <view class="lp-agree-text" bindtap="onToggleAgreement">
+        <text>我已阅读并同意</text>
+        <text class="lp-link" catchtap="viewUserAgreement">《用户协议》</text>
+        <text>和</text>
+        <text class="lp-link" catchtap="viewPrivacyPolicy">《隐私政策》</text>
+      </view>
+    </view>
+
+    <!-- 稍后再说（游客继续浏览） -->
+    <view class="lp-ghost" bindtap="onGuest" hover-class="lp-ghost-hover">
+      暂不登录，先逛逛
+    </view>
+
+    <!-- 协议提示（底部，可点击跳转） -->
+    <view class="lp-protocol">
+      登录即代表同意
+      <text class="lp-link" catchtap="viewUserAgreement">《用户协议》</text>
+      与
+      <text class="lp-link" catchtap="viewPrivacyPolicy">《隐私政策》</text>
+    </view>
+  </view>
+</view>

@@ -42,13 +42,26 @@ async function safeDb(fn, fallback, collectionNames) {
 
 exports.main = async (event, context) => {
   const { OPENID } = cloud.getWXContext()
-  const { nickName, avatarUrl } = event
+  const { nickName, avatarUrl, phoneCode } = event
 
   if (!OPENID) {
     return { code: -1, message: '无法获取用户身份' }
   }
 
   const FALLBACK = { code: -1, message: '云端暂不可用，请稍后重试' }
+
+  // 若传入手机号授权 code，尝试换取手机号（换取失败不阻断登录）
+  let phoneNumber = ''
+  if (phoneCode) {
+    try {
+      const phoneRes = await cloud.openapi.phonenumber.getPhoneNumber({ code: phoneCode })
+      if (phoneRes && phoneRes.phoneInfo && phoneRes.phoneInfo.purePhoneNumber) {
+        phoneNumber = phoneRes.phoneInfo.purePhoneNumber
+      }
+    } catch (err) {
+      console.warn('手机号换取失败（不影响登录）:', err.errMsg || err.message || err)
+    }
+  }
 
   return safeDb(async () => {
     // 查找已有用户
@@ -62,6 +75,9 @@ exports.main = async (event, context) => {
       const update = { lastLoginAt: now }
       if (nickName) update.nickName = String(nickName).slice(0, 30)
       if (avatarUrl) update.avatarUrl = avatarUrl
+      if (phoneNumber) update.phoneNumber = phoneNumber
+      // 首次登录（此前无昵称）补默认昵称
+      if (!existRes.data[0].nickName && !update.nickName) update.nickName = '微信用户'
 
       await db.collection('users').doc(existRes.data[0]._id).update({ data: update })
       user = { ...existRes.data[0], ...update }
@@ -71,6 +87,7 @@ exports.main = async (event, context) => {
         openid: OPENID,
         nickName: (nickName || '微信用户').slice(0, 30),
         avatarUrl: avatarUrl || '',
+        phoneNumber,
         createdAt: now,
         lastLoginAt: now
       }

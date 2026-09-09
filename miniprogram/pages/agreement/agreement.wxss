@@ -1,0 +1,245 @@
+/* pages/agreement/agreement.wxss - 协议详情页（奶咖色系，同 app.wxss 设计令牌） */
+.agreement-page {
+  --color-primary: #D4B896;
+  --color-primary-dark: #C0A07A;
+  --color-primary-light: #E8D5B8;
+  --color-primary-bg: #F5EBDD;
+  --color-text-primary: #3D3027;
+  --color-text-secondary: #8B7D6E;
+  --color-text-hint: #B5A795;
+  --color-divider: #F0E8DE;
+
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg, #FAF6F0);
+  overflow: hidden;
+}
+
+/* ===== 顶部品牌条 ===== */
+.doc-head {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48rpx 40rpx 36rpx;
+  background: linear-gradient(180deg, #FAF6F0 0%, #F2E8D8 100%);
+}
+
+.doc-logo {
+  width: 96rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+  font-size: 52rpx;
+  background: #FFFFFF;
+  border-radius: 28rpx;
+  box-shadow: 0 8rpx 24rpx rgba(180, 150, 110, 0.25);
+}
+
+.doc-title {
+  margin-top: 20rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: 2rpx;
+}
+
+.doc-sub {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  letter-spacing: 1rpx;
+}
+
+/* ===== 正文滚动区 ===== */
+.doc-body {
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.doc-inner {
+  padding: 32rpx 40rpx calc(env(safe-area-inset-bottom) + 80rpx);
+  box-sizing: border-box;
+}
+
+/* 版本信息 */
+.doc-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 22rpx;
+  color: var(--color-text-hint);
+  margin-bottom: 24rpx;
+  line-height: 1.7;
+}
+
+/* ===== 目录 ===== */
+.doc-toc {
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx 32rpx;
+  box-shadow: 0 4rpx 20rpx rgba(180, 150, 110, 0.10);
+  margin-bottom: 32rpx;
+}
+
+.toc-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: 4rpx;
+  margin-bottom: 16rpx;
+}
+
+.toc-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 14rpx 8rpx;
+  border-bottom: 1rpx solid var(--color-bg, #FAF6F0);
+}
+
+.toc-item:last-child {
+  border-bottom: none;
+}
+
+.toc-no {
+  width: 52rpx;
+  font-size: 24rpx;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.toc-name {
+  flex: 1;
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
+/* ===== 章节 ===== */
+.doc-section {
+  margin-bottom: 40rpx;
+}
+
+.sec-title {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.sec-no {
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #D4B896, #C0A07A);
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(212, 184, 150, 0.4);
+  flex-shrink: 0;
+}
+
+.sec-name {
+  margin-left: 20rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: 1rpx;
+}
+
+.sec-body {
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx 32rpx;
+  box-shadow: 0 4rpx 20rpx rgba(180, 150, 110, 0.08);
+}
+
+/* 普通段落 */
+.para {
+  display: block;
+  font-size: 26rpx;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+  margin-bottom: 16rpx;
+  text-align: justify;
+}
+
+/* 缩进条款（如 1.1.1） */
+.para-indent {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  margin-bottom: 12rpx;
+}
+
+.para-li-prefix {
+  font-size: 26rpx;
+  line-height: 1.8;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-right: 8rpx;
+}
+
+.para-li-text {
+  flex: 1;
+  font-size: 26rpx;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+  text-align: justify;
+}
+
+/* ===== 底部落款 ===== */
+.doc-tail {
+  margin-top: 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tail-line {
+  width: 120rpx;
+  height: 6rpx;
+  border-radius: 6rpx;
+  background: linear-gradient(90deg, #E8D5B8, #D4B896, #E8D5B8);
+  margin-bottom: 24rpx;
+}
+
+.tail-text {
+  font-size: 24rpx;
+  color: var(--color-text-hint);
+  text-align: center;
+  line-height: 1.7;
+}
+
+.tail-copy {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #C9BEB1;
+}
+
+/* ===== 回到顶部 ===== */
+.back-top {
+  position: fixed;
+  right: 32rpx;
+  bottom: calc(env(safe-area-inset-bottom) + 80rpx);
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6rpx 20rpx rgba(180, 150, 110, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.back-top-icon {
+  font-size: 28rpx;
+  color: var(--color-primary-dark);
+}

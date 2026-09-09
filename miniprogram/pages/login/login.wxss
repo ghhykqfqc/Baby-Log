@@ -184,6 +184,74 @@
   box-shadow: none;
 }
 
+/* 游客入口（先体验后授权） */
+.guest-row {
+  margin-top: 28rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 44rpx;
+  background: #FAF6F0;
+  color: var(--text-sub);
+  font-size: 30rpx;
+}
+
+/* ===== 协议勾选（合规：默认不勾选） ===== */
+.agreement-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  margin-top: 28rpx;
+  padding: 4rpx 0;
+}
+
+.agree-check {
+  width: 36rpx;
+  height: 36rpx;
+  min-width: 36rpx;
+  border-radius: 50%;
+  border: 3rpx solid #D8CBB8;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4rpx;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.agree-check.agreed {
+  background: linear-gradient(135deg, #D4B896, #C0A07A);
+  border-color: #C0A07A;
+}
+
+.check-mark {
+  font-size: 22rpx;
+  color: #FFFFFF;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.check-hover {
+  opacity: 0.8;
+}
+
+.agree-text {
+  margin-left: 12rpx;
+  font-size: 24rpx;
+  color: var(--text-sub);
+  line-height: 1.6;
+  flex: 1;
+  text-align: left;
+}
+
+/* 可点击的协议链接（主色高亮示意可点击） */
+.protocol-link {
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
 /* 协议 */
 .protocol {
   position: absolute;
@@ -193,8 +261,4 @@
   text-align: center;
   font-size: 22rpx;
   color: var(--text-sub);
-}
-
-.protocol-link {
-  color: var(--primary-dark);
 }

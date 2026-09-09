@@ -1,4 +1,4 @@
-<!-- pages/login/login.wxml -->
+<!-- pages/login/login.wxml - 登录/注册（游客可跳过，先体验后授权） -->
 <view class="login-page">
   <!-- 顶部品牌区 -->
   <view class="brand">
@@ -9,33 +9,49 @@
 
   <!-- 登录卡片 -->
   <view class="card">
-    <view class="card-title">使用前请先登录</view>
-    <view class="card-desc">授权微信头像和昵称，开启宝宝记录之旅</view>
+    <view class="card-title">开始记录宝宝的每一天</view>
+    <view class="card-desc">登录后可永久保存数据并与家人共享；游客模式也随时可用</view>
 
-    <!-- 微信一键登录按钮（使用 open-type=chooseAvatar + nickname input） -->
-    <button class="login-btn" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar" hover-class="btn-hover">
-      <image wx:if="{{avatarUrl}}" class="login-avatar" src="{{avatarUrl}}" mode="aspectFill"></image>
-      <view wx:else class="login-avatar placeholder">📷</view>
-      <view class="login-btn-text">
-        <view class="login-btn-title">{{ avatarUrl ? '已选择头像' : '点击选择头像' }}</view>
-        <view class="login-btn-tip">使用我的微信头像</view>
-      </view>
-    </button>
-
-    <!-- 昵称输入 -->
-    <view class="nickname-row">
-      <input class="nickname-input" type="nickname" placeholder="点击输入昵称" value="{{nickName}}" bindinput="onNickInput" bindblur="onNickInput" maxlength="20" />
-    </view>
-
-    <!-- 登录按钮 -->
-    <button class="primary-btn {{(!avatarUrl || !nickName || logging) ? 'disabled' : ''}}" bindtap="handleLogin" disabled="{{logging}}">
-      <text wx:if="{{!logging}}">登录</text>
+    <!-- 微信一键登录（官方推荐：getPhoneNumber 获取手机号；头像昵称选填） -->
+    <button
+      class="primary-btn {{logging ? 'disabled' : ''}}"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+      disabled="{{logging}}"
+      hover-class="btn-hover"
+    >
+      <text wx:if="{{!logging}}">微信一键登录</text>
       <text wx:else>登录中...</text>
     </button>
+
+    <!-- 协议勾选（默认不勾选；未勾选点登录会提示） -->
+    <view class="agreement-row">
+      <view
+        class="agree-check {{agreed ? 'agreed' : ''}}"
+        bindtap="onToggleAgreement"
+        hover-class="check-hover"
+        aria-role="checkbox"
+        aria-checked="{{agreed}}"
+        aria-label="同意用户协议和隐私政策"
+      >
+        <text class="check-mark" wx:if="{{agreed}}">✓</text>
+      </view>
+      <view class="agree-text" bindtap="onToggleAgreement">
+        <text>我已阅读并同意</text>
+        <text class="protocol-link" catchtap="viewUserAgreement">《用户协议》</text>
+        <text>和</text>
+        <text class="protocol-link" catchtap="viewPrivacyPolicy">《隐私政策》</text>
+      </view>
+    </view>
+
+    <!-- 游客入口（先体验，后授权） -->
+    <view class="guest-row" bindtap="enterAsGuest" hover-class="btn-hover">
+      暂不登录，先逛逛
+    </view>
   </view>
 
-  <!-- 协议提示 -->
+  <!-- 协议提示（底部，已升级为可点击的链接） -->
   <view class="protocol">
-    登录即表示同意 <text class="protocol-link">《用户协议》</text> 和 <text class="protocol-link">《隐私政策》</text>
+    登录即表示同意 <text class="protocol-link" bindtap="viewUserAgreement">《用户协议》</text> 和 <text class="protocol-link" bindtap="viewPrivacyPolicy">《隐私政策》</text>
   </view>
 </view>

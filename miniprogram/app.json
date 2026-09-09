@@ -8,7 +8,8 @@
     "pages/history/history",
     "pages/profile/profile",
     "pages/share/share",
-    "pages/schedule/schedule"
+    "pages/schedule/schedule",
+    "pages/agreement/agreement"
   ],
   "window": {
     "backgroundColor": "#FAF6F0",
@@ -55,13 +56,5 @@
   "cloud": true,
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents",
-  "requiredPrivateInfos": [
-    "getLocation"
-  ],
-  "permission": {
-    "scope.userLocation": {
-      "desc": "用于记录宝宝的作息数据"
-    }
-  }
+  "lazyCodeLoading": "requiredComponents"
 }
