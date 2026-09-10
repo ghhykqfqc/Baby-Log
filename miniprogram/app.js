@@ -85,6 +85,14 @@ App({
     // 恢复本地缓存
     this.restoreFromStorage()
 
+    // 恢复「云端写入失败」的待同步队列（重启后不丢失，保证记录最终上云）
+    try {
+      const savedPending = wx.getStorageSync('pendingSync')
+      if (Array.isArray(savedPending) && savedPending.length > 0) {
+        this.globalData.pendingSync = savedPending
+      }
+    } catch (e) {}
+
     // 游客启动：清掉「上一个登录账号」遗留的业务缓存，保证游客只见自己的本地数据
     if (!this.isLoggedIn()) {
       this.clearGuestVisibleCache()

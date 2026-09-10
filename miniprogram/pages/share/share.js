@@ -219,6 +219,10 @@ Page({
     this._avatarPath = await this.prepareAvatarPath()
 
     // 优先尝试云端（云环境就绪且在线时）
+    // 防抖：云函数在 UTC 时区解析日期曾有 8h 偏移 bug（北京 0~8 点统计为 0），
+    // 且 addRecord 失败时记录只落本地 todayRecords——云端返回全 0 不代表真的没有记录。
+    // 因此统一策略：云端成功返回后，若三项全 0，用本地今日记录核对兜底，保证分享图与首页一致。
+    let usedCloud = false
     if (app.globalData.isOnline && app.globalData.cloudReady) {
       try {
         const result = await call('getDailySummary', {
@@ -227,23 +231,28 @@ Page({
         })
 
         if (result) {
-          this.setData({
-            summary: {
-              feedCount: result.feedCount || 0,
-              diaperCount: result.diaperCount || 0,
-              sleepDuration: result.sleepDuration || 0,
-              sleepText: minutesToText(result.sleepDuration || 0),
-              feedAmount: result.feedAmount || 0,
-              firstFeedTime: result.firstFeedTime ? this.formatTime(result.firstFeedTime) : '--',
-              lastFeedTime: result.lastFeedTime ? this.formatTime(result.lastFeedTime) : '--'
-            },
-            dataSource: '☁️ 数据来自云端'
-          })
+          const cloudHasData = (result.feedCount > 0) || (result.diaperCount > 0) || (result.sleepDuration > 0)
+          if (cloudHasData) {
+            this.setData({
+              summary: {
+                feedCount: result.feedCount || 0,
+                diaperCount: result.diaperCount || 0,
+                sleepDuration: result.sleepDuration || 0,
+                sleepText: minutesToText(result.sleepDuration || 0),
+                feedAmount: result.feedAmount || 0,
+                firstFeedTime: result.firstFeedTime ? this.formatTime(result.firstFeedTime) : '--',
+                lastFeedTime: result.lastFeedTime ? this.formatTime(result.lastFeedTime) : '--'
+              },
+              dataSource: '☁️ 数据来自云端'
+            })
+            usedCloud = true
+          }
+          // 云端返回全 0 → 落到下方 loadFromCache() 用本地今日记录兜底
         }
       } catch (err) {
         console.warn('云端拉取失败，尝试本地缓存:', (err && err.message) || (err && err.errMsg) || err)
-        this.loadFromCache()
       }
+      if (!usedCloud) this.loadFromCache()
     } else {
       this.loadFromCache()
     }
@@ -295,9 +304,19 @@ Page({
 
   /**
    * 从本地缓存加载数据（仅当目标日期是今天时才有意义）
+   * todayRecords 可能有纯数组或 { feed, diaper, sleep } 两种结构，统一兼容
    */
   loadFromCache() {
-    const todayRecords = wx.getStorageSync('todayRecords') || []
+    // 仅「今天」的分享用本地缓存兜底；查历史日期时本地缓存语义不符，保持全 0
+    const today = this.getLocalDate()
+    if (this.targetDate && this.targetDate !== today) {
+      return
+    }
+    const raw = wx.getStorageSync('todayRecords') || []
+    // 兼容对象结构 { feed: [], diaper: [], sleep: [] }
+    const todayRecords = Array.isArray(raw)
+      ? raw
+      : (raw.feed || []).concat(raw.diaper || [], raw.sleep || [])
     const feedCount = todayRecords.filter(r => r.recordType === 'feed').length
     const diaperCount = todayRecords.filter(r => r.recordType === 'diaper').length
     const sleepDuration = todayRecords
@@ -452,15 +471,26 @@ Page({
     ctx.fillStyle = '#5D4F3F'
 
     // 第一行：喝奶
+    // 注意：measureText 必须在「绘制字体」下测量，改 font 后测量会偏差导致文字重叠
     ctx.font = 'bold 18px sans-serif'
     ctx.fillText(`今天喝了`, padding, y)
     ctx.fillStyle = '#E89B5F'
     ctx.font = 'bold 24px sans-serif'
     const feedText = `${this.data.summary.feedCount}`
     ctx.fillText(feedText, padding + 85, y)
+    // 先测量（font 仍未 24px），再切回 18px 绘制后续文本
+    const feedTextW = ctx.measureText(feedText).width
     ctx.fillStyle = '#5D4F3F'
     ctx.font = 'bold 18px sans-serif'
-    ctx.fillText(`顿奶，攒了`, padding + 85 + ctx.measureText(feedText).width + 6, y)
+    // 喂奶行以「顿奶」收尾，不再加「攒了」——由睡眠行统一引出「攒了 X 的觉」，避免语义重复
+    const feedTextRow = `顿奶`
+    const feedRowX = padding + 85 + feedTextW + 6
+    ctx.fillText(feedTextRow, feedRowX, y)
+    // 奶瓶小表情紧跟「顿奶」后：先测量文本宽度（font 仍为 18px，避免测宽偏差），再切 15px 绘制，避免重叠
+    const feedRowW = ctx.measureText(feedTextRow).width
+    ctx.fillStyle = '#E89B5F'
+    ctx.font = 'bold 15px sans-serif'
+    ctx.fillText('🍼', feedRowX + feedRowW + 8, y + 1)
 
     // 睡眠：攒了 X 小时 Y 分的觉（sleepDuration 是分钟数，转小时+分钟展示；0 显示「还没睡过觉」更友好）
     y += lineH
@@ -477,9 +507,13 @@ Page({
     ctx.font = 'bold 18px sans-serif'
     ctx.fillText(sleepText, padding, y)
     if (sleepMin > 0) {
+      // 必须在改写 font 前测量：sleepText 用 18px 绘制，
+      // 若先切到 15px 再 measureText，测量值偏小约 17%，
+      // emoji 起点左移，会与「觉」字重叠（文本越长偏差越大）
+      const sleepW = ctx.measureText(sleepText).width
       ctx.fillStyle = '#7AAFA8'
       ctx.font = 'bold 15px sans-serif'
-      ctx.fillText('😴', padding + ctx.measureText(sleepText).width + 6, y + 1)
+      ctx.fillText('😴', padding + sleepW + 8, y + 1)
     }
 
     // 换尿布
@@ -491,9 +525,11 @@ Page({
     ctx.font = 'bold 24px sans-serif'
     const diaperText = `${this.data.summary.diaperCount}`
     ctx.fillText(diaperText, padding + 45, y)
+    // 先测量（font 仍为 24px），再切回 18px 绘制后续文本，避免重叠
+    const diaperTextW = ctx.measureText(diaperText).width
     ctx.fillStyle = '#5D4F3F'
     ctx.font = 'bold 18px sans-serif'
-    ctx.fillText(`次尿布，全是黄金便 💩`, padding + 45 + ctx.measureText(diaperText).width + 6, y)
+    ctx.fillText(`次尿布，全是黄金便 💩`, padding + 45 + diaperTextW + 6, y)
 
     // ===== 分隔小爱心 =====
     ctx.textAlign = 'center'
@@ -551,12 +587,30 @@ Page({
     }
 
     // ===== 业绩勋章墙（三行，每行三段式） =====
-    const sleepHours = Math.floor(this.data.summary.sleepDuration / 60) || 0
+    // 睡眠时长精确到分钟：不足 1 小时显示「X 分钟」（避免显示 0 小时被误以为没睡）；
+    // 超过 1 小时带零头显示「X小时Y分」。
+    const sleepMin = this.data.summary.sleepDuration || 0
+    const sleepH = Math.floor(sleepMin / 60)
+    const sleepRM = sleepMin % 60
+    let sleepValue, sleepUnit
+    if (sleepMin <= 0) {
+      sleepValue = '0'
+      sleepUnit = '分钟'
+    } else if (sleepH === 0) {
+      sleepValue = `${sleepMin}`
+      sleepUnit = '分钟'
+    } else if (sleepRM === 0) {
+      sleepValue = `${sleepH}`
+      sleepUnit = '小时'
+    } else {
+      sleepValue = `${sleepH}小时${sleepRM}分`
+      sleepUnit = ''
+    }
     const awakeTimes = Math.max(0, Math.floor(this.data.summary.feedCount / 3))
     const medals = [
       { icon: '🍼', title: '干饭王',  value: `${this.data.summary.feedCount}`,  unit: '顿',  suffix: '嗝~',          color: '#E89B5F', bg: '#FCE8D6' },
-      { icon: '😴', title: '睡眠KPI', value: `${sleepHours}`,                   unit: '小时', suffix: `醒了${awakeTimes}次`, color: '#8B7AAA', bg: '#EDE6F5' },
-      { icon: '🧷', title: '清洁工',  value: `${this.data.summary.diaperCount}`, unit: '次',  suffix: '辛苦啦',       color: '#7AAFA8', bg: '#E2EFED' }
+      { icon: '😴', title: '睡眠KPI', value: sleepValue,                        unit: sleepUnit, suffix: `醒了${awakeTimes}次`, color: '#8B7AAA', bg: '#EDE6F5' },
+      { icon: '🧷', title: '清洁工',  value: `${this.data.summary.diaperCount}`, unit: '次',  suffix: '辛苦啦',    color: '#7AAFA8', bg: '#E2EFED' }
     ]
 
     let y = 232
@@ -689,10 +743,21 @@ Page({
     ctx.stroke()
 
     // ===== 大号图标 + 数字 =====
+    // 睡眠时长精确到分钟：不足 1 小时显示「X 分钟」，避免「0 小时」误导
+    const sleepMinSimple = this.data.summary.sleepDuration || 0
+    const sleepHSimple = Math.floor(sleepMinSimple / 60)
+    const sleepRMSimple = sleepMinSimple % 60
+    const sleepValueSimple = sleepMinSimple <= 0
+      ? '0 分钟'
+      : sleepHSimple === 0
+        ? `${sleepMinSimple} 分钟`
+        : sleepRMSimple === 0
+          ? `${sleepHSimple} 小时`
+          : `${sleepHSimple} 小时 ${sleepRMSimple} 分`
     const itemH = 102
     const items = [
       { icon: '🍼', label: '吃了', value: `${this.data.summary.feedCount} 次`, color: '#E89B5F' },
-      { icon: '😴', label: '睡了', value: `${Math.floor(this.data.summary.sleepDuration / 60) || 0} 小时`, color: '#8B7AAA' },
+      { icon: '😴', label: '睡了', value: sleepValueSimple, color: '#8B7AAA' },
       { icon: '💩', label: '便便', value: `${this.data.summary.diaperCount} 次换洗`, color: '#7AAFA8' }
     ]
 

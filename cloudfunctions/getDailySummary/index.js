@@ -87,15 +87,24 @@ exports.main = async (event, context) => {
     }
   }
 
-  // 计算当日时间范围
-  const targetDate = date ? new Date(date) : new Date()
-  const dayStart = new Date(targetDate)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(targetDate)
-  dayEnd.setHours(23, 59, 59, 999)
-
-  const startTs = dayStart.getTime()
-  const endTs = dayEnd.getTime()
+  // 计算当日时间范围（北京时间 0 点 = 前一天 UTC 16 点）
+  // 注意：云函数运行在 UTC 时区，直接 new Date('YYYY-MM-DD') 会解析成 UTC 零点（=北京 8 点），
+  // 导致北京 0~8 点之间的记录被排除、跨凌晨时段统计全部为 0。
+  // 修正：先把 date 按「北京时间」显式拆成年月日，再 -8h 换算成 UTC 毫秒时间戳。
+  let year, month, day
+  const match = date ? String(date).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/) : null
+  if (match) {
+    year = parseInt(match[1], 10)
+    month = parseInt(match[2], 10)
+    day = parseInt(match[3], 10)
+  } else {
+    const now = new Date(Date.now() + 8 * 3600 * 1000) // 当前北京时间
+    year = now.getUTCFullYear()
+    month = now.getUTCMonth() + 1
+    day = now.getUTCDate()
+  }
+  const startTs = Date.UTC(year, month - 1, day) - 8 * 3600 * 1000 // 北京 0:00
+  const endTs = startTs + 24 * 3600 * 1000 - 1                      // 北京 23:59:59.999
 
   // 集合缺失时返回空统计，前端回退本地缓存
   const FALLBACK = {

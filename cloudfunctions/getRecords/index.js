@@ -86,7 +86,7 @@ exports.main = async (event, context) => {
     return { code: 0, data: { records: [], total: 0 } }
   }
 
-  // 计算时间范围
+  // 计算时间范围（最近 N 天的滚动窗口，含凌晨记录，不受 UTC 时区影响）
   const now = Date.now()
   const startTime = now - days * 24 * 60 * 60 * 1000
 
