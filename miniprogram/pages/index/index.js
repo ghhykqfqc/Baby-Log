@@ -171,6 +171,15 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().switchTab('pages/index/index')
     }
+    // 从分享落地页「去登录」跳回时，自动弹出登录面板
+    try {
+      if (wx.getStorageSync('autoOpenLogin')) {
+        wx.removeStorageSync('autoOpenLogin')
+        if (!app.isLoggedIn() && !this.data.showLoginPanel) {
+          this.setData({ showLoginPanel: true })
+        }
+      }
+    } catch (e) {}
     // 同步当前用户与宝宝信息到视图
     this.syncGlobalToView()
     this.loadAlbum()
@@ -2174,13 +2183,13 @@ loadAlbum(babyId) {
 
   onShareAppMessage() {
     return {
-      title: '贝贝log - 极简育儿记录',
+      title: '宝宝日志 - 智能预测宝宝作息',
       path: '/pages/index/index'
     }
   },
 
   onShareTimeline() {
-    return { title: '我用贝贝log轻松记录宝宝作息' }
+    return { title: '我用宝宝日志科学记录宝宝作息' }
   },
 
   // ============================================

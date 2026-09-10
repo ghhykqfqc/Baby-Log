@@ -4,14 +4,37 @@
   <!-- 游客拦截占位：分享卡含宝宝数据，游客不可生成 -->
   <view class="guest-block" wx:if="{{guestBlocked}}">
     <view class="guest-block-icon">🔒</view>
-    <view class="guest-block-title">登录后才能生成分享卡</view>
-    <view class="guest-block-sub">分享卡包含宝宝信息与今日记录，游客模式不可查看</view>
+    <view class="guest-block-title">登录后才能查看分享卡</view>
+    <view class="guest-block-sub">这是家人分享的宝宝记录卡片，登录后即可查看并继续记录宝宝点滴</view>
     <view class="guest-block-btn" bindtap="guestGoLogin">去登录</view>
     <view class="guest-block-back" bindtap="guestGoBack">返回</view>
   </view>
 
-  <!-- 正常内容（仅登录态显示） -->
-  <block wx:if="{{!guestBlocked}}">
+  <!-- 无权限查看分享的宝宝（非家庭成员） -->
+  <view class="guest-block" wx:elif="{{accessDenied}}">
+    <view class="guest-block-icon">🔍</view>
+    <view class="guest-block-title">暂无法查看该分享</view>
+    <view class="guest-block-sub">分享的宝宝记录属于家庭成员数据，请先在首页「家庭共享」中加入该宝宝</view>
+    <view class="guest-block-btn" bindtap="goHome">去首页</view>
+    <view class="guest-block-back" bindtap="guestGoBack">返回</view>
+  </view>
+
+  <!-- 正常内容（登录态或有分享快照时显示；无权限访问才拦截） -->
+  <block wx:if="{{!guestBlocked && !accessDenied}}">
+
+  <!-- 分享落地引导条：来自家人分享的卡片，提供「登录 / 首页」捷径（游客也可完整浏览） -->
+  <view class="shared-banner" wx:if="{{sharedView}}">
+    <view class="shared-banner-icon">💌</view>
+    <view class="shared-banner-text">
+      <view class="shared-banner-title">这是家人分享的宝宝日志</view>
+      <view class="shared-banner-sub">登录后即可创建自己的宝宝，开始记录成长点滴</view>
+    </view>
+    <view class="shared-banner-actions">
+      <view class="shared-banner-btn primary" bindtap="guestGoLogin">登录</view>
+      <view class="shared-banner-btn ghost" bindtap="goHome">首页</view>
+    </view>
+  </view>
+
   <!-- 顶部标题栏 -->
   <view class="share-header">
     <view class="title">每日小结</view>
@@ -54,7 +77,7 @@
     <text class="source-text">{{dataSource}}</text>
   </view>
 
-  <!-- 操作按钮 -->
+  <!-- 操作按钮（分享落地视图同样完整可用，游客保存/分享仅基于快照数据，无云端写入） -->
   <view class="actions">
     <view class="action-btn primary" bindtap="saveImage">
       <text>💾 保存图片到相册</text>

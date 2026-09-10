@@ -1,8 +1,8 @@
 <div align="center">
 
-# 贝贝log
+# 宝宝日志log
 
-**极简育儿记录 · 让单手抱娃也能轻松记账**
+**科学育娃 · 智能预测宝宝作息**
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-WeChat%20Mini%20Program-07c160.svg)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
@@ -11,7 +11,7 @@
 
 </div>
 
-> 一款面向新手父母的育儿记录小程序。单手抱娃也能三秒打卡，离线可用、自动同步，记录宝宝每一天的成长。
+> 一款面向新手父母的科学育娃小程序。随手记录宝宝作息，智能预测辅助决策，离线可用、自动同步，记录宝宝每一天的成长。
 
 ---
 
@@ -303,7 +303,7 @@ baby-log/
 
 ## 🗺 路线图
 
-- [x] **v1.0** — 极简打卡 + 时光轴 + 成长档案 + 家庭共享
+- [x] **v1.0** — 科学打卡 + 时光轴 + 成长档案 + 家庭共享
 - [x] **v1.1** — 天气皮肤 + 相册 + 分享卡片
 - [x] **v1.2** — 日程事项 + 多宝宝管理 + 历史记录页
 - [ ] **v1.3** — 数据导出（CSV / PDF）

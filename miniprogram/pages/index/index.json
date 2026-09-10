@@ -4,6 +4,6 @@
     "login-panel": "../../components/login-panel/login-panel"
   },
   "navigationStyle": "default",
-  "navigationBarTitleText": "贝贝log",
+  "navigationBarTitleText": "宝宝日志",
   "disableScroll": true
 }

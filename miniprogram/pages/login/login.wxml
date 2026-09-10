@@ -3,8 +3,8 @@
   <!-- 顶部品牌区 -->
   <view class="brand">
     <view class="logo">👶</view>
-    <view class="brand-title">贝贝log</view>
-    <view class="brand-subtitle">极简育儿记录，一家人共同守护</view>
+    <view class="brand-title">宝宝日志</view>
+    <view class="brand-subtitle">科学育娃 · 智能预测宝宝作息</view>
   </view>
 
   <!-- 登录卡片 -->

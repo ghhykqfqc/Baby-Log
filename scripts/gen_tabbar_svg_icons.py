@@ -1,5 +1,5 @@
 """
-生成贝贝log tabBar PNG 图标（SVG 设计语言版）
+生成宝宝日志log tabBar PNG 图标（SVG 设计语言版）
 - 尺寸 81x81
 - 未选中：灰色 #B5A795
 - 选中：奶咖色 #D4B896

@@ -5,7 +5,7 @@
   <view class="doc-head">
     <view class="doc-logo">👶</view>
     <text class="doc-title">{{ title }}</text>
-    <text class="doc-sub">贝贝log · 极简育儿记录</text>
+    <text class="doc-sub">宝宝日志 · 科学育娃 · 智能预测宝宝作息</text>
   </view>
 
   <!-- 正文滚动区 -->
@@ -53,8 +53,8 @@
       <!-- 底部落款 -->
       <view class="doc-tail">
         <view class="tail-line"></view>
-        <text class="tail-text">感谢您选择「贝贝log」，愿我们一起守护宝宝成长的每一天。</text>
-        <text class="tail-copy">© {{ year }} 贝贝log 团队</text>
+        <text class="tail-text">感谢您选择「宝宝日志log」，愿我们一起守护宝宝成长的每一天。</text>
+        <text class="tail-copy">© {{ year }} 宝宝日志log 团队</text>
       </view>
     </view>
   </scroll-view>

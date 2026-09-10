@@ -28,7 +28,9 @@ Page({
       firstFeedTime: '--',
       lastFeedTime: '--'
     },
-    babyName: '宝宝'
+    babyName: '宝宝',
+    accessDenied: false,   // 无权限查看该宝宝分享（非家庭成员）
+    sharedView: false      // 分享落地视图：顶部显示「登录 / 首页」引导条
   },
 
   // Canvas 节点引用（保存避免重复查询）
@@ -47,41 +49,171 @@ Page({
    */
   QR_PATH: '/assets/qr-code.png',
 
-  onLoad() {
-    // 游客禁止进入分享页：分享卡包含宝宝姓名/头像/记录数据，属于云端宝宝信息，
-    // 游客模式彻底隔离（不读取任何历史 babyInfo，不生成含宝宝信息的图）
-    if (!app.isLoggedIn()) {
+  onLoad(options = {}) {
+    // 从分享卡片进入：携带 ?babyId=xxx&date=YYYY-MM-DD[&n=名字&f=次数&d=次数&s=分钟]
+    this.shareBabyId = (options && options.babyId) ? decodeURIComponent(options.babyId) : ''
+    this.shareDate = (options && options.date) ? decodeURIComponent(options.date) : this.getLocalDate()
+
+    // 分享快照：分享时随链接携带的摘要数据，供访客/游客直接渲染与分享图一致的卡片
+    this.snapshot = null
+    if (options && options.f !== undefined && options.d !== undefined && options.s !== undefined) {
+      this.snapshot = {
+        babyName: (options.n && decodeURIComponent(options.n)) || '',
+        feedCount: parseInt(options.f, 10) || 0,
+        diaperCount: parseInt(options.d, 10) || 0,
+        sleepDuration: parseInt(options.s, 10) || 0
+      }
+    }
+
+    // 游客登录态：有分享快照 → 直接渲染分享图（与图片内容一致，无需登录）；
+    // 无快照 → 分享页需生成新卡片，属云端宝宝数据，游客拦截
+    if (!app.isLoggedIn() && !this.snapshot) {
       this.setData({ guestBlocked: true, loading: false })
       return
     }
-    const today = new Date()
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-    this.setData({
-      todayLabel: `${today.getMonth() + 1}月${today.getDate()}日`,
-      weekdayText: `星期${weekdays[today.getDay()]}`
-    })
-    this.loadSummary()
+
+    // 携带快照：只对「自己当前宝宝」走云端实时数据（更权威）；
+    // 其他宝宝（含非成员的家人）一律用快照渲染，避免权限空数据
+    if (this.snapshot) {
+      const isOwn = !this.shareBabyId ||
+        this.shareBabyId === (app.globalData.babyId || 'default') ||
+        (app.globalData.babyInfo && app.globalData.babyInfo.babyId === this.shareBabyId)
+      if (isOwn) {
+        this.loadSummary()
+      } else {
+        this.renderFromSnapshot()
+      }
+      return
+    }
+
+    // 已登录、无快照：目标是其他宝宝时确认成员关系；否则正常加载
+    if (this.shareBabyId && this.shareBabyId !== (app.globalData.babyId || 'default')) {
+      this.ensureBabyAccess(this.shareBabyId)
+    } else {
+      this.loadSummary()
+    }
   },
 
   // ===== 游客拦截占位 =====
   guestGoLogin() {
-    wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/index/index' }) })
+    // 标记首页 onShow 自动弹出登录面板
+    try { wx.setStorageSync('autoOpenLogin', true) } catch (e) {}
+    wx.switchTab({ url: '/pages/index/index' })
   },
   guestGoBack() {
     wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/index/index' }) })
   },
+  goHome() {
+    wx.switchTab({ url: '/pages/index/index' })
+  },
 
   /**
-   * 拉取当日聚合数据
+   * 本地日期 YYYY-MM-DD（避免 toISOString 的 UTC 偏移导致日期错一天）
+   */
+  getLocalDate() {
+    const d = new Date()
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  },
+
+  /**
+   * 校验当前登录用户是否有权访问「分享进入」的宝宝
+   * 无权限时进入 accessDenied 引导态（不拉取任何数据）
+   */
+  async ensureBabyAccess(babyId) {
+    // 自己宝贝列表里存在 → 有权限，正常加载
+    const myBabies = app.globalData.babies || []
+    const mine = myBabies.some(b => b && b.babyId === babyId) ||
+      (app.globalData.babyInfo && app.globalData.babyInfo.babyId === babyId)
+    if (mine) {
+      this.loadSummary()
+      return
+    }
+    // 云端确认一次（本地缓存可能没有，但实际是家庭成员）
+    try {
+      const res = await wx.cloud.callFunction({ name: 'listBabies', data: {} })
+      const list = (res.result && res.result.data && res.result.data.babies) || []
+      if (list.some(b => b && b.babyId === babyId)) {
+        this.loadSummary()
+        return
+      }
+    } catch (err) { /* 云失败按无权限处理 */ }
+    this.setData({ accessDenied: true, loading: false })
+  },
+
+  /**
+   * 用分享链接携带的快照数据渲染卡片（分享卡进入的统一入口：游客/非成员也完整展示）
+   * 与分享图内容一致：宝宝名 + 日期 + 喂奶/尿布次数 + 睡眠时长
+   * 全程不调用任何云端接口（数据都在 URL 参数里），无需登录、无权限校验
+   */
+  async renderFromSnapshot() {
+    const snap = this.snapshot
+    const d = new Date((this.shareDate || this.getLocalDate()).replace(/-/g, '/'))
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+    this.setData({
+      babyName: snap.babyName || '宝宝',
+      todayLabel: `${d.getMonth() + 1}月${d.getDate()}日`,
+      weekdayText: `星期${weekdays[d.getDay()]}`,
+      summary: {
+        feedCount: snap.feedCount,
+        diaperCount: snap.diaperCount,
+        sleepDuration: snap.sleepDuration,
+        sleepText: minutesToText(snap.sleepDuration),
+        feedAmount: 0,
+        firstFeedTime: '--',
+        lastFeedTime: '--'
+      },
+      dataSource: '',
+      sharedView: true   // 分享落地视图：顶部显示「登录/首页」引导条
+    })
+    this.targetBabyId = this.shareBabyId || 'default'
+    this.targetDate = this.shareDate || this.getLocalDate()
+
+    this.setData({ loading: false })
+    setTimeout(() => this.initAndDraw(), 100)
+  },
+
+  /**
+   * 拉取当日聚合数据（支持指定日期与宝宝，用于分享落地页）
    */
   async loadSummary() {
     this.setData({ loading: true })
 
-    // 宝宝昵称
-    const babyInfo = wx.getStorageSync('babyInfo')
-    if (babyInfo && babyInfo.name) {
-      this.setData({ babyName: babyInfo.name })
+    const targetDate = this.shareDate || this.getLocalDate()
+    this.targetDate = targetDate
+    const targetBabyId = this.shareBabyId || app.globalData.babyId || 'default'
+    this.targetBabyId = targetBabyId
+
+    // 展示日期文案
+    const d = new Date(targetDate.replace(/-/g, '/'))
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+    if (!isNaN(d.getTime())) {
+      this.setData({
+        todayLabel: `${d.getMonth() + 1}月${d.getDate()}日`,
+        weekdayText: `星期${weekdays[d.getDay()]}`
+      })
     }
+
+    // 宝宝昵称（优先目标宝宝；分享进入的目标宝宝信息从全局宝宝列表取）
+    let babyName = ''
+    let targetInfo = null
+    const myBabies = app.globalData.babies || []
+    const target = myBabies.find(b => b && b.babyId === targetBabyId)
+    const babyInfo = wx.getStorageSync('babyInfo')
+    if (target && target.name) {
+      babyName = target.name
+      targetInfo = target
+    } else if (babyInfo && babyInfo.babyId === targetBabyId && babyInfo.name) {
+      babyName = babyInfo.name
+      targetInfo = babyInfo
+    } else if (babyInfo && babyInfo.name && !this.shareBabyId) {
+      babyName = babyInfo.name
+    }
+    // 从分享进入时，头像用目标宝宝的头像（仅当是自己宝宝或成员时才可能拿到）
+    if (targetInfo) {
+      try { wx.setStorageSync('shareTargetInfo', targetInfo) } catch (e) {}
+    }
+    this.setData({ babyName: babyName || '宝宝' })
 
     // 宝宝头像（优先云端，失败回退默认笑脸）
     this._avatarPath = await this.prepareAvatarPath()
@@ -90,8 +222,8 @@ Page({
     if (app.globalData.isOnline && app.globalData.cloudReady) {
       try {
         const result = await call('getDailySummary', {
-          babyId: app.globalData.babyId || 'default',
-          date: new Date().toISOString().slice(0, 10)
+          babyId: targetBabyId,
+          date: targetDate
         })
 
         if (result) {
@@ -126,10 +258,18 @@ Page({
    * 准备宝宝头像的本地可绘制路径
    * cloud fileID → 云端下载；http(s) → downloadFile；本地路径直接用
    * 任何失败都返回空串（绘制时回退默认笑脸）
+   * 头像来源：分享目标宝宝 > 本地缓存 babyInfo
    */
   async prepareAvatarPath() {
     try {
-      const babyInfo = wx.getStorageSync('babyInfo') || {}
+      let babyInfo = wx.getStorageSync('babyInfo') || {}
+      // 分享落地页：优先使用目标宝宝信息（全局宝宝列表里可找到）
+      if (this.shareBabyId) {
+        const shareTarget = wx.getStorageSync('shareTargetInfo')
+        if (shareTarget && shareTarget.babyId === this.shareBabyId) {
+          babyInfo = shareTarget
+        }
+      }
       const avatar = babyInfo.avatar
       if (!avatar) return ''
 
@@ -154,7 +294,7 @@ Page({
   },
 
   /**
-   * 从本地缓存加载数据
+   * 从本地缓存加载数据（仅当目标日期是今天时才有意义）
    */
   loadFromCache() {
     const todayRecords = wx.getStorageSync('todayRecords') || []
@@ -322,14 +462,25 @@ Page({
     ctx.font = 'bold 18px sans-serif'
     ctx.fillText(`顿奶，攒了`, padding + 85 + ctx.measureText(feedText).width + 6, y)
 
-    // 睡眠
+    // 睡眠：攒了 X 小时 Y 分的觉（sleepDuration 是分钟数，转小时+分钟展示；0 显示「还没睡过觉」更友好）
     y += lineH
-    const sleepHours = Math.floor(this.data.summary.sleepDuration / 60) || 0
+    const sleepMin = this.data.summary.sleepDuration || 0
+    const sleepH = Math.floor(sleepMin / 60)
+    const sleepM = sleepMin % 60
+    let sleepText = '今天还没睡过觉 😴'
+    if (sleepMin > 0) {
+      sleepText = sleepH > 0
+        ? (sleepM > 0 ? `攒了 ${sleepH}小时${sleepM}分 的觉` : `攒了 ${sleepH}小时 的觉`)
+        : `攒了 ${sleepM}分 的觉`
+    }
     ctx.fillStyle = '#5D4F3F'
     ctx.font = 'bold 18px sans-serif'
-    ctx.fillText(`${sleepHours} 个小觉`, padding, y)
-    ctx.fillStyle = '#7AAFA8'
-    ctx.fillText(`  😴`, padding + 100, y)
+    ctx.fillText(sleepText, padding, y)
+    if (sleepMin > 0) {
+      ctx.fillStyle = '#7AAFA8'
+      ctx.font = 'bold 15px sans-serif'
+      ctx.fillText('😴', padding + ctx.measureText(sleepText).width + 6, y + 1)
+    }
 
     // 换尿布
     y += lineH
@@ -609,7 +760,7 @@ Page({
     ctx.textAlign = 'left'
     ctx.fillStyle = opts.brandColor || '#3D3027'
     ctx.font = 'bold 15px sans-serif'
-    ctx.fillText('贝贝log', pad, H - 46)
+    ctx.fillText('宝宝日志', pad, H - 46)
 
     ctx.fillStyle = '#B5A795'
     ctx.font = '10px sans-serif'
@@ -947,9 +1098,23 @@ Page({
   },
 
   onShareAppMessage() {
+    // 分享落地页：带 babyId（宝宝标识）+ date（卡片日期）+
+    // 摘要快照（n=宝宝名 / f=喂奶次数 / d=尿布次数 / s=睡眠分钟）
+    // 家人点开 → 实时云端数据；访客/游客点开 → 直接用快照渲染同一张分享卡（与分享图内容一致）
+    const babyId = this.targetBabyId || app.globalData.babyId || 'default'
+    const date = this.targetDate || this.getLocalDate()
+    const s = this.data.summary || {}
+    const qs = [
+      `babyId=${encodeURIComponent(babyId)}`,
+      `date=${encodeURIComponent(date)}`,
+      `n=${encodeURIComponent(this.data.babyName || '')}`,
+      `f=${encodeURIComponent(s.feedCount || 0)}`,
+      `d=${encodeURIComponent(s.diaperCount || 0)}`,
+      `s=${encodeURIComponent(s.sleepDuration || 0)}`
+    ].join('&')
     return {
       title: `我家${this.data.babyName}今日作息小结（${this.data.todayLabel}）`,
-      path: '/pages/index/index',
+      path: `/pages/share/share?${qs}`,
       imageUrl: this.data.tempFilePath || ''
     }
   }

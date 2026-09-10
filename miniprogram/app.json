@@ -15,7 +15,7 @@
     "backgroundColor": "#FAF6F0",
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#FAF6F0",
-    "navigationBarTitleText": "贝贝log",
+    "navigationBarTitleText": "宝宝日志",
     "navigationBarTextStyle": "black",
     "navigationStyle": "default",
     "enablePullDownRefresh": false

@@ -956,7 +956,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '贝贝log - 看看宝宝今天的表现',
+      title: '宝宝日志 - 看看宝宝今天的表现',
       path: '/pages/timeline/timeline'
     }
   }
