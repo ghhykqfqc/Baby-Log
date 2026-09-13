@@ -71,7 +71,7 @@ Page({
       '8个月夜醒怎么办',
       '给宝宝说句鼓励的话'
     ],
-    aiTipText: '按住说话，或点一下问问育儿问题',
+    aiTipText: '轻点打字 · 按住说话',
     aiSubtitle: '',          // 单行字幕
     aiFullAnswer: '',        // 本次完整回答
     aiShowArrow: false,      // 是否显示 ∨ 展开箭头
@@ -79,11 +79,11 @@ Page({
     aiListening: false,      // 按住说话中
     aiTalking: false,        // 播报中（呼吸）
     aiWaveActive: false,     // CSS 声波条
-    aiSpeaking: false,       // 完整面板播报按钮状态
+    aiSpeaking: false,       // 播报状态
+    aiExpanded: false,       // 字幕区是否展开完整回答（支持再次点击收起）
     aiInputValue: '',
     aiInputFocus: false,
     showAiSheet: false,      // 文本输入弹层
-    showAiAnswerPanel: false, // 完整回答
     isOffline: false,
     cloudReady: true,
     todayText: '',
@@ -593,7 +593,7 @@ Page({
     this.setData({
       aiListening: false,
       aiWaveActive: false,
-      aiTipText: this.data.aiTipTextDefault || '按住说话，或点一下问问育儿问题'
+      aiTipText: this.data.aiTipTextDefault || '轻点打字 · 按住说话'
     })
   },
 
@@ -637,6 +637,7 @@ Page({
       aiSubtitle: '',
       aiFullAnswer: '',
       aiShowArrow: false,
+      aiExpanded: false,      // 新提问自动收起上一次的完整回答
       aiThinking: true,
       aiTipText: '小云朵思考中…'
     })
@@ -764,17 +765,22 @@ Page({
 
   /** 语音输入的场景：回答流式生成完成后自动播报（由 aiSend 的 promise 完成时触发） */
 
-  /** 展开完整回答 */
+  /** 展开 / 收起完整回答（字幕区内联展开，再次点击即收起） */
   showFullAnswer() {
-    if (!this.data.aiFullAnswer) return
-    this.setData({ showAiAnswerPanel: true, aiSpeaking: false, aiTalking: false, aiWaveActive: false })
+    const { aiFullAnswer, aiExpanded } = this.data
+    if (!aiFullAnswer) return
+    if (aiExpanded) {
+      this.hideAiAnswer()
+      return
+    }
+    this.setData({ aiExpanded: true, aiSpeaking: false, aiTalking: false, aiWaveActive: false })
     tts.stop()
   },
 
   hideAiAnswer() {
-    this.setData({ showAiAnswerPanel: false })
+    if (!this.data.aiExpanded) return
+    this.setData({ aiExpanded: false })
     this.aiStopSpeaking()
-    this._resumeRainIfNeeded()
   },
 
   copyAnswer() {
@@ -787,7 +793,7 @@ Page({
 
   resetAiTip() {
     this.setData({
-      aiTipText: '按住说话，或点一下问问育儿问题',
+      aiTipText: '轻点打字 · 按住说话',
       aiListening: false,
       aiWaveActive: false
     })
