@@ -303,3 +303,57 @@
 | 8 个云函数（getRecords/getGrowthData/getDailySummary/getSchedules/addGrowthData/updateGrowthData/updateRecord/feedback） | 权限校验 / 新增 |
 
 **待用户操作**：在微信开发者工具「云开发 → 云函数」中重新部署以上 8 个云函数（npm 安装依赖），前端改动上传后真机验证：游客模式分享/生成图/记录/日程不可见云端数据，登录后数据正常。
+
+---
+
+# 2026-09-12：内容安全改造（过审专项）
+
+> 背景：小程序曾被拒（照片上传未接入内容安全）。本次迭代：**删除全部 UGC 图片发布链路**，头像走微信官方组件+异步审核，新增「云朵 AI 育娃伙伴」，文本全链路 msgSecCheck 2.0。
+
+## 一、首页照片轮播区 → 云朵 AI 育娃伙伴（README § 核心功能）
+- 删除相册卡片 / 照片裁剪 / 上传入口，`pages/index` 不再有 `chooseMedia`
+- 云朵（132rpx 圆形 + CSS 声波动画）→ 轻点弹底部输入框 / 长按语音（350ms 触发）→ 快捷提问气泡
+- 打字机字幕（40ms/2 字，50 字/秒），∨ 展开完整回答（复制 / 播报 / 收起）
+- **语音输入回答完成后自动播报**（`aiSend(clean, {fromVoice:true})` → 打字机结束 300ms 后 `speakAnswer()`），防串台：`_aiAutoSpeakTimer` 在 `aiStopSpeaking` / 失败分支清理
+- DeepSeek-Flash 经 `wx.cloud.extend.AI.createModel('cloudbase').streamText`，云函数聚合返回，前端无密钥、无历史、无 UGC
+
+## 二、头像官方化 + 异步审核（mediaCheckAsync）
+- `profile` / `index` 头像选择改 `<button open-type="chooseAvatar">`（官方免裁剪、自带权限）
+- `utils/avatar.js`：上传 `avatars/pending/` → `avatarCheck(submit)` 提交 mediaCheckAsync → 轮询（800ms×8）→ 通过才展示；失败回退旧头像 + 「头像未通过安全检测，请换一张」
+- 审核中：灰底 + 「审核中…」徽标（`@keyframes audit-pulse`）
+- 云函数：`avatarCheck`（submit/query）+ `avatarCallback`（回调回写 `avatar_reviews`）
+
+## 三、文本全链路安检（msgSecCheck 2.0）
+| 位置 | scene | 实现 |
+|------|-------|------|
+| 昵称（新建/修改） | 1 | 前端 `textCheck` + 云函数 `createBaby/saveBabyInfo` 服务端二次校验 |
+| 日程标题/备注 | 4 | 前端 `textCheck` + `addSchedule/updateSchedule` 服务端二次校验 |
+| 反馈 | 4 | 前端 `textCheck` |
+| AI 输入/输出 | 4 | `aiChat` 云函数 msgSecCheck，不通过拒绝/拦截 |
+
+- 提示统一友好：「换个可爱的名字吧～」（昵称）/「换个说法吧～」（日程/反馈/对话）
+- 安检接口异常 → **降级放行**（记录日志不阻断），避免服务抖动影响用户
+- 4 个写云函数 `createBaby/saveBabyInfo/addSchedule/updateSchedule` package.json 升级 wx-server-sdk `~2.6.3 → ~4.0.1`
+
+## 四、文档
+- `docs/submit-guide.md`（新增）：过审自查清单 + 自测清单 + 提交备注模板
+- `README.md`：功能 / 技术栈 / 项目结构 / 数据模型（`avatar_reviews`）/ 路线图（v1.3 完成）更新
+
+## 本次改动文件（核心）
+| 文件 | 改动 |
+|------|------|
+| `cloudfunctions/aiChat/*` | 新增（输入/输出 msgSecCheck + DeepSeek-Flash） |
+| `cloudfunctions/textCheck/*` | 新增：纯文本安检 |
+| `cloudfunctions/avatarCheck/*` `avatarCallback/*` | 新增：头像异步审核 |
+| `cloudfunctions/createBaby/saveBabyInfo/addSchedule/updateSchedule` | 服务端 msgSecCheck + sdk 升级 |
+| `miniprogram/utils/tts.js`、`utils/avatar.js` | 新增：语音 / 头像审核工具 |
+| `miniprogram/pages/index/*` | AI 伙伴替换相册、头像官方化 |
+| `miniprogram/pages/profile/*` | 官方 chooseAvatar + 审核态 |
+| `miniprogram/app.json` | 声明 WechatSI 插件 |
+| `docs/submit-guide.md` | 新增过审指南 |
+| `README.md` | 功能 / 结构 / 技术栈更新 |
+
+**待用户操作**：
+1. 部署新云函数：`aiChat` / `textCheck` / `avatarCheck` / `avatarCallback`（右键 → 上传并部署：云端安装依赖）；重新部署 4 个升级 sdk 的写云函数
+2. 小程序后台：添加「微信同声传译」插件（AppID `wx069ba97219f66d99`）；更新隐私协议提及 AI 问答与内容安全
+3. 真机自测：AI 打字机自动播报、昵称/日程违规输入拦截、头像审核中态、语音长按识别

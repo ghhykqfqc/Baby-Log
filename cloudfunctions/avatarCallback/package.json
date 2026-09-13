@@ -1,0 +1,9 @@
+{
+  "name": "avatarCallback",
+  "version": "1.0.0",
+  "description": "接收微信 mediaCheckAsync 审核回调，更新头像审核状态",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.1"
+  }
+}

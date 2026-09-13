@@ -70,6 +70,26 @@ exports.main = async (event, context) => {
     return { code: -1, message: '请填写宝宝昵称' }
   }
 
+  const nameText = String(name).trim().slice(0, 30)
+
+  // ========== 文本安检：昵称必须过 msgSecCheck（scene=1 资料），不通过拒绝创建 ==========
+  // 服务端防线（前端 profile/index 保存时已先调 textCheck）；接口异常时降级放行并记录日志，
+  // 避免安检服务抖动导致用户无法创建宝宝
+  try {
+    const secRes = await cloud.openapi.security.msgSecCheck({
+      version: 2,
+      scene: 1,
+      openid: OPENID,
+      content: nameText
+    })
+    const suggest = ((secRes && secRes.result) || {}).suggest || 'pass'
+    if (suggest !== 'pass') {
+      return { code: -1, message: '换个可爱的名字吧～' }
+    }
+  } catch (err) {
+    console.error('createBaby msgSecCheck 失败（降级放行）:', (err && (err.errMsg || err.message)) || err)
+  }
+
   const FALLBACK = { code: -1, message: '云端暂不可用，请稍后重试' }
 
   return safeDb(async () => {
@@ -96,7 +116,7 @@ exports.main = async (event, context) => {
     const babyData = {
       babyId,
       babyCode,
-      name: String(name).trim().slice(0, 30),
+      name: nameText,
       avatar: avatar || '',
       birthDate: birthDate || '',
       gender: gender || '',

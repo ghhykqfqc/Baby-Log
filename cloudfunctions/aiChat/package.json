@@ -1,0 +1,9 @@
+{
+  "name": "aiChat",
+  "version": "1.0.0",
+  "description": "云朵 AI 育娃伙伴：msgSecCheck 双向安检 + DeepSeek 流式对话",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.1"
+  }
+}

@@ -77,15 +77,37 @@ exports.main = async (event, context) => {
   const isCustom = typeof category === 'string' && category.startsWith('custom_')
   const finalCategory = validCategories.includes(category) || isCustom ? category : 'other'
 
+  // ========== 文本安检：标题/备注必须过 msgSecCheck（scene=4 内容）==========
+  // title/note 为用户输入的自由文本，防脏词/广告/违规内容。接口异常降级放行并记录日志。
+  const titleText = String(title).trim().slice(0, 60)
+  const noteText = String(note || '').trim().slice(0, 200)
+  const combined = [titleText, noteText].filter(Boolean).join(' ')
+  if (combined) {
+    try {
+      const secRes = await cloud.openapi.security.msgSecCheck({
+        version: 2,
+        scene: 4,
+        openid: OPENID,
+        content: combined.slice(0, 500)
+      })
+      const suggest = ((secRes && secRes.result) || {}).suggest || 'pass'
+      if (suggest !== 'pass') {
+        return { code: -1, message: '换个说法吧～' }
+      }
+    } catch (err) {
+      console.error('addSchedule msgSecCheck 失败（降级放行）:', (err && (err.errMsg || err.message)) || err)
+    }
+  }
+
   const schedule = {
     babyId,
-    title,
+    title: titleText,
     category: finalCategory,
     date,
     startTime,
     endTime,
-    location,
-    note,
+    location: String(location || ''),
+    note: noteText,
     important: !!important,
     userId: OPENID,
     createdAt: new Date(),

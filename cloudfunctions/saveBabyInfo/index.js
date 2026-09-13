@@ -154,6 +154,25 @@ exports.main = async (event, context) => {
 
     if (name !== undefined) {
       update.name = String(name || '').trim().slice(0, 30)
+      // 昵称服务端安检（scene=1 资料）。前端 profile/index 保存时已先调 textCheck，
+      // 这里为纵深防线；接口异常降级放行并记录日志，避免安检抖动阻断保存
+      const nameText = update.name
+      if (nameText) {
+        try {
+          const secRes = await cloud.openapi.security.msgSecCheck({
+            version: 2,
+            scene: 1,
+            openid: OPENID,
+            content: nameText
+          })
+          const suggest = ((secRes && secRes.result) || {}).suggest || 'pass'
+          if (suggest !== 'pass') {
+            return { code: -1, message: '换个可爱的名字吧～' }
+          }
+        } catch (err) {
+          console.error('saveBabyInfo msgSecCheck 失败（降级放行）:', (err && (err.errMsg || err.message)) || err)
+        }
+      }
     }
     if (avatar !== undefined) {
       update.avatar = String(avatar || '')

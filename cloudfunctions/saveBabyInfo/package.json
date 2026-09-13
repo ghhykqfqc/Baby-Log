@@ -4,6 +4,6 @@
   "description": "保存宝宝资料（昵称、头像、出生日期等）",
   "main": "index.js",
   "dependencies": {
-    "wx-server-sdk": "~2.6.3"
+    "wx-server-sdk": "~4.0.1"
   }
 }

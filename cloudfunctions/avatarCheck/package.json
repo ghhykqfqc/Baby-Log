@@ -1,0 +1,9 @@
+{
+  "name": "avatarCheck",
+  "version": "1.0.0",
+  "description": "宝宝头像异步内容安全审核（mediaCheckAsync 兜底 + traceId 轮询）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.1"
+  }
+}

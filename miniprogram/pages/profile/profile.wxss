@@ -9,12 +9,33 @@
   background: var(--color-bg);
 }
 
-/* ===== 头像区 ===== */
+/* ===== 头像区（官方 chooseAvatar 按钮） ===== */
 .avatar-block {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 64rpx 0 56rpx;
+}
+
+/* 适配 button 的 reset */
+.avatar-block-btn {
+  padding: 24rpx 0 32rpx;
+}
+
+.avatar-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  line-height: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 0;
+}
+
+.avatar-btn::after {
+  border: none;
 }
 
 .avatar-ring {
@@ -44,6 +65,42 @@
 
 .avatar-emoji {
   font-size: 96rpx;
+}
+
+/* 审核中：默认灰色头像 + 右下角旋转小圆点徽标 */
+.avatar-auditing-emoji {
+  font-size: 96rpx;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.avatar-auditing-badge {
+  position: absolute;
+  right: -8rpx;
+  bottom: -8rpx;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  background: #8A8A8A;
+  color: #FFFFFF;
+  font-size: 18rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 20rpx;
+  border: 3rpx solid #FFFFFF;
+  white-space: nowrap;
+}
+
+.avatar-auditing-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #FFD76A;
+  animation: audit-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes audit-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
 
 .camera-badge {
@@ -147,102 +204,8 @@
   transform: scale(0.97);
 }
 
-/* ===== 裁剪弹层 ===== */
-.cropper-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.92);
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.cropper-header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: calc(env(safe-area-inset-top) + 88rpx);
-  padding-top: env(safe-area-inset-top);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-left: 32rpx;
-  padding-right: 32rpx;
-  box-sizing: border-box;
-}
-
-.cropper-btn-cancel,
-.cropper-btn-done {
-  font-size: 30rpx;
-  padding: 16rpx 8rpx;
-}
-
-.cropper-btn-cancel {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.cropper-btn-done {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.cropper-title {
-  font-size: 32rpx;
-  font-weight: 500;
-  color: #FFFFFF;
-}
-
-/* 裁剪舞台 */
-.cropper-stage {
-  position: relative;
-  background: #2A2A2A;
-  overflow: hidden;
-  border-radius: 8rpx;
-  touch-action: none;
-}
-
-.cropper-image {
-  position: absolute;
-  user-select: none;
-  pointer-events: none;
-}
-
-/* 中心镂空遮罩：用 box-shadow 扩展到很大范围实现（经典做法） */
-.cropper-frame {
-  position: absolute;
-  border: 2rpx solid rgba(255, 255, 255, 0.9);
-  pointer-events: none;
-  box-sizing: border-box;
-  /* 阴影扩展超大，覆盖裁剪框外部全部区域 */
-  box-shadow: 0 0 0 9999rpx rgba(0, 0, 0, 0.55);
-}
-
-.cropper-tip {
-  position: absolute;
-  bottom: calc(env(safe-area-inset-bottom) + 48rpx);
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-/* 裁剪导出用的隐藏 canvas（不可见但需要存在） */
-.crop-canvas-hidden {
-  position: fixed;
-  left: -9999rpx;
-  top: -9999rpx;
-  width: 256rpx;
-  height: 256rpx;
-}
 /* ============================================
-   新增：页面标题 / ID 区 / 性别选择
+   页面标题 / ID 区 / 性别选择
    ============================================ */
 .page-title {
   font-size: 36rpx;

@@ -1,0 +1,9 @@
+{
+  "name": "textCheck",
+  "version": "1.0.0",
+  "description": "纯文本内容安检（昵称/标签/反馈等），服务端 msgSecCheck",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.1"
+  }
+}

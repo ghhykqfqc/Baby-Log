@@ -57,8 +57,15 @@
 - 支持 9 种事项类别：疫苗 / 生日 / 预约 / 兴趣班 / 购物 / 礼物 / 红包 / 其他
 - 未来事项倒计时提示
 
+### 云朵 AI 育娃伙伴 · 即时问答
+- 首页云朵按钮：轻点文字提问 / 长按语音提问，快捷问题一键直达
+- 云端 DeepSeek-Flash 大模型，育儿问题专业回答，打字机字幕流式展示
+- 回答自动语音播报（微信同声传译插件 TTS），可手动暂停 / 重播 / 复制
+- 输入与输出双重内容安全（msgSecCheck 2.0），违规内容一律不返回
+
 ### 宝宝资料 · 多宝宝管理
-- 头像裁剪上传（自定义 Canvas 裁剪框）
+- 头像使用微信官方「微信头像昵称填写能力」（`open-type="chooseAvatar"`），免裁剪免权限
+- 头像上传后经微信异步内容安全审核（mediaCheckAsync），审核通过才展示
 - 多宝宝档案管理，支持切换
 - 宝宝 ID + 密码邀请家人共享
 
@@ -99,7 +106,10 @@
 | 后端 | 微信云开发（云函数 + 云数据库 + 云存储） |
 | 图表 | Canvas 2D API（生长曲线 / 时光轴 / 分享卡） |
 | 天气 | Open-Meteo + ipwho.is（免 Key） |
-| 基础库 | ≥ 3.5.0 |
+| AI 对话 | 微信云开发 AI 能力（DeepSeek-Flash，DeepSeek-V3 级推理） |
+| 语音 | 微信同声传译插件（TTS 播报 + 语音识别） |
+| 内容安全 | msgSecCheck 2.0 / mediaCheckAsync（微信官方内容安全） |
+| 基础库 | ≥ 3.15.1 |
 
 ---
 
@@ -147,6 +157,7 @@ const PROD_ENV = 'your-prod-env-id'  // 生产环境 ID（留空则回退到 DEV
 | `family_members` | 家庭成员关联 |
 | `invitations` | 邀请令牌 |
 | `schedules` | 日程事项 |
+| `avatar_reviews` | 头像异步审核记录（mediaCheckAsync traceId 状态） |
 
 ### 5. 运行预览
 
@@ -164,13 +175,13 @@ baby-log/
 │   ├── app.wxss                  # 全局样式（设计令牌 CSS 变量）
 │   ├── sitemap.json
 │   ├── pages/
-│   │   ├── index/                # 首页：天气皮肤 + 预测卡 + 相册 + 单行记录
+│   │   ├── index/                # 首页：天气皮肤 + 预测卡 + 云朵 AI + 单行记录
 │   │   ├── timeline/             # 时光轴：当日摘要 + 时间分布图
 │   │   ├── timeline-records/     # 时光记录详情：按日期分组、分页、删除
 │   │   ├── growth/               # 成长档案：焦点数据 + 生长曲线
 │   │   ├── history/              # 历史记录：成长数据历史 + 长按删除
 │   │   ├── schedule/             # 日程事项：日历视图 + 事项管理
-│   │   ├── profile/              # 宝宝资料：头像裁剪 + 多宝宝管理
+│   │   ├── profile/              # 宝宝资料：官方头像能力 + 多宝宝管理
 │   │   ├── share/                # 分享卡片：Canvas 绘制 + 小程序码
 │   │   └── login/                # 登录引导页
 │   ├── components/
@@ -182,10 +193,12 @@ baby-log/
 │   │   ├── storage.js            # 本地缓存封装
 │   │   ├── predict.js            # 智能预测算法
 │   │   ├── time.js               # 时间处理工具
+│   │   ├── tts.js                # 语音播报 + 语音识别（同声传译插件）
+│   │   ├── avatar.js             # 头像上传 + 异步审核（mediaCheckAsync）
 │   │   └── constants.js          # 常量
 │   ├── custom-tab-bar/           # 自定义 tabBar
 │   └── images/                   # 图标资源
-├── cloudfunctions/               # 云函数（共 27 个）
+├── cloudfunctions/               # 云函数（共 31 个）
 │   ├── addRecord/                # 新增作息记录
 │   ├── updateRecord/             # 更新记录
 │   ├── deleteRecord/             # 删除记录
@@ -210,7 +223,11 @@ baby-log/
 │   ├── userLogin/                # 用户登录
 │   ├── getOpenId/                # 获取 openid
 │   ├── getMiniProgramCode/       # 生成小程序码
-│   └── getWeather/               # 获取天气（IP 定位 + Open-Meteo）
+│   ├── getWeather/               # 获取天气（IP 定位 + Open-Meteo）
+│   ├── aiChat/                   # AI 育娃问答（msgSecCheck 入出双向安检）
+│   ├── textCheck/                # 文本内容安检（昵称/标签/备注/反馈）
+│   ├── avatarCheck/              # 头像异步审核（mediaCheckAsync 提交/轮询）
+│   └── avatarCallback/           # 头像审核回调（mediaCheckAsync 结果回写）
 ├── docs/
 │   └── architecture.md           # 架构设计文档
 ├── scripts/                      # 辅助脚本
@@ -298,6 +315,9 @@ baby-log/
 - [x] 全面屏底部安全区域适配
 - [x] 雨 / 雪 / 晴 / 阴 / 风 五种天气皮肤
 - [x] 日程事项按类别色点在日历上标记
+- [x] 云朵 AI 伙伴：文字 / 语音提问 + 打字机回答 + TTS 播报
+- [x] 用户文本内容全链路 msgSecCheck 2.0 安检（输入 / 输出）
+- [x] 头像官方能力上传 + 异步内容安全审核
 
 ---
 
@@ -306,9 +326,9 @@ baby-log/
 - [x] **v1.0** — 科学打卡 + 时光轴 + 成长档案 + 家庭共享
 - [x] **v1.1** — 天气皮肤 + 相册 + 分享卡片
 - [x] **v1.2** — 日程事项 + 多宝宝管理 + 历史记录页
-- [ ] **v1.3** — 数据导出（CSV / PDF）
-- [ ] **v1.4** — 喂养统计周报 / 月报
-- [ ] **v2.0** — AI 育儿助手接入
+- [x] **v1.3** — 内容安全改造（删除 UGC 相册、头像官方审核、AI 育儿伙伴、文本全量安检）
+- [ ] **v1.4** — 数据导出（CSV / PDF）
+- [ ] **v1.5** — 喂养统计周报 / 月报
 
 ---
 

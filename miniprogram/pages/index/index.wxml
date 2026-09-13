@@ -1,42 +1,32 @@
-<!-- pages/index/index.wxml - 首页（天气皮肤 + 预测卡 + 相册轮播 + 单行记录） -->
+<!-- pages/index/index.wxml - 首页（天气皮肤 + 云朵AI育娃伙伴 + 单行记录）
+     2026-09-12 改造：原「照片轮播相册」整块移除（规避 UGC 图片审核风险），
+     替换为「云朵 AI 育娃伙伴」：按住说话 / 点按文本提问 → 云函数调 DeepSeek → 打字机字幕 → TTS 播报 -->
 <view class="page-index safe-bottom">
 
   <!-- ===== 天气皮肤背景层（纯装饰，最底层） ===== -->
   <view class="weather-bg wx-{{weatherClass}}">
-    <!-- 晴：太阳光晕 + 云朵 -->
     <block wx:if="{{weatherClass === 'sunny'}}">
       <view class="sun-glow"></view>
       <view class="cloud cloud-1"></view>
       <view class="cloud cloud-2"></view>
       <view class="cloud cloud-3"></view>
     </block>
-    <!-- 多云：灰白云 -->
     <block wx:if="{{weatherClass === 'cloudy'}}">
       <view class="cloud cloud-1 cloud-dim"></view>
       <view class="cloud cloud-2 cloud-dim"></view>
     </block>
-    <!-- 雨：玻璃水雾 + Canvas 真实雨滴动画（随机长短/角度 + 底部涟漪） -->
     <block wx:if="{{weatherClass === 'rain'}}">
       <view class="glass-mist"></view>
-      <!--
-        Canvas 2d 用于绘制真实雨滴动画：
-        - 雨滴长度、角度、速度随机
-        - 底部落地后触发涟漪扩散
-        - 性能注意：弹层打开时通过 wx:if 卸载 canvas 避免真机同层渲染冲突
-        （见 MEMORY.md：弹层与 canvas 同页共存会导致弹层被 canvas 盖住）
-      -->
       <canvas
         type="2d"
         id="rainCanvas"
         class="rain-canvas"
-        wx:if="{{!showFeedSheet && !showDiaperSheet && !showSleepSheet && !showBabySheet && !showUploadCropper && !showPhotoEditSheet && !showLoginPanel}}"
+        wx:if="{{!showFeedSheet && !showDiaperSheet && !showSleepSheet && !showBabySheet && !showAiTextSheet && !showAiAnswerPanel && !showLoginPanel}}"
       ></canvas>
     </block>
-    <!-- 雪 -->
     <block wx:if="{{weatherClass === 'snow'}}">
       <view class="snow-layer"></view>
     </block>
-    <!-- 风：落叶风絮 -->
     <block wx:if="{{weatherClass === 'wind'}}">
       <view class="leaf leaf-1">🍂</view>
       <view class="leaf leaf-2">🍃</view>
@@ -49,11 +39,7 @@
   <!-- ===== 页面内容层 ===== -->
   <view class="content-layer">
 
-    <!-- ========== 顶部统一信息条 ==========
-         左：当前用户头像 + "昵称 · 共N个宝宝"
-         右下："宝宝：XXX ▾" 切换入口（点击打开宝宝管理面板）
-         最右：天气/日期胶囊
-    -->
+    <!-- ========== 顶部统一信息条 ========== -->
     <view class="top-bar">
       <view class="top-bar-left" bindtap="showBabyPanel" hover-class="avatar-tap" hover-stay-time="80">
         <image wx:if="{{userInfo.avatarUrl}}" class="user-avatar" src="{{userInfo.avatarUrl}}" mode="aspectFill"></image>
@@ -89,7 +75,7 @@
       <text>🔧 云开发未开通，当前为离线模式。记录会保存到本地，开通云环境后自动同步。</text>
     </view>
 
-    <!-- ===== 每日育娃小贴士卡（原预测卡区，点击展开完整内容 + 复制） ===== -->
+    <!-- ===== 每日育娃小贴士卡 ===== -->
     <view class="predict-card tip-card" bindtap="showDailyTip" hover-class="tip-card-hover" hover-stay-time="80">
       <view class="tip-card-icon">💡</view>
       <view class="tip-card-body">
@@ -103,55 +89,79 @@
       </view>
     </view>
 
-    <!-- ========== 封面相册（4:3 比例，右上角编辑控件） ========== -->
-    <view class="album-card">
-      <!-- 相册主区 -->
-      <swiper
-        wx:if="{{albumPhotos.length > 0}}"
-        class="album-swiper"
-        indicator-dots="{{albumPhotos.length > 1}}"
-        indicator-color="rgba(255,255,255,0.4)"
-        indicator-active-color="#FFFFFF"
-        autoplay="{{albumPhotos.length > 1}}"
-        interval="4000"
-        circular="{{albumPhotos.length > 1}}"
-        bindchange="onAlbumChange"
-      >
-        <swiper-item wx:for="{{albumPhotos}}" wx:key="id">
-          <view class="album-item" longpress="removeAlbumPhoto" data-index="{{index}}">
-            <image class="album-img" src="{{item.src}}" mode="aspectFill" lazy-load="{{true}}"></image>
-            <!-- 照片标签：左下角胶囊，显示该照片所属宝宝昵称 -->
-            <view class="photo-tag" wx:if="{{item.tag}}">
-              <text class="photo-tag-text">{{item.tag}}</text>
-            </view>
-          </view>
-        </swiper-item>
-        <!-- 上传入口：不足 9 张时显示 -->
-        <swiper-item wx:if="{{albumPhotos.length < 9 && albumPhotos.length > 0}}">
-          <view class="album-item album-add" bindtap="addAlbumPhoto" hover-class="album-add-hover">
-            <view class="album-add-icon">📷</view>
-            <view class="album-add-text">上传照片</view>
-            <view class="album-add-sub">{{albumPhotos.length}}/9</view>
-          </view>
-        </swiper-item>
-      </swiper>
+    <!-- ========== 云朵 AI 育娃伙伴（原照片轮播区位置 · 弹性布局加高） ========== -->
+    <view class="ai-buddy-card">
+      <!-- 快捷提问气泡（横向滚动） -->
+      <scroll-view class="ai-quick-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+        <view class="ai-quick-row">
+          <view
+            class="ai-quick-bubble"
+            wx:for="{{quickQuestions}}" wx:key="*this"
+            data-text="{{item}}"
+            bindtap="onQuickQuestion"
+            hover-class="ai-quick-hover"
+          >{{item}}</view>
+        </view>
+      </scroll-view>
 
-      <!-- 空相册：整卡即上传入口 -->
-      <view class="album-empty" wx:if="{{albumPhotos.length === 0}}" bindtap="addAlbumPhoto" hover-class="album-add-hover">
-        <view class="album-add-icon">📷</view>
-        <view class="album-add-text">为宝宝添加封面相册</view>
-        <view class="album-add-sub">记录每一个可爱瞬间</view>
-      </view>
+      <!-- AI 主区：语音大按钮（大而居中）+ 字幕 -->
+      <view class="ai-main">
+        <!-- 顶部状态：听 / 想 / 播 -->
+        <view class="ai-status-row">
+          <text wx:if="{{aiListening}}" class="ai-status-text ai-status-listening">正在聆听…</text>
+          <text wx:elif="{{aiThinking}}" class="ai-status-text ai-status-thinking">小云朵思考中…</text>
+          <text wx:elif="{{aiSpeaking && !aiTalking}}" class="ai-status-text ai-status-speaking">正在播报…</text>
+          <text wx:else class="ai-status-text ai-status-idle">按住说话，或点一下问问育儿问题</text>
+        </view>
 
-      <!-- 右上角编辑控件：替换当前照片 + 修改标签 -->
-      <view class="album-edit-fab" wx:if="{{albumPhotos.length > 0}}" catchtap="showPhotoEdit" hover-class="fab-hover">
-        <text class="fab-icon">✏️</text>
+        <!-- 语音工作区（大按钮，居中） -->
+        <view class="ai-voice-zone">
+          <!-- 声波指示条（按住说话 / 播放中显示），纯 CSS 动画 -->
+          <view class="ai-wave {{aiWaveActive ? 'active' : ''}}" wx:if="{{aiWaveActive}}">
+            <view class="ai-wave-bar b1"></view>
+            <view class="ai-wave-bar b2"></view>
+            <view class="ai-wave-bar b3"></view>
+            <view class="ai-wave-bar b4"></view>
+            <view class="ai-wave-bar b5"></view>
+          </view>
+
+          <!-- 大语音按钮（按住说话 / 单击输入） -->
+          <view
+            class="ai-voice-btn {{aiTalking ? 'talking' : ''}} {{aiListening ? 'listening' : ''}}"
+            bindtouchstart="onCloudTouchStart"
+            bindtouchend="onCloudTouchEnd"
+            bindtouchcancel="onCloudTouchCancel"
+            bindlongpress="onCloudLongPress"
+            bindtap="onCloudTap"
+            hover-class="none"
+          >
+            <svg class="ai-mic-svg" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <!-- 麦克风主体：圆角胶囊 -->
+              <path d="M13.5 7c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v7c0 1.38-1.12 2.5-2.5 2.5s-2.5-1.12-2.5-2.5V7z" fill="currentColor" opacity="0.95"/>
+              <!-- 麦克风座（弧形拾音区） -->
+              <path d="M9.5 14.5c0 3.6 2.83 6.55 6.5 6.55s6.5-2.95 6.5-6.55c0-.55.45-1 1-1s1 .45 1 1c0 4.5-3.42 8.2-7.5 8.92V26h4c.55 0 1 .45 1 1s-.45 1-1 1h-10c-.55 0-1-.45-1-1s.45-1 1-1h4v-2.58c-4.08-.72-7.5-4.42-7.5-8.92 0-.55.45-1 1-1s1 .45 1 1z" fill="currentColor" opacity="0.85"/>
+              <!-- 右侧装饰声波短竖线 -->
+              <path d="M23 11.5c.55 0 1 .45 1 1v2c0 .55-.45 1-1 1s-1-.45-1-1v-2c0-.55.45-1 1-1z" fill="currentColor" opacity="0.65"/>
+            </svg>
+          </view>
+
+          <view class="ai-voice-tip">{{aiTipText}}</view>
+        </view>
+
+        <!-- 单行流式字幕条 -->
+        <view class="ai-subtitle-bar" bindtap="showFullAnswer">
+          <view class="ai-subtitle-text">
+            <text wx:if="{{aiSubtitle}}">{{aiSubtitle}}</text>
+            <text wx:elif="{{aiThinking}}" class="ai-thinking">小云朵思考中</text>
+            <text wx:else class="ai-subtitle-placeholder">点击展开完整回答</text>
+          </view>
+          <view class="ai-subtitle-arrow" wx:if="{{aiShowArrow}}">∨</view>
+        </view>
       </view>
     </view>
 
-    <!-- ===== 记录控件：三卡一行（单击记录时间点，长按填写详情） ===== -->
+    <!-- ===== 记录控件：三卡一行 ===== -->
     <view class="record-row">
-      <!-- 喂奶 -->
       <view
         class="record-card feed-card {{feedPress ? 'pressing' : ''}}"
         bindtap="handleFeed"
@@ -170,7 +180,6 @@
         <view class="record-hint" wx:else>点击记录 · 长按填量</view>
       </view>
 
-      <!-- 换尿布 -->
       <view
         class="record-card diaper-card {{diaperPress ? 'pressing' : ''}}"
         bindtap="handleDiaper"
@@ -189,7 +198,6 @@
         <view class="record-hint" wx:else>点击记录</view>
       </view>
 
-      <!-- 睡觉（单击切换入睡/醒来，长按回忆记录） -->
       <view
         class="record-card sleep-card {{sleepPress ? 'pressing' : ''}} {{sleeping ? 'sleeping-state' : ''}}"
         bindtap="handleSleepTap"
@@ -222,7 +230,6 @@
       <view class="sleep-sheet-title">记录喂奶</view>
       <view class="sheet-sub">选择常见喂奶量，或点「自定义」输入具体数值</view>
 
-      <!-- 快捷喂奶量：两排胶囊，每个点击即选中（高亮） -->
       <view class="feed-quick-grid">
         <view
           class="feed-quick-item {{feedQuickAmount === item && !feedCustomMode ? 'active' : ''}}"
@@ -233,14 +240,12 @@
         >{{item}}ml</view>
       </view>
 
-      <!-- 自定义入口标签 -->
       <view class="feed-custom-row">
         <view
           class="feed-custom-tag {{feedCustomMode ? 'active' : ''}}"
           bindtap="enableFeedCustom"
           hover-class="duration-item-hover"
         >✏️ 自定义</view>
-        <!-- 自定义输入框：仅当处于自定义模式时显示 -->
         <block wx:if="{{feedCustomMode}}">
           <view class="amount-input-row feed-custom-input">
             <input class="amount-input" type="digit" placeholder="如 125" value="{{feedAmountInput}}" bindinput="onFeedAmountInput" confirm-type="done" bindconfirm="saveFeedWithAmount" focus="{{true}}" />
@@ -294,127 +299,55 @@
     </view>
   </view>
 
-  <!-- ========== 上传 / 替换照片裁剪面板（固定 4:3 裁剪框 + 标签选择） ========== -->
-  <view class="sheet-mask photo-crop-mask" wx:if="{{showUploadCropper}}" bindtap="cancelUploadCropper" catchtouchmove="noop">
-    <view class="photo-crop-panel" catchtap="noop">
-      <view class="sheet-handle" data-close="cancelUploadCropper" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
-      <view class="photo-crop-title">裁剪照片</view>
-      <view class="photo-crop-sub">拖动图片调整位置，裁切后自动保存为 4:3 封面</view>
+  <!-- ========== 云朵 AI：文本输入弹层（点按云朵触发） ========== -->
+  <view class="sheet-mask ai-sheet-mask" wx:if="{{showAiSheet}}" bindtap="hideAiSheet" catchtouchmove="noop">
+    <view class="ai-input-sheet" catchtap="noop">
+      <view class="sheet-handle" data-close="hideAiSheet" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
+      <view class="ai-input-title">问问小云朵☁️</view>
+      <view class="ai-input-sub">{{aiSheetSub}}</view>
 
-      <!-- 裁剪舞台 -->
-      <view
-        class="photo-crop-stage"
-        style="width: {{cropStageSize}}px; height: {{cropBoxH}}px;"
-        bindtouchstart="onCropUpTouchStart"
-        bindtouchmove="onCropUpTouchMove"
-        bindtouchend="onCropUpTouchEnd"
-      >
-        <image
-          class="photo-crop-img"
-          src="{{uploadRawPath}}"
-          style="width: {{cropImgW}}px; height: {{cropImgH}}px; left: {{cropImgX}}px; top: {{cropImgY}}px;"
-          mode="scaleToFill"
-        ></image>
-        <!-- 固定裁剪框（4:3）：中心区域高亮，外部遮罩 -->
-        <view class="photo-crop-frame"></view>
-        <!-- 网格线（参考） -->
-        <view class="photo-crop-grid-v"></view>
-        <view class="photo-crop-grid-h"></view>
+      <view class="ai-input-row">
+        <input
+          class="ai-input-field"
+          value="{{aiInputValue}}"
+          bindinput="onAiInput"
+          placeholder="问点育儿问题…"
+          placeholder-class="ai-input-ph"
+          confirm-type="send"
+          bindconfirm="submitAiFromInput"
+          focus="{{aiInputFocus}}"
+          maxlength="300"
+        />
+        <view class="ai-input-send {{aiInputValue ? 'active' : ''}}" bindtap="submitAiFromInput" hover-class="btn-hover">发送</view>
       </view>
-      <view class="photo-crop-tip">拖动调整位置</view>
-
-      <!-- 标签选择：默认当前宝宝昵称，可切换其他宝宝 -->
-      <view class="photo-edit-section">
-        <view class="photo-edit-label">照片标签</view>
-        <view class="tag-options">
-          <!-- 直接显示宝宝昵称；当前宝宝默认选中（由 uploadTag 初始值决定）。
-               wx:if 过滤无昵称的宝宝，避免空选项（「无标签」已兜底） -->
-          <view
-            class="tag-option {{uploadTag === (item.name || '') ? 'active' : ''}}"
-            wx:for="{{babies}}" wx:key="babyId"
-            wx:if="{{item.name}}"
-            data-tag="{{item.name}}"
-            bindtap="selectUploadTag"
-            hover-class="btn-hover"
-          >{{item.name}}</view>
-          <view
-            class="tag-option {{uploadTag === '' ? 'active' : ''}}"
-            data-tag=""
-            bindtap="selectUploadTag"
-            hover-class="btn-hover"
-          >无标签</view>
-        </view>
-      </view>
-
-      <view class="photo-crop-actions">
-        <view class="photo-crop-cancel" bindtap="cancelUploadCropper" hover-class="btn-hover">取消</view>
-        <view class="photo-crop-confirm" bindtap="confirmUploadCropper" hover-class="btn-hover">确定</view>
-      </view>
+      <view class="ai-input-tip">也可以长按首页云朵直接说话</view>
     </view>
   </view>
 
-  <!-- 上传裁剪导出用隐藏 canvas -->
-  <canvas type="2d" id="uploadCropCanvas" class="crop-canvas-hidden"></canvas>
-
-  <!-- ========== 照片编辑面板（替换照片 + 修改标签 + 删除） ========== -->
-  <view class="sheet-mask photo-edit-mask" wx:if="{{showPhotoEditSheet}}" bindtap="hidePhotoEdit" catchtouchmove="noop">
-    <view class="photo-edit-panel" catchtap="noop">
-      <view class="sheet-handle" data-close="hidePhotoEdit" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
-      <view class="photo-edit-title">编辑照片</view>
-
-      <!-- 当前照片预览 -->
-      <view class="photo-edit-preview" wx:if="{{photoEditCurrent.src}}">
-        <image class="photo-edit-img" src="{{photoEditCurrent.src}}" mode="aspectFill"></image>
-        <view class="photo-edit-pos">{{currentAlbumIndex + 1}} / {{albumPhotos.length}}</view>
-      </view>
-
-      <!-- 标签选择：默认当前宝宝昵称，可选择其他宝宝 -->
-      <view class="photo-edit-section">
-        <view class="photo-edit-label">照片标签</view>
-        <view class="tag-options">
-          <!-- 直接显示宝宝昵称；当前宝宝默认选中（由 photoEditCurrent.tag 初始值决定）。
-               wx:if 过滤无昵称的宝宝，避免空选项（「无标签」已兜底） -->
-          <view
-            class="tag-option {{photoEditCurrent.tag === (item.name || '') ? 'active' : ''}}"
-            wx:for="{{babies}}" wx:key="babyId"
-            wx:if="{{item.name}}"
-            data-tag="{{item.name}}"
-            bindtap="selectPhotoTag"
-            hover-class="btn-hover"
-          >{{item.name}}</view>
-          <view
-            class="tag-option {{photoEditCurrent.tag === '' ? 'active' : ''}}"
-            data-tag=""
-            bindtap="selectPhotoTag"
-            hover-class="btn-hover"
-          >无标签</view>
+  <!-- ========== 云朵 AI：完整回答半屏卡片（点字幕 ∨ 展开） ========== -->
+  <view class="sheet-mask ai-answer-mask" wx:if="{{showAiAnswerPanel}}" bindtap="hideAiAnswer" catchtouchmove="noop">
+    <view class="ai-answer-panel" catchtap="noop">
+      <view class="sheet-handle" data-close="hideAiAnswer" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
+      <view class="ai-answer-header">
+        <text class="ai-answer-title">小云朵的回答</text>
+        <view class="ai-answer-btns">
+          <view class="ai-answer-btn" bindtap="speakAnswer" hover-class="btn-hover">{{aiSpeaking ? '停止' : '🔊 播报'}}</view>
+          <view class="ai-answer-btn" bindtap="copyAnswer" hover-class="btn-hover">复制</view>
         </view>
       </view>
-
-      <!-- 操作按钮 -->
-      <view class="photo-edit-actions">
-        <view class="photo-edit-btn" bindtap="replaceCurrentPhoto" hover-class="btn-hover">
-          <view class="action-icon">🖼</view>
-          <view>替换照片</view>
-        </view>
-        <view class="photo-edit-btn photo-edit-btn-danger" bindtap="deleteCurrentPhoto" hover-class="btn-hover">
-          <view class="action-icon">🗑</view>
-          <view>删除</view>
-        </view>
-      </view>
-
-      <view class="photo-edit-save" bindtap="savePhotoEdit" hover-class="btn-hover">完成</view>
-      <view class="sleep-cancel-link" bindtap="hidePhotoEdit">取消</view>
+      <scroll-view class="ai-answer-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+        <view class="ai-answer-content">{{aiFullAnswer}}</view>
+      </scroll-view>
+      <view class="ai-answer-meta">内容由 AI 生成，仅供参考</view>
     </view>
   </view>
 
-  <!-- ========== 宝宝管理面板（切换 / 新建 / 加入 / 登出） ========== -->
+  <!-- ========== 宝宝管理面板 ========== -->
   <view class="sheet-mask baby-panel-mask" wx:if="{{showBabySheet}}" bindtap="hideBabyPanel" catchtouchmove="noop">
     <view class="baby-panel" catchtap="noop">
       <view class="sheet-handle" data-close="hideBabyPanel" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="baby-panel-title">我的宝宝</view>
 
-      <!-- 宝宝列表 -->
       <view class="baby-list">
         <view
           class="baby-item {{item.babyId === currentBabyId ? 'active' : ''}}"
@@ -430,17 +363,13 @@
             <view class="baby-item-id">ID: {{item.babyId}}</view>
           </view>
           <view class="baby-item-check" wx:if="{{item.babyId === currentBabyId}}">✓</view>
-          <!-- 所有宝宝（含当前打勾的）都可编辑 -->
           <view class="baby-item-edit" data-baby-id="{{item.babyId}}" catchtap="editBaby">编辑</view>
-          <!-- 仅创建者（管理员主账号）可见删除按钮，防止家庭成员误删 -->
           <view class="baby-item-delete" wx:if="{{item.isOwner}}" data-baby-id="{{item.babyId}}" data-name="{{item.name || ''}}" catchtap="deleteBaby">删除</view>
         </view>
 
-        <!-- 占位提示 -->
         <view class="baby-empty" wx:if="{{babies.length === 0}}">还没有宝宝，点击下方按钮添加一个吧</view>
       </view>
 
-      <!-- 操作按钮组 -->
       <view class="baby-actions">
         <view class="baby-action-btn" bindtap="startCreateBaby" hover-class="btn-hover">
           <view class="action-icon">＋</view>
@@ -456,11 +385,13 @@
       <view class="baby-form" wx:if="{{formMode === 'create'}}">
         <view class="form-title">新建宝宝</view>
         <view class="form-avatar-row">
-          <button class="form-avatar-btn" open-type="chooseAvatar" bind:chooseavatar="onFormChooseAvatar" hover-class="btn-hover">
-            <image wx:if="{{formAvatar}}" class="form-avatar-img" src="{{formAvatar}}" mode="aspectFill"></image>
-            <view wx:else class="form-avatar-placeholder">📷</view>
+          <button class="form-avatar-btn" open-type="chooseAvatar" bind:chooseavatar="onFormChooseAvatar" disabled="{{formAvatarAuditing}}" hover-class="btn-hover">
+            <image wx:if="{{formAvatar && !formAvatarAuditing}}" class="form-avatar-img" src="{{formAvatar}}" mode="aspectFill"></image>
+            <view wx:else class="form-avatar-placeholder {{formAvatarAuditing ? 'auditing' : ''}}">
+              {{formAvatarAuditing ? '审核中…' : '📷'}}
+            </view>
           </button>
-          <view class="form-tip">点击选择宝宝照片</view>
+          <view class="form-tip">{{formAvatarAuditing ? '新头像安全检测中…' : '点击选择宝宝照片（需安全检测）'}}</view>
         </view>
         <input class="form-input" placeholder="宝宝昵称" value="{{formName}}" bindinput="onFormNameInput" maxlength="20" />
         <view class="form-row-inline">
@@ -493,7 +424,7 @@
         </view>
       </view>
 
-      <!-- 创建成功后展示宝宝 ID 与密码 -->
+      <!-- 创建成功展示 ID/密码 -->
       <view class="baby-form" wx:if="{{formMode === 'success'}}">
         <view class="form-title">🎉 宝宝已创建</view>
         <view class="form-tip-block">把下面的 ID 和密码分享给家人，他们就可以加入并一起记录啦！</view>
@@ -510,7 +441,6 @@
         </view>
       </view>
 
-      <!-- 登出按钮（游客不显示，显示登录入口） -->
       <view class="logout-row" wx:if="{{formMode === '' && userInfo.openid}}">
         <view class="logout-btn" bindtap="handleLogout" hover-class="btn-hover">退出登录</view>
       </view>
@@ -518,7 +448,6 @@
         <view class="logout-btn logout-btn-login" bindtap="showLoginInPanel" hover-class="btn-hover">登录以永久保存数据</view>
       </view>
 
-      <!-- 意见反馈入口（登录/游客均可用，符合《用户协议》「联系渠道」声明） -->
       <view class="feedback-row" wx:if="{{formMode === ''}}" bindtap="openFeedback" hover-class="feedback-row-hover">
         <text class="feedback-icon">💬</text>
         <text class="feedback-text">意见反馈</text>
@@ -529,7 +458,7 @@
     </view>
   </view>
 
-  <!-- 意见反馈弹层（半屏表单：反馈类型 + 内容 + 联系方式） -->
+  <!-- 意见反馈弹层 -->
   <view class="sheet-mask feedback-mask" wx:if="{{showFeedbackSheet}}" bindtap="closeFeedback" catchtouchmove="noop">
     <view class="feedback-panel" catchtap="noop">
       <view class="sheet-handle" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
@@ -538,7 +467,6 @@
 
       <scroll-view class="feedback-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
         <view class="feedback-inner">
-          <!-- 反馈类型 -->
           <view class="feedback-type-row">
             <view
               class="feedback-type-btn {{feedbackType === item.key ? 'active' : ''}}"
@@ -549,7 +477,6 @@
             >{{item.label}}</view>
           </view>
 
-          <!-- 反馈内容 -->
           <view class="feedback-label">反馈内容</view>
           <textarea
             class="feedback-textarea"
@@ -560,7 +487,6 @@
           ></textarea>
           <view class="feedback-count">{{feedbackContent.length}}/500</view>
 
-          <!-- 联系方式（选填） -->
           <view class="feedback-label">联系方式（选填）</view>
           <input class="feedback-input" placeholder="微信号 / 手机号 / 邮箱" value="{{feedbackContact}}" bindinput="onFeedbackContactInput" maxlength="50" />
 
@@ -575,6 +501,6 @@
     </view>
   </view>
 
-  <!-- 登录引导面板（半屏弹层，游客关键操作时弹出） -->
+  <!-- 登录引导面板 -->
   <login-panel id="loginPanel" bind:change="onLoginPanelChange" />
 </view>
