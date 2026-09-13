@@ -148,14 +148,19 @@
           <view class="ai-voice-tip">{{aiTipText}}</view>
         </view>
 
-        <!-- 单行流式字幕条 -->
+        <!-- 流式字幕区（多行自适应，可滚动，点击展开完整回答） -->
         <view class="ai-subtitle-bar" bindtap="showFullAnswer">
-          <view class="ai-subtitle-text">
-            <text wx:if="{{aiSubtitle}}">{{aiSubtitle}}</text>
-            <text wx:elif="{{aiThinking}}" class="ai-thinking">小云朵思考中</text>
-            <text wx:else class="ai-subtitle-placeholder">点击展开完整回答</text>
+          <scroll-view class="ai-subtitle-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+            <view class="ai-subtitle-text">
+              <text wx:if="{{aiSubtitle}}">{{aiSubtitle}}</text>
+              <text wx:elif="{{aiThinking}}" class="ai-thinking">小云朵思考中</text>
+              <text wx:else class="ai-subtitle-placeholder">点击展开完整回答</text>
+            </view>
+          </scroll-view>
+          <view class="ai-subtitle-arrow" wx:if="{{aiShowArrow}}">
+            <text>∨</text>
+            <text class="ai-subtitle-expand-tip">全文</text>
           </view>
-          <view class="ai-subtitle-arrow" wx:if="{{aiShowArrow}}">∨</view>
         </view>
       </view>
     </view>

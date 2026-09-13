@@ -357,3 +357,35 @@
 1. 部署新云函数：`aiChat` / `textCheck` / `avatarCheck` / `avatarCallback`（右键 → 上传并部署：云端安装依赖）；重新部署 4 个升级 sdk 的写云函数
 2. 小程序后台：添加「微信同声传译」插件（AppID `wx069ba97219f66d99`）；更新隐私协议提及 AI 问答与内容安全
 3. 真机自测：AI 打字机自动播报、昵称/日程违规输入拦截、头像审核中态、语音长按识别
+
+---
+
+# 2026-09-13/14：AI 实战修复 + 女声 TTS 升级
+
+> 背景：AI 上线后连续踩坑（checkText 未定义 → 4003 误拦 → 500 模型调用失败 → 付费模型开不了 → 换免费模型扶正），最终 hy3 正常可用；再修长文样式 bug + 换免费温柔女声。
+
+## 一、aiChat 连环故障修复（详见 memory 2026-09-13 §1-6）
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| `checkText is not defined` 崩溃 | 函数定义 `checkTextSec`，调用 `checkText` | 两处调用改名 |
+| 全部快捷问题 4003 | 安检 catch 误判全部违规 + openid 空 | 降级放行 + 真实 OPENID + review 视同通过 |
+| 全部问题 500「小云朵有点累」 | 模型调用抛错 | detail 透出 + 控制台开通 AI 能力 |
+| deepseek 开不了 | 需资源点计费（付费） | 改免费 `hunyuan-exp` 兜底 |
+| **最终模型** | 成长计划免费 | 默认 `hy3`，失败回退 `hunyuan-exp`，环境变量 `AI_MODEL` 可切 |
+
+## 二、AI 区布局重设计（长文本样式修复）
+- 字幕条固定单行 → **多行自适应**（`min-height:72rpx → max-height:220rpx`，内部 `scroll-view` 滚动，`pre-wrap` 折行）
+- 语音按钮 132→200rpx 大而居中；`ai-voice-zone` 加 `min-height:224rpx` 保底，长字幕不挤按钮
+- 只改 `.ai-*` 作用域，首页其余区块（top-bar/record-row）零影响
+
+## 三、免费温柔女声 TTS（NEW 云函数 `aiTts`）
+- **方案**：`node-edge-tts`@1.2.10（微软 Edge 在线 TTS，免费免 Key / MIT），女声 `zh-CN-XiaoxiaoNeural`（晓晓）
+- **坑**：npm `edge-tts`@1.0.1 是未编译 TS（`main: index.ts`）+ ESM + 非商 license，云函数跑不了；`node-edge-tts` 是编译好的 CJS
+- 云函数：合成→`/tmp` mp3→base64 返回；前端：base64→`USER_DATA_PATH` 临时文件→播放
+- **无缝回退**：云函数失败自动回退原同声传译插件（男声兜底）；分段 280 字（插件回退内部再细分 100 字）
+- 实测：100 字 ≈ 118KB base64 < 云函数 1MB 响应上限 ✅
+
+**待用户操作**：
+1. 微信开发者工具 → `cloudfunctions/aiTts` 右键 → **上传并部署：云端安装依赖**；控制台把 `aiTts` 执行超时调到 ≥20s
+2. 重新部署 `cloudfunctions/aiChat`（模型逻辑已更新）；前端重新上传
+3. 真机验证：长回答多行不截断、点开全文正常；播报为温柔女声；停用 aiTts 时回退男声插件

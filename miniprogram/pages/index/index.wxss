@@ -493,7 +493,7 @@
 .ai-voice-zone {
   position: relative;
   flex: 1;
-  min-height: 0;
+  min-height: 224rpx;        /* 保底：按钮 200rpx + 提示，长字幕时不挤压语音按钮 */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -593,31 +593,47 @@
   flex-shrink: 0;
 }
 
-/* ---- 单行流式字幕条 ---- */
+/* ---- 流式字幕区（多行自适应：min-height + 可滚动，长文本不再截断/溢出） ---- */
 .ai-subtitle-bar {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;   /* 顶部对齐，多行时箭头不被拉伸 */
   justify-content: space-between;
   gap: 12rpx;
-  height: 72rpx;
-  padding: 0 20rpx;
+  min-height: 72rpx;         /* 单行保底；内容多了自然长高 */
+  max-height: 220rpx;        /* 上限，超出内部滚动 */
+  padding: 14rpx 20rpx;
   background: rgba(255, 255, 255, 0.85);
   border-radius: 20rpx;
   border: 2rpx solid rgba(232, 212, 180, 0.8);
   cursor: pointer;
   margin-top: 8rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: min-height 0.2s ease;
+}
+
+/* 内容区：内部独立滚动，长文本可读 */
+.ai-subtitle-scroll {
+  flex: 1;
+  min-width: 0;
+  max-height: 190rpx;        /* 与 .ai-subtitle-bar max-height 匹配（扣除 padding） */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;     /* Firefox 隐藏滚动条 */
+}
+
+.ai-subtitle-scroll::-webkit-scrollbar {
+  display: none;             /* 隐藏滚动条，保持卡片整洁 */
 }
 
 .ai-subtitle-text {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   font-size: var(--font-sm, 26rpx);
+  line-height: 1.55;         /* 多行行高 */
   color: var(--color-text-primary, #4A4036);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 72rpx;
+  white-space: pre-wrap;     /* 保留换行，长文本自动折行 */
+  word-break: break-word;    /* 长单词/URL 折行 */
 }
 
 .ai-subtitle-placeholder {
@@ -635,16 +651,25 @@
 }
 
 .ai-subtitle-arrow {
-  width: 40rpx;
-  height: 40rpx;
+  width: 44rpx;
+  height: 44rpx;              /* 弹性收缩时不拉伸 */
   border-radius: 50%;
   background: var(--color-primary-bg, #F7EDDD);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 24rpx;
+  font-size: 18rpx;
+  line-height: 1;
   color: var(--color-primary, #D4B896);
   flex-shrink: 0;
+  align-self: flex-start;     /* 顶部对齐，与文字首行平齐 */
+  margin-top: 2rpx;
+}
+
+.ai-subtitle-expand-tip {
+  font-size: 16rpx;
+  margin-top: 2rpx;
 }
 
 /* ---- AI 文本输入弹层 ---- */

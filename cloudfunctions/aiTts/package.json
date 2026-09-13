@@ -1,0 +1,10 @@
+{
+  "name": "aiTts",
+  "version": "1.0.0",
+  "description": "云朵 AI 语音合成：node-edge-tts 免费温柔女声（zh-CN-XiaoxiaoNeural 晓晓）",
+  "main": "index.js",
+  "dependencies": {
+    "node-edge-tts": "^1.2.10",
+    "wx-server-sdk": "~4.0.1"
+  }
+}
