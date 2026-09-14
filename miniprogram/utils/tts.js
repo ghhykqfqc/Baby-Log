@@ -1,28 +1,23 @@
 // utils/tts.js - 语音播报（云函数 edge-tts 温柔女声优先 + 微信同声传译插件兜底）+ 语音识别
 //
-// 播报方案（2026-09-15 v3 重构）：
+// 播报方案（2026-09-15 v4 重构）：
 //  1. 优先调用云函数 aiTts：edge-tts 免费合成「温柔女声 晓晓（zh-CN-XiaoxiaoNeural）」，
 //     返回 mp3 base64，写入本地临时文件播放
 //  2. 失败 / 云函数未部署 → 自动回退「微信同声传译」插件（默认男声，仅保底）
 //
-// 【2026-09-15 v3：智能分片 + 流水线预取】
-//   背景：aiTts 云函数默认 3s 超时，长文本（讲故事 500 字）单段合成必被杀；
-//   短文本（鼓励的话）成功 → 长短两重天。
-//   解决：
-//     A. 云函数端：config.json 已配 timeout:20（务必重新部署生效）+ 单例复用 + 12s 守护
-//     B. 前端端（本文件）：
-//        - 句读感知分片：优先按 句号/感叹号/问号/省略号/分号/换行 断句，
-//          次按 逗号/顿号/冒号，兜底硬切；单段目标 ≤120 字 —— 短段合成快、不落 3s 陷阱，
-//          断点落在自然语句处，停顿不突兀
-//        - 流水线预取（核心）：播第 N 段的同时，后台并发合成第 N+1/N+2 段
-//          （双缓冲），播完立刻有货、无断链等待；失败段实时降级插件单段兜底
-//  3. 停止机制（2026-09-14 修复）延续：会话令牌 _seq，stop() 即令所有在途
-//     合成/播放/预取链作废，杜绝「停了又播」
+// 【2026-09-15 v4：顺序保真的双缓冲预取 + 分段续播】
+//   - 预取：并发合成多段（默认 2），但按【下标】落地到 slots 数组，
+//     播放永远从当前所需下标取，绝不出乱序（v3 的 ready.push 队列在
+//     各分片合成耗时随机时可能先播后面的段 —— 已修）
+//   - 续播：speech(text, { from: k }) 从第 k 段开始播；stop() 通过
+//     回调 options.onStopped({ segmentIndex }) 告知「停在第几段」，
+//     页面据此实现「同内容未收起 → 停止处续播」「新内容 → 从头播」
+//   - 停止令牌 _seq 机制：stop() 立即令合成/预取/播放全链作废
+//   - 句读感知分片（smartSplit）：句末标点优先，逗号次之，硬切兜底，单段≈120 字
 //
 // 使用：
-//  - tts.speak(text, opts) ：合成并播放（自动分片 + 预取 + 无缝衔接）
-//  - tts.stop()             ：停止播报（立即、彻底）
-//  - tts.startRecord() / tts.stopRecord(cb) ：按住说话录音识别（需插件权限）
+//  - tts.speech(text, { from, onStart, onEnd, onError, onStopped })
+//  - tts.stop()  // 立即、彻底；触发 onStopped 回调
 const PLUGIN_ID = 'WechatSI'
 
 let _plugin = null
@@ -45,10 +40,15 @@ function isAlive(seq) {
   return _seq === seq
 }
 
+// 当前播放会话的对象（供 stop() 触发 onStopped 回调）
+let _activeSession = null
+
 /**
  * 停止当前播报（并使任何进行中的异步合成/播放/预取链立即失效）
  */
 function stop() {
+  const session = _activeSession
+  _activeSession = null
   _seq++ // 先递增令牌：让所有在途链作废
   if (_audio) {
     try {
@@ -56,6 +56,12 @@ function stop() {
       _audio.destroy()
     } catch (e) {}
     _audio = null
+  }
+  // 通知当前会话（如果它在播）回调「已停止在第几段」
+  if (session && session.onStopped) {
+    try {
+      session.onStopped({ segmentIndex: session.currentSegment })
+    } catch (e) {}
   }
 }
 
@@ -261,7 +267,7 @@ function _playLocal(src) {
 }
 
 // ============================================================
-// speech：智能分片 + 流水线预取 + 无缝播放
+// speech：智能分片 + 顺序保真的双缓冲预取 + 无缝播放 + 分段续播
 // ============================================================
 const PREFETCH_BATCH = 2 // 预取并发数（双缓冲：第 N 段播放时，N+1/N+2 已在合成）
 
@@ -269,69 +275,97 @@ const PREFETCH_BATCH = 2 // 预取并发数（双缓冲：第 N 段播放时，N
  * 合成并顺序播放（长文本自动分片；云函数 edge-tts 女声优先，失败回退插件）
  * @param {string} text 要播报的文本
  * @param {object} [options]
+ * @param {number} [options.from] 从第几段开始播（0 = 从头，续播用）
  * @param {Function} [options.onStart] 开始播放回调
  * @param {Function} [options.onEnd] 全部播放完回调
- * @param {Function} [options.onError] 失败回调
+ * @param {Function} [options.onError] 失败回调（全程无成功段）
+ * @param {Function} [options.onStopped] 用户 stop() 时回调：({ segment }) 停在的分段下标
  */
 function speech(text, options = {}) {
   const parts = smartSplit(text)
   if (!parts.length) return
-  stop() // 先停旧播放链（令牌自增）
+  stop() // 先停旧播放链（令牌自增，并触发旧会话 onStopped）
   const seq = ++_seq // 再取本次会话号（顺序敏感：先 stop 后取号）
   const alive = () => isAlive(seq)
   const opts = options || {}
 
-  let pendingIdx = 0 // 下一个待合成分片下标
-  const ready = [] // 已合成完、可立即播放的文件队列
+  let startIdx = opts.from || 0 // 续播起点（0=从头）
+  if (startIdx < 0) startIdx = 0
+  const total = parts.length
+  const slots = new Array(total).fill(null) // 按 index 落地，杜绝乱序
+  const failedIdx = new Set() // 合成失败的段（跳过）
   let inflight = 0 // 在途合成数
-  let anyPlayed = false // 是否至少成功播过一段
+  let anyPlayed = false
   let startFired = false
   let ended = false // 防止 onEnd/onError 重复触发
+  let currentIdx = -1 // 当前正播的分段（供 stop 回调）
+  let nextReady = startIdx // 预取「下一个要落 slot」的下标（单调递增）
 
-  /** 预取：保证 ready+inflight 至少到 target */
-  const kickPrefetch = (target) => {
-    while (alive() && pendingIdx < parts.length && (ready.length + inflight) < target) {
-      const content = parts[pendingIdx++]
+  // 当前会话登记（stop() 从这里取 onStopped）
+  _activeSession = {
+    onStopped: opts.onStopped,
+    get currentSegment() { return currentIdx }
+  }
+
+  /** 预取：从 nextReady 起，把「还没安排」的下标并行合成到 slots */
+  const kickPrefetch = () => {
+    while (alive() && inflight < PREFETCH_BATCH) {
+      // 找下一个 slots 仍为 null 且未失败的下标
+      let target = -1
+      for (let i = nextReady; i < total; i++) {
+        if (slots[i] === null && !failedIdx.has(i)) { target = i; break }
+      }
+      if (target === -1) break
+      // 预取前推进 nextReady（同一位置只会安排一次）
+      nextReady = target + 1
       inflight++
+      const content = parts[target]
       _synthOne(content, seq).then((src) => {
         inflight--
-        if (alive() && src) ready.push(src)
+        if (!alive()) return
+        if (src) slots[target] = src
+        else failedIdx.add(target)
       })
     }
   }
 
-  /** 等待队首就绪；返回 false 表示「已无可用内容」（全部合成失败/处理完） */
-  const waitReady = () => new Promise((resolve) => {
+  /** 等待指定下标就绪；false 表示该段已失败/无内容 */
+  const waitReadyAt = (idx) => new Promise((resolve) => {
     const t = setInterval(() => {
       if (!alive()) { clearInterval(t); resolve(false); return }
-      if (ready.length > 0) { clearInterval(t); resolve(true); return }
-      if (pendingIdx >= parts.length && inflight === 0) {
+      if (slots[idx] !== null) { clearInterval(t); resolve(true); return }
+      if (failedIdx.has(idx)) { clearInterval(t); resolve(false); return }
+      // 所有可能的预取都已完成且没产出这一段的音频
+      if (nextReady >= total && inflight === 0) {
         clearInterval(t)
-        resolve(ready.length > 0)
+        resolve(false)
         return
       }
     }, 30)
-    kickPrefetch(PREFETCH_BATCH)
+    kickPrefetch() // 确保预取推进
   })
 
   const run = async () => {
-    kickPrefetch(PREFETCH_BATCH) // 开播即预取第一、二段
-    while (alive()) {
-      const ok = await waitReady()
+    kickPrefetch() // 开播即预取后续段
+    // 严格按下标顺序播放；失败段跳过，不影响整体
+    for (let idx = startIdx; idx < total; idx++) {
       if (!alive()) break
-      if (!ok) break // 无可用内容，结束
-      const src = ready.shift()
+      const ok = await waitReadyAt(idx)
+      if (!alive()) break
+      if (!ok) continue // 该段失败 → 跳过
+      const src = slots[idx]
+      slots[idx] = null
       if (!src) continue
       if (!startFired) {
         startFired = true
         if (opts.onStart) opts.onStart()
       }
-      await _playLocal(src) // 无论 播完/出错/被停 都继续循环（循环顶部再校验 alive）
+      currentIdx = idx
+      await _playLocal(src)
       if (!alive()) break
       anyPlayed = true
-      kickPrefetch(PREFETCH_BATCH) // 播完一段：补足预取
+      kickPrefetch() // 播完一段，补足预取
     }
-    // 会话结束：正常播完 → onEnd；全程无成功片段 → onError
     if (alive() && !ended) {
       ended = true
       if (anyPlayed) {

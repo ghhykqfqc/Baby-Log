@@ -629,6 +629,7 @@ Page({
     // 停止旧的播报与打字机
     this.aiStopSpeaking()
     this.clearAiTypeTimer()
+    this._aiResumeSegment = 0 // 新问题 → 播报永远从头（清掉上一问的续播位置）
 
     // 语音输入标记：回答完成后自动播报
     this._aiAutoSpeak = fromVoice
@@ -733,7 +734,13 @@ Page({
     }
   },
 
-  /** AI 播报（完整回答，点击字幕 ∨ 面板中的播报按钮） */
+  /** AI 播报（完整回答，点击字幕 ∨ 面板中的播报按钮）
+   *  续播规则（2026-09-15）：
+   *    - 正在播 → 点击=停止
+   *    - 未在播 & 面板展开 & 上次被手动停止 → 从停止处分段续播（onStopped 已记录）
+   *    - 未在播 & （收起过 / 新问题 / 播完）→ 从头播
+   *  - tts.speech 的 from 参数：从第几段开始（0=从头）
+   */
   speakAnswer() {
     const full = this.data.aiFullAnswer
     if (!full) return
@@ -741,14 +748,30 @@ Page({
       this.aiStopSpeaking()
       return
     }
+    // 展开状态下且上次是「手动停在中途」 → 续播
+    let from = 0
+    if (this.data.aiExpanded && this._aiResumeSegment && this._aiResumeSegment > 0) {
+      from = this._aiResumeSegment
+    }
+    this._aiResumeSegment = 0 // 用掉即清，下次默认从头
     this.setData({ aiSpeaking: true, aiTalking: true, aiWaveActive: true })
     tts.speech(full, {
+      from,
+      onStart: () => {},
       onEnd: () => {
         this.setData({ aiSpeaking: false, aiTalking: false, aiWaveActive: false })
+        this._aiResumeSegment = 0
       },
       onError: () => {
         this.setData({ aiSpeaking: false, aiTalking: false, aiWaveActive: false })
         wx.showToast({ title: '播报暂不可用', icon: 'none' })
+      },
+      onStopped: (info) => {
+        // 记录停在哪一段；仅当「内容还展开着」才允许续播，
+        // 收起过（hideAiAnswer 会清 _aiResumeSegment）则下次从头
+        if (info && typeof info.segmentIndex === 'number' && info.segmentIndex >= 0) {
+          this._aiResumeSegment = info.segmentIndex
+        }
       }
     })
   },
@@ -759,7 +782,7 @@ Page({
       this._aiAutoSpeakTimer = null
     }
     this._aiAutoSpeak = false
-    tts.stop()
+    tts.stop() // stop() 内部会触发本会话 onStopped（更新 _aiResumeSegment）
     this.setData({ aiSpeaking: false, aiTalking: false, aiWaveActive: false })
   },
 
@@ -780,6 +803,7 @@ Page({
   hideAiAnswer() {
     if (!this.data.aiExpanded) return
     this.setData({ aiExpanded: false })
+    this._aiResumeSegment = 0 // 收起视为「从头开始」：清掉续播位置
     this.aiStopSpeaking()
   },
 
