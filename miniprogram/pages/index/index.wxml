@@ -117,7 +117,7 @@
         <view class="ai-halo halo-1 {{aiWaveActive ? 'on' : ''}}"></view>
         <view class="ai-halo halo-2 {{aiWaveActive ? 'on' : ''}}"></view>
 
-        <!-- 大语音按钮：纯渐变玻璃云朵 + 居中麦克风图标 + 云内动态提示文字 -->
+        <!-- 大语音按钮：直接使用参考图裁切的云朵按钮图（含居中麦克风/声波/按住说话） -->
         <view
           class="ai-voice-btn {{aiTalking ? 'talking' : ''}} {{aiListening ? 'listening' : ''}}"
           bindtouchstart="onCloudTouchStart"
@@ -127,9 +127,11 @@
           bindtap="onCloudTap"
           hover-class="none"
         >
-          <image class="ai-cloud-img" src="/images/icons/cloud-ai.svg" mode="aspectFit"></image>
-          <view class="ai-btn-label">{{aiTipText}}</view>
+          <image class="ai-cloud-img" src="/images/cloud-voice-btn.png" mode="aspectFit"></image>
         </view>
+
+        <!-- 状态提示（云朵图内已含「按住说话」，仅聆听/思考时显示动态提示） -->
+        <view class="ai-voice-tip" wx:if="{{aiListening || aiThinking}}">{{aiTipText}}</view>
       </view>
 
       <!-- 流式字幕区 + 展开/收起（点胶囊按钮或字幕条切换，展开显示完整回答） -->

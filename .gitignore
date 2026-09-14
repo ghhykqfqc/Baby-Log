@@ -70,3 +70,6 @@ temp/
 *.psd
 *.ai
 *.sketch
+
+# ===== 文档备份 =====
+*_old_backup.pdf

@@ -19,6 +19,13 @@
    - 新增：漂浮装饰小云（deco-float）、状态徽标（st-listening/thinking/speaking 呼吸圆点）、双光环 halo-expand、云内文字 text-shadow、按压 scale(0.94)
    - 保留：talking 呼吸动画、listening 柔光脉冲、字幕区结构
 
+## 第三轮优化（同日晚）
+1. **云朵按钮改用真实图片**：从参考图 `云朵ai语音背景图.png` 左上角云朵（蓝粉渐变+麦克风声波+「按住说话」）裁切 → 白底洪泛填充转透明 → 640px 缩放 + alpha 羽化 → 256 色量化，产出 `miniprogram/images/cloud-voice-btn.png`（**32KB**，替代原 318KB 全彩版）。删除自绘的 `cloud-ai.svg`。
+   - 注意：WXSS 本地路径 `background-image` 真机不渲染，故仍用 `<image>` 组件承载（视觉效果等同背景图）。
+   - 云朵图内已固定「按住说话」，动态 `aiTipText` 改为显示在云朵下方（仅 aiListening/aiThinking 时出现，`.ai-voice-tip` 粉色小字）。
+   - 按钮 340x270rpx（图 640x506 等比）；呼吸/柔光动画从 `.ai-cloud-img` 移到 `.ai-voice-btn` 整体。
+2. **收起态固定一行 + 省略号**：收起时字幕条 `max-height: 80rpx`、scroll 区 `max-height: 48rpx + overflow:hidden`、文字 `-webkit-line-clamp:1 + text-overflow:ellipsis`；展开态用 `.expanded` 覆盖恢复多行滚动（display:block + overflow-y:auto）。收起时内容仍显示 `aiSubtitle`（打字完成后 == aiFullAnswer），溢出自动「…」。
+
 ## 第二轮优化（同日）
 1. **云朵 SVG 再简化**：移除声波弧线与玻璃高光椭圆，只保留「渐变云体 + 居中白色麦克风」；云体略放大、麦克风上移，给云内提示文字留出空间（label bottom 由 44rpx → 56rpx，字号 24 → 22rpx）。
 2. **展开/收起按钮改版**：原圆形「∨ + 全文」小标改为胶囊按钮 —— 新增 `images/icons/chevron-down.svg`（主色 #B08D5D 线稿 chevron），配粉调渐变胶囊底 + 描边 + 阴影；展开时图标 `rotate(180deg)` 翻转、文案变「收起」。

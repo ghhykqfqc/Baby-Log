@@ -520,8 +520,9 @@
 .ai-voice-zone {
   position: relative;
   flex: 1;
-  min-height: 250rpx;        /* 保底：云朵按钮 + 提示，长字幕时不挤压 */
+  min-height: 290rpx;        /* 保底：云朵按钮 270 + 状态提示 */
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -531,8 +532,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 300rpx;
-  height: 226rpx;
+  width: 330rpx;
+  height: 258rpx;
   border-radius: 50%;
   border: 3rpx solid rgba(216, 168, 196, 0.55);
   opacity: 0;
@@ -554,11 +555,12 @@
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.32); }
 }
 
-/* ================= 大语音按钮：渐变玻璃云朵 + 居中麦克风声波 + 云内提示文字 ================= */
+/* ================= 大语音按钮：参考图裁切云朵图（含居中麦克风/声波/按住说话） ================= */
+/* 说明：WXSS 本地路径 background-image 真机不渲染，故用 image 组件承载，视觉效果等同背景图 */
 .ai-voice-btn {
   position: relative;
-  width: 320rpx;
-  height: 240rpx;
+  width: 340rpx;
+  height: 270rpx;            /* 图 640x506，等比 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -572,48 +574,39 @@
   transform: scale(0.94);
 }
 
-/* 云朵徽标 SVG（磨砂玻璃渐变云 + 白麦克风声波，一体化） */
+/* 云朵按钮图（透明底 PNG） */
 .ai-cloud-img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 320rpx;
-  height: 226rpx;
-  transform: translate(-50%, -50%);
+  width: 340rpx;
+  height: 270rpx;
   /* 柔和粉紫投影：让云朵浮起来 */
   filter: drop-shadow(0 14rpx 26rpx rgba(196, 150, 190, 0.35));
   pointer-events: none;
 }
 
-/* 云内动态提示文字（按住说话 / 松开发送 / 思考中…） */
-.ai-btn-label {
-  position: absolute;
-  left: 16rpx;
-  right: 16rpx;
-  bottom: 56rpx;
-  text-align: center;
+/* 聆听/思考时的动态状态提示（云朵图内已固定「按住说话」，此提示显示在云朵下方） */
+.ai-voice-tip {
+  margin-top: 6rpx;
   font-size: 22rpx;
-  line-height: 1.2;
-  color: #FFFFFF;
+  line-height: 1.3;
+  color: #C98BA6;
   font-weight: 600;
   letter-spacing: 1rpx;
-  text-shadow: 0 2rpx 8rpx rgba(158, 118, 158, 0.5);
-  pointer-events: none;
-  transition: opacity 0.2s ease;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 /* 播报中：云朵轻轻呼吸（带动整体） */
-.ai-voice-btn.talking .ai-cloud-img {
+.ai-voice-btn.talking {
   animation: cloud-breathe 1.6s ease-in-out infinite;
 }
 
 @keyframes cloud-breathe {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50% { transform: translate(-50%, -50%) scale(1.05); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 /* 聆听中：云朵柔光脉冲（示意收音中） */
-.ai-voice-btn.listening .ai-cloud-img {
+.ai-voice-btn.listening {
   animation: listening-pulse 1.4s ease-in-out infinite;
 }
 
@@ -691,8 +684,8 @@
   align-items: flex-start;   /* 顶部对齐，多行时按钮不被拉伸 */
   justify-content: space-between;
   gap: 12rpx;
-  min-height: 72rpx;         /* 单行保底；内容多了自然长高 */
-  max-height: 220rpx;        /* 上限，超出内部滚动 */
+  min-height: 72rpx;         /* 单行保底 */
+  max-height: 80rpx;         /* 收起态固定一行高度，溢出由文字省略号截断 */
   padding: 14rpx 20rpx;
   background: rgba(255, 255, 255, 0.85);
   border-radius: 20rpx;
@@ -701,6 +694,7 @@
   cursor: pointer;
   box-sizing: border-box;
   overflow: hidden;
+  transition: max-height 0.25s ease;
   position: relative;
   z-index: 1;
 }
@@ -712,12 +706,12 @@
   align-items: stretch;      /* 展开时内容区撑满高度 */
 }
 
-/* 内容区：内部独立滚动，长文本可读 */
+/* 内容区：收起态固定一行（溢出隐藏），展开态撑满滚动 */
 .ai-subtitle-scroll {
   flex: 1;
   min-width: 0;
-  max-height: 190rpx;        /* 与 .ai-subtitle-bar max-height 匹配（扣除 padding） */
-  overflow-y: auto;
+  max-height: 48rpx;         /* 收起态：一行文字高度，超出隐藏 */
+  overflow: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;     /* Firefox 隐藏滚动条 */
 }
@@ -726,6 +720,7 @@
 .ai-subtitle-box.expanded .ai-subtitle-scroll {
   max-height: none;
   height: 100%;
+  overflow-y: auto;
 }
 
 .ai-subtitle-scroll::-webkit-scrollbar {
@@ -739,6 +734,19 @@
   color: var(--color-text-primary, #4A4036);
   white-space: pre-wrap;     /* 保留换行，长文本自动折行 */
   word-break: break-word;    /* 长单词/URL 折行 */
+  /* 收起态：单行省略 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 展开态：恢复完整多行显示 */
+.ai-subtitle-box.expanded .ai-subtitle-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .ai-subtitle-placeholder {
@@ -827,15 +835,15 @@
 /* 展开卡片态：云朵区让位缩小，给完整回答更多空间 */
 .ai-buddy-card.expanded .ai-voice-zone {
   flex: 0 0 auto;
-  min-height: 140rpx;
+  min-height: 180rpx;
 }
 
 .ai-buddy-card.expanded .ai-voice-btn {
-  transform: scale(0.58);
+  transform: scale(0.55);
 }
 
-.ai-buddy-card.expanded .ai-btn-label {
-  opacity: 0;
+.ai-buddy-card.expanded .ai-voice-tip {
+  display: none;
 }
 
 .ai-answer-meta {
