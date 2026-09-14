@@ -530,7 +530,7 @@ Page({
 
   /** 打开文本输入弹层 */
   openAiInputSheet() {
-    tts.stop() // 切停播报
+    this.aiStopSpeaking() // 切停播报（含待触发的自动播报定时器）
     this.setData({ showAiSheet: true, aiInputValue: '', aiInputFocus: true })
   },
 
@@ -563,7 +563,7 @@ Page({
       aiWaveActive: true,
       aiTipText: '松开发送语音…'
     })
-    tts.stop()
+    this.aiStopSpeaking() // 停播报（含待触发的自动播报定时器），避免录音与播报打架
     // 插件可能在真机/工具上不可用，捕获 300ms 内未识别则提示
     tts.startRecord({
       onStart: () => {},
@@ -774,7 +774,7 @@ Page({
       return
     }
     this.setData({ aiExpanded: true, aiSpeaking: false, aiTalking: false, aiWaveActive: false })
-    tts.stop()
+    this.aiStopSpeaking() // 收起自动播报（含 300ms 延迟待触发的定时器）
   },
 
   hideAiAnswer() {

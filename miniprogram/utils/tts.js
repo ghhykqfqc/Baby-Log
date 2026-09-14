@@ -1,19 +1,28 @@
 // utils/tts.js - 语音播报（云函数 edge-tts 温柔女声优先 + 微信同声传译插件兜底）+ 语音识别
 //
-// 播报方案（2026-09-13 升级）：
+// 播报方案（2026-09-15 v3 重构）：
 //  1. 优先调用云函数 aiTts：edge-tts 免费合成「温柔女声 晓晓（zh-CN-XiaoxiaoNeural）」，
 //     返回 mp3 base64，写入本地临时文件播放
 //  2. 失败 / 云函数未部署 → 自动回退「微信同声传译」插件（默认男声，仅保底）
 //
-// 依赖：
-//  - 小程序后台「设置 → 第三方设置 → 插件管理」添加「微信同声传译」插件
-//    AppID: wx069ba97219f66d99，版本 0.3.5（回退方案）
-//  - app.json 中已声明 plugins.WechatSI
+// 【2026-09-15 v3：智能分片 + 流水线预取】
+//   背景：aiTts 云函数默认 3s 超时，长文本（讲故事 500 字）单段合成必被杀；
+//   短文本（鼓励的话）成功 → 长短两重天。
+//   解决：
+//     A. 云函数端：config.json 已配 timeout:20（务必重新部署生效）+ 单例复用 + 12s 守护
+//     B. 前端端（本文件）：
+//        - 句读感知分片：优先按 句号/感叹号/问号/省略号/分号/换行 断句，
+//          次按 逗号/顿号/冒号，兜底硬切；单段目标 ≤120 字 —— 短段合成快、不落 3s 陷阱，
+//          断点落在自然语句处，停顿不突兀
+//        - 流水线预取（核心）：播第 N 段的同时，后台并发合成第 N+1/N+2 段
+//          （双缓冲），播完立刻有货、无断链等待；失败段实时降级插件单段兜底
+//  3. 停止机制（2026-09-14 修复）延续：会话令牌 _seq，stop() 即令所有在途
+//     合成/播放/预取链作废，杜绝「停了又播」
 //
 // 使用：
-//  - tts.speak(text, opts) ：合成并播放（自动分段 ≤100 字、自动 stop 上一个）
-//  - tts.stop()             ：停止播报
-//  - tts.startRecord() / tts.stopRecord(cb) ：按住说话录音识别（需插件语音识别权限）
+//  - tts.speak(text, opts) ：合成并播放（自动分片 + 预取 + 无缝衔接）
+//  - tts.stop()             ：停止播报（立即、彻底）
+//  - tts.startRecord() / tts.stopRecord(cb) ：按住说话录音识别（需插件权限）
 const PLUGIN_ID = 'WechatSI'
 
 let _plugin = null
@@ -30,10 +39,17 @@ function getPlugin() {
 // 当前播放音频上下文（全局单例，避免重叠）
 let _audio = null
 
+// 播放会话令牌：每次 speech()/stop() 自增；所有异步回调校验 _seq !== seq 即终止
+let _seq = 0
+function isAlive(seq) {
+  return _seq === seq
+}
+
 /**
- * 停止当前播报
+ * 停止当前播报（并使任何进行中的异步合成/播放/预取链立即失效）
  */
 function stop() {
+  _seq++ // 先递增令牌：让所有在途链作废
   if (_audio) {
     try {
       _audio.stop()
@@ -43,28 +59,214 @@ function stop() {
   }
 }
 
-/**
- * 把文本按 ≤100 字分段（中文按字符数切，避免截断句子）
- * 同声传译单次合成文本不宜过长
- */
-function splitText(text, maxLen = 100) {
-  const s = String(text || '').trim()
-  if (!s) return []
-  const parts = []
+// ============================================================
+// 智能分片（句读感知）
+// ============================================================
+const SEG_TARGET = 120 // 单段目标字数：够短（合成快、不撞 3s 陷阱），又保持语句相对完整
+
+/** 按保留标点的正则把文本切成片段（保留标点） */
+function splitByPunct(text, re) {
+  const out = []
+  let last = 0
+  const r = new RegExp(re.source, 'g')
+  let m
+  while ((m = r.exec(text)) !== null) {
+    const end = m.index + m[0].length
+    out.push(text.slice(last, end))
+    last = end
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out.map((x) => x.trim()).filter(Boolean)
+}
+
+/** 把小片段打包成 ≤max 的段 */
+function packSegments(segs, max) {
+  const out = []
   let cur = ''
-  for (const ch of s) {
-    cur += ch
-    if (cur.length >= maxLen) {
-      parts.push(cur)
-      cur = ''
+  for (const s of segs) {
+    if ((cur + s).length <= max) cur += s
+    else {
+      if (cur) out.push(cur)
+      cur = s
     }
   }
-  if (cur) parts.push(cur)
-  return parts
+  if (cur) out.push(cur)
+  return out
 }
 
 /**
- * 合成并顺序播放（长文本自动分段；云函数 edge-tts 女声优先，失败回退插件）
+ * 智能分片：句号级别优先 → 逗号级别 → 硬切兜底
+ * @param {string} text 全文
+ * @param {number} [maxLen] 目标单段长度（默认 SEG_TARGET=120）
+ * @returns {string[]} 有序分片
+ */
+function smartSplit(text, maxLen) {
+  const s = String(text || '').trim()
+  if (!s) return []
+  const MAX = maxLen || SEG_TARGET
+  if (s.length <= MAX) return [s]
+
+  // 一级：句末标点/换行
+  let segs = splitByPunct(s, /[。！？；…\n]/)
+  segs = packSegments(segs, MAX)
+
+  // 二级：仍有超长者按逗号/顿号/冒号拆
+  const level2 = []
+  for (const p of segs) {
+    if (p.length <= MAX) {
+      level2.push(p)
+      continue
+    }
+    const subs = splitByPunct(p, /[，、：]/)
+    level2.push(...packSegments(subs, MAX))
+  }
+
+  // 三级：仍超长（无标点长串）→ 硬切
+  const final = []
+  for (const p of level2) {
+    if (p.length <= MAX) final.push(p)
+    else {
+      for (let i = 0; i < p.length; i += MAX) final.push(p.slice(i, i + MAX))
+    }
+  }
+  return final
+}
+
+/** 兼容旧导出名（供调试） */
+function splitText(text, maxLen) {
+  return smartSplit(text, maxLen || 100)
+}
+
+// ============================================================
+// 单段合成：云函数 edge-tts 优先 → 同声传译插件兜底 → null 跳过
+// ============================================================
+
+/** 云函数 aiTts 合成 → 本地临时 mp3 路径 */
+function _synthCloud(content, seq) {
+  return new Promise((resolve, reject) => {
+    if (!isAlive(seq) || !wx.cloud || !wx.cloud.callFunction) {
+      reject(new Error('cloud-unavailable'))
+      return
+    }
+    wx.cloud.callFunction({
+      name: 'aiTts',
+      data: { text: content }
+    }).then((res) => {
+      if (!isAlive(seq)) { reject(new Error('stopped')); return }
+      const r = (res && res.result) || {}
+      if (r.code !== 0 || !r.data || !r.data.audioBase64) {
+        reject(new Error((r && r.message) || 'cloud-tts-failed'))
+        return
+      }
+      const fs = wx.getFileSystemManager()
+      const tmp = `${wx.env.USER_DATA_PATH}/tts_${seq}_${Date.now()}_${Math.floor(Math.random() * 1e6)}.mp3`
+      try {
+        fs.writeFileSync(tmp, r.data.audioBase64, 'base64')
+        resolve(tmp)
+      } catch (e) {
+        reject(e)
+      }
+    }).catch((err) => reject(err))
+  })
+}
+
+/** 同声传译插件合成（单段 ≤100 字）→ 插件临时文件路径 */
+function _synthPlugin(content, seq) {
+  return new Promise((resolve, reject) => {
+    const pl = getPlugin()
+    if (!pl || !pl.textToSpeech) {
+      reject(new Error('plugin-unavailable'))
+      return
+    }
+    pl.textToSpeech({
+      lang: 'zh_CN',
+      tts: true,
+      content: String(content).slice(0, 100),
+      success: (res) => {
+        if (!isAlive(seq)) { reject(new Error('stopped')); return }
+        if (!res || !res.filename) reject(new Error('plugin-empty'))
+        else resolve(res.filename)
+      },
+      fail: reject
+    })
+  })
+}
+
+/** 单段全链路合成：云 → 插件兜底；都失败 resolve(null)（该段跳过，不中断整体） */
+function _synthOne(content, seq) {
+  return new Promise((resolve) => {
+    _synthCloud(content, seq).then(
+      (src) => resolve(src),
+      (err) => {
+        if (!isAlive(seq)) { resolve(null); return }
+        console.warn('edge-tts 女声合成失败，回退插件:', err)
+        _synthPlugin(content, seq)
+          .then((src) => resolve(src))
+          .catch(() => resolve(null))
+      }
+    )
+  })
+}
+
+// ============================================================
+// 播放本地文件（令牌校验 + 60s 防呆 + 停止轮询 + 播完清理临时文件）
+// ============================================================
+function _playLocal(src) {
+  return new Promise((resolve) => {
+    const seq = _seq // 当前会话号（stop() 会递增，poll 检测到即终止）
+    if (_audio) {
+      try { _audio.stop(); _audio.destroy() } catch (e) {}
+      _audio = null
+    }
+    const audio = wx.createInnerAudioContext()
+    audio.src = src
+    audio.play()
+    _audio = audio
+    let settled = false
+    let guard = null
+    let poll = null
+    const finish = () => {
+      if (settled) return
+      settled = true
+      if (poll) clearInterval(poll)
+      if (guard) clearTimeout(guard)
+      if (_audio === audio) _audio = null
+      try { audio.destroy() } catch (e) {}
+      // 播完清理临时文件（云/插件产物）
+      try { wx.getFileSystemManager().unlinkSync(src) } catch (e) {}
+      resolve()
+    }
+    audio.onEnded(() => {
+      if (!isAlive(seq)) return // 已被停止：不触发任何回调
+      finish()
+    })
+    audio.onError(() => {
+      if (!isAlive(seq)) return
+      finish()
+    })
+    // 防呆：播放 60s 未结束视为异常，强制结束
+    guard = setTimeout(() => {
+      if (!isAlive(seq)) return
+      try { audio.stop() } catch (e) {}
+      finish()
+    }, 60000)
+    // 轮询捕获「stop() 已触发但原生层没有回调」的极端情况
+    poll = setInterval(() => {
+      if (!isAlive(seq) && !settled) {
+        try { audio.stop() } catch (e) {}
+        finish()
+      }
+    }, 400)
+  })
+}
+
+// ============================================================
+// speech：智能分片 + 流水线预取 + 无缝播放
+// ============================================================
+const PREFETCH_BATCH = 2 // 预取并发数（双缓冲：第 N 段播放时，N+1/N+2 已在合成）
+
+/**
+ * 合成并顺序播放（长文本自动分片；云函数 edge-tts 女声优先，失败回退插件）
  * @param {string} text 要播报的文本
  * @param {object} [options]
  * @param {Function} [options.onStart] 开始播放回调
@@ -72,190 +274,74 @@ function splitText(text, maxLen = 100) {
  * @param {Function} [options.onError] 失败回调
  */
 function speech(text, options = {}) {
-  const parts = _splitForTTS(text)
+  const parts = smartSplit(text)
   if (!parts.length) return
-  stop() // 先停旧播报，防止重叠
+  stop() // 先停旧播放链（令牌自增）
+  const seq = ++_seq // 再取本次会话号（顺序敏感：先 stop 后取号）
+  const alive = () => isAlive(seq)
+  const opts = options || {}
 
-  // 播放下一个分段：优先云函数合成，失败回退插件
-  let index = 0
-  let anySuccess = false
+  let pendingIdx = 0 // 下一个待合成分片下标
+  const ready = [] // 已合成完、可立即播放的文件队列
+  let inflight = 0 // 在途合成数
+  let anyPlayed = false // 是否至少成功播过一段
   let startFired = false
-  const playNext = () => {
-    if (index >= parts.length) {
-      // 全部失败 → onError（原语义）；只要成功过一段 → onEnd
-      if (!anySuccess && options.onError) options.onError(new Error('tts-all-failed'))
-      else if (options.onEnd) options.onEnd()
-      return
+  let ended = false // 防止 onEnd/onError 重复触发
+
+  /** 预取：保证 ready+inflight 至少到 target */
+  const kickPrefetch = (target) => {
+    while (alive() && pendingIdx < parts.length && (ready.length + inflight) < target) {
+      const content = parts[pendingIdx++]
+      inflight++
+      _synthOne(content, seq).then((src) => {
+        inflight--
+        if (alive() && src) ready.push(src)
+      })
     }
-    const content = parts[index++]
-    _speakPart(content)
-      .then(() => {
-        anySuccess = true
-        playNext()            // 本段播放完成 → 下一段
-      })
-      .catch(() => {
-        // 云函数 + 插件兜底都失败：跳过本段继续（不阻塞整体）
-        playNext()
-      })
   }
 
-  /**
-   * 合成并播放单段
-   * 优先云函数 aiTts（免费温柔女声），失败自动回退同声传译插件
-   * @returns {Promise} 播放完成 resolve；全部失败 reject
-   */
-  function _speakPart(content) {
-    return new Promise((resolve, reject) => {
-      _playWithCloud(content)
-        .then(() => {
-          if (!startFired && options.onStart) { startFired = true; options.onStart() }
-          resolve()
-        })
-        .catch((err) => {
-          console.warn('edge-tts 女声合成失败，回退插件:', err)
-          _playWithPlugin(content)
-            .then(() => {
-              if (!startFired && options.onStart) { startFired = true; options.onStart() }
-              resolve()
-            })
-            .catch(reject)
-        })
-    })
-  }
-
-  // 方案一：云函数 aiTts → base64 → 本地临时文件播放
-  function _playWithCloud(content) {
-    return new Promise((resolve, reject) => {
-      if (!wx.cloud || !wx.cloud.callFunction) {
-        reject(new Error('cloud-unavailable'))
+  /** 等待队首就绪；返回 false 表示「已无可用内容」（全部合成失败/处理完） */
+  const waitReady = () => new Promise((resolve) => {
+    const t = setInterval(() => {
+      if (!alive()) { clearInterval(t); resolve(false); return }
+      if (ready.length > 0) { clearInterval(t); resolve(true); return }
+      if (pendingIdx >= parts.length && inflight === 0) {
+        clearInterval(t)
+        resolve(ready.length > 0)
         return
       }
-      wx.cloud.callFunction({
-        name: 'aiTts',
-        data: { text: content }
-      }).then((res) => {
-        const r = (res && res.result) || {}
-        if (r.code !== 0 || !r.data || !r.data.audioBase64) {
-          reject(new Error((r && r.message) || 'cloud-tts-failed'))
-          return
-        }
-        // base64 → 本地临时文件 → 播放
-        const fs = wx.getFileSystemManager()
-        const tmp = `${wx.env.USER_DATA_PATH}/tts_${Date.now()}_${Math.floor(Math.random() * 1e6)}.mp3`
-        try {
-          fs.writeFileSync(tmp, r.data.audioBase64, 'base64')
-        } catch (e) {
-          reject(e)
-          return
-        }
-        _playFile(tmp).then(resolve, (err) => {
-          reject(err)
-        })
-      }).catch((err) => {
-        reject(err)
-      })
-    })
-  }
+    }, 30)
+    kickPrefetch(PREFETCH_BATCH)
+  })
 
-  // 方案二：同声传译插件（默认男声，仅保底；内部按 ≤100 字细分，兼容插件限制）
-  function _playWithPlugin(content) {
-    return new Promise((resolve, reject) => {
-      const pl = getPlugin()
-      if (!pl || !pl.textToSpeech) {
-        reject(new Error('plugin-unavailable'))
-        return
+  const run = async () => {
+    kickPrefetch(PREFETCH_BATCH) // 开播即预取第一、二段
+    while (alive()) {
+      const ok = await waitReady()
+      if (!alive()) break
+      if (!ok) break // 无可用内容，结束
+      const src = ready.shift()
+      if (!src) continue
+      if (!startFired) {
+        startFired = true
+        if (opts.onStart) opts.onStart()
       }
-      // 插件单次合成建议 ≤100 字（官方限制 1000 字节），大段细分依次播放
-      const subParts = _splitForTTS(content, 100)
-      let subIdx = 0
-      const playSub = () => {
-        if (subIdx >= subParts.length) {
-          resolve()
-          return
-        }
-        const sub = subParts[subIdx++]
-        pl.textToSpeech({
-          lang: 'zh_CN',
-          tts: true,
-          content: sub,
-          success: (res) => {
-            if (!res || !res.filename) {
-              playSub() // 单段失败跳过
-              return
-            }
-            _playFile(res.filename).then(playSub, playSub)
-          },
-          fail: () => playSub() // 单段失败跳过
-        })
+      await _playLocal(src) // 无论 播完/出错/被停 都继续循环（循环顶部再校验 alive）
+      if (!alive()) break
+      anyPlayed = true
+      kickPrefetch(PREFETCH_BATCH) // 播完一段：补足预取
+    }
+    // 会话结束：正常播完 → onEnd；全程无成功片段 → onError
+    if (alive() && !ended) {
+      ended = true
+      if (anyPlayed) {
+        if (opts.onEnd) opts.onEnd()
+      } else if (opts.onError) {
+        opts.onError(new Error('tts-all-failed'))
       }
-      playSub()
-    })
-  }
-
-  // 播放本地 / 临时文件，播完 resolve、出错 reject
-  function _playFile(src) {
-    return new Promise((resolve, reject) => {
-      stop() // 确保上一段上下文释放
-      const audio = wx.createInnerAudioContext()
-      audio.src = src
-      audio.play()
-      _audio = audio
-      let guard = null
-      audio.onEnded(() => {
-        if (guard) clearTimeout(guard)
-        try { audio.destroy() } catch (e) {}
-        if (_audio === audio) _audio = null
-        resolve()
-      })
-      audio.onError((err) => {
-        if (guard) clearTimeout(guard)
-        try { audio.destroy() } catch (e) {}
-        if (_audio === audio) _audio = null
-        reject(err)
-      })
-      // 防呆：播放 60s 未结束视为异常，强制结束防卡死（继续下一段）
-      guard = setTimeout(() => {
-        try { audio.stop() } catch (e) {}
-        if (_audio === audio) _audio = null
-        try { audio.destroy() } catch (e) {}
-        resolve()
-      }, 60000)
-    })
-  }
-
-  playNext()
-}
-
-// 拆分文本：优先按标点断句，再按最大长度
-function _splitForTTS(text, maxLen) {
-  const s = String(text || '').trim()
-  if (!s) return []
-  const MAX = maxLen || 280   // 默认 edge-tts 云函数单段上限（内置 300 防御截断），留余量
-  if (s.length <= MAX) return [s]
-  // 按句子切分（。！？；\n 等）
-  const sentences = s.split(/(?<=[。！？；\n])/)
-  const parts = []
-  let cur = ''
-  for (const seg of sentences) {
-    const trimmed = seg.trim()
-    if (!trimmed) continue
-    if ((cur + trimmed).length <= MAX) {
-      cur += trimmed
-    } else {
-      if (cur) parts.push(cur)
-      cur = trimmed
     }
   }
-  if (cur) parts.push(cur)
-  // 极端情况仍有超长段（无标点长串），按 MAX 硬切
-  const result = []
-  for (const p of parts) {
-    if (p.length <= MAX) result.push(p)
-    else {
-      for (let i = 0; i < p.length; i += MAX) result.push(p.slice(i, i + MAX))
-    }
-  }
-  return result
+  run()
 }
 
 // ============================================================

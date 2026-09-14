@@ -13,8 +13,15 @@
 //
 // 注意：
 //  - 非官方付费服务，有速率限制，前端已做「失败自动回退同声传译插件」兜底
-//  - 建议在控制台把本云函数超时调到 20s 以上（合成需连外网 ws，约 1-4s/段）
-//  - 微信云开发运行环境 /tmp 可写，用于临时落盘（node-edge-tts 需要文件路径）
+//  - 【超时修复 2026-09-14】控制台默认云函数超时 3s，edge-tts 需要连外网 WebSocket
+//    （约 1-4s/段），3s 必然被杀 → 前端报 -504003 Invoking task timed out。
+//    必须：
+//     1. 本目录 config.json 已配置 "timeout": 20（部署时生效）
+//     2. 如果你用控制台/开发者工具部署，请把超时手动改到 20s 以上
+//     3. 合成增加 12s 的 Promise.race 守护：偶发卡网时快速失败回退插件，不再盲目等超时
+//  - TTS 客户端单例复用（EdgeTTS 每次 new 会重建 WebSocket 连接握手，
+//    复用连接可显著提速）；失败时重置单例，下次请求重建，
+//    避免连接僵死时反复复用坏连接
 const cloud = require('wx-server-sdk')
 const { EdgeTTS } = require('node-edge-tts')
 const os = require('os')
@@ -32,6 +39,38 @@ const TTS_VOLUME = process.env.TTS_VOLUME || '+0%'
 // 单段文本长度：前端已按 ≤100 字分段，这里防御性截断
 const MAX_CHARS = 300
 
+// 合成超时守护（ms）：Edge 在线合成偶尔网络抖动，
+// 超过该时间直接判失败回退插件，避免占用云函数配额
+const TTS_TIMEOUT_MS = 12000
+
+// 模块级单例：复用 WebSocket 连接，避免每次调用都重建
+let _ttsClient = null
+
+function getTtsClient() {
+  if (_ttsClient) return _ttsClient
+  _ttsClient = new EdgeTTS({
+    voice: TTS_VOICE,
+    lang: 'zh-CN',
+    rate: TTS_RATE,
+    pitch: TTS_PITCH,
+    volume: TTS_VOLUME,
+    outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
+  })
+  return _ttsClient
+}
+
+// 合成语音 → 临时文件；失败抛错
+async function synthesize(text, tmpFile) {
+  const client = getTtsClient()
+  // 超时守护：网络不发怵时快速失败，令前端回退插件
+  await Promise.race([
+    client.ttsPromise(text, tmpFile),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('tts-synthesize-timeout')), TTS_TIMEOUT_MS)
+    )
+  ])
+}
+
 exports.main = async (event) => {
   const text = String((event && event.text) || '').trim().slice(0, MAX_CHARS)
   if (!text) {
@@ -40,15 +79,7 @@ exports.main = async (event) => {
 
   const tmpFile = path.join(os.tmpdir(), `tts_${Date.now()}_${Math.floor(Math.random() * 1e6)}.mp3`)
   try {
-    const tts = new EdgeTTS({
-      voice: TTS_VOICE,
-      lang: 'zh-CN',
-      rate: TTS_RATE,
-      pitch: TTS_PITCH,
-      volume: TTS_VOLUME,
-      outputFormat: 'audio-24khz-48kbitrate-mono-mp3'
-    })
-    await tts.ttsPromise(text, tmpFile)
+    await synthesize(text, tmpFile)
 
     const buf = fs.readFileSync(tmpFile)
     if (!buf || !buf.length) {
@@ -65,6 +96,8 @@ exports.main = async (event) => {
   } catch (err) {
     const e = (err && (err.errMsg || err.message)) || String(err || '')
     console.error('edge-tts 合成失败:', e)
+    // 连接可能已损坏，重置单例让下次请求重建连接
+    _ttsClient = null
     return {
       code: 500,
       message: '语音合成失败',
