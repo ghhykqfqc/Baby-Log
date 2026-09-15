@@ -1,5 +1,6 @@
-// pages/index/index.js - 首页（天气皮肤 + 云朵AI育娃伙伴 + 单行记录）
-// 2026-09-12 改造：移除照片轮播相册（规避 UGC 图片审核风险），替换为「云朵 AI 育娃伙伴」
+// pages/index/index.js - 首页（天气皮肤 + 每日早读故事 + 记录三卡）
+// 2026-09-15 审核改造：首页中部改为「每日早读故事卡」（系统预置内容 + 语音播报）。
+// 原「云朵 AI 育娃伙伴」仅当云端开关 aiEnabled=true 时启用（审核通过后靠数据库开关唤起）。
 const app = getApp()
 const { call } = require('../../utils/request')
 const storage = require('../../utils/storage')
@@ -14,6 +15,51 @@ const SLEEP_RESET_MS = 12 * 60 * 60 * 1000
 
 // 天气缓存有效期（30 分钟）
 const WEATHER_CACHE_MS = 30 * 60 * 1000
+
+// ===== 每日早读故事库（系统预置，无任何 AI 生成；多篇轮换） =====
+// 供「审核模式」默认展示；故事内容均为公开可转载的儿童经典故事正文。
+const DAILY_STORIES = [
+  {
+    title: '三只小猪',
+    content: '从前，有三只小猪离开了妈妈，各自盖房子。老大盖了草房子，老二盖了木房子，老三辛勤地盖了砖房子。大灰狼来了，呼呼一吹，草房子和木房子都倒了，两只小猪跑进老三的砖房子里。大灰狼怎么吹也吹不倒砖房子，只好爬上烟囱，却掉进了烧开水的锅里，灰溜溜地逃走了。三只小猪明白了：做事不能偷懒，踏踏实实才能保护好自己。'
+  },
+  {
+    title: '龟兔赛跑',
+    content: '兔子嘲笑乌龟爬得慢，乌龟说：“咱们比一比吧。”兔子飞快地跑在前面，看见乌龟远远落在后面，就躺在大树下睡大觉。乌龟一步也不停，慢慢地爬过了终点。兔子醒来才发现自己输了。这个故事告诉我们：骄傲使人落后，坚持就是胜利。'
+  },
+  {
+    title: '狼来了',
+    content: '放羊的小男孩觉得无聊，就朝山下喊：“狼来了！狼来了！”村民们赶紧跑上来，却发现根本没有狼，男孩哈哈大笑。过了几天，男孩又喊：“狼来了！”村民们又上当了，生气地走了。后来狼真的来了，男孩拼命喊“狼来了、狼来了”，但是再也没有人信他了，他的羊被狼吃掉了。说谎话会失去大家的信任，要做一个诚实的孩子。'
+  },
+  {
+    title: '乌鸦喝水',
+    content: '一只乌鸦口渴了，看见一个瓶子里有水，可是瓶口太小，喝不着。它飞到周围找，衔来小石子，一颗一颗地放进瓶子里。水慢慢地升起来，乌鸦终于喝到了水。遇到困难不要着急，要多动脑筋想办法。'
+  },
+  {
+    title: '小马过河',
+    content: '小马驮着麦子去过河，松鼠说：“河水很深，会淹死！”老牛说：“河水很浅，才到小腿。”小马回家问妈妈，妈妈让它自己去试一试。小马一步步走进河里，原来河水既不像松鼠说得那么深，也不像老牛说得那么浅。做事情要听了别人的建议，更要亲自试一试。'
+  },
+  {
+    title: '白雪公主',
+    content: '白雪公主因为美丽，遭到了皇后的嫉妒。皇后变成老奶奶，骗她吃下毒苹果，白雪公主晕倒了。七个小矮人非常伤心。后来，一位王子遇到了她，轻轻地吻醒了她，白雪公主醒了过来，从此和王子、七个小矮人幸福地生活在一起。善良的人总会得到爱的回报。'
+  },
+  {
+    title: '丑小鸭',
+    content: '有一只小鸭长得和别人不一样，大家都嘲笑它，因为它长得像只丑小鸭。它孤单地走过冬夏，不停地游哇游。到了春天，它低头看见自己在水里的倒影——原来它已经变成了一只美丽的白天鹅。不要因为外表不同而自卑，每个人都会绽放自己的美。'
+  },
+  {
+    title: '小蝌蚪找妈妈',
+    content: '池塘里有一群黑乎乎的小蝌蚪，它们没有妈妈，决定自己去找妈妈。它们问金鱼，问乌龟，问螃蟹，最后们发现自己的妈妈是大眼睛的绿青蛙。小蝌蚪游啊游，慢慢长出后腿、前腿，尾巴变短，最后变成可爱的小青蛙，终于找到了妈妈。'
+  },
+  {
+    title: '小兔乖乖',
+    content: '兔妈妈要去拔萝卜，嘱咐小兔子们：“谁喊开门都不能开，只有妈妈回来唱：小兔子乖乖，把门儿开开。”大灰狼偷听到，学着妈妈的声音唱，小兔子们一听不对，从门缝看到灰色的狼，坚决不开门。妈妈回来后，大家一起打跑了坏狼。'
+  },
+  {
+    title: '猴子捞月',
+    content: '小猴子看到井里的月亮，以为月亮掉到水里了，就一只接一只地倒挂在树上捞月亮。它们捞呀捞，怎么也捞不上来。老猴子抬头一看，月亮好端端地挂在天上呢。原来井里只是月亮的影子。做事要先想清楚，不要被太慌着急。'
+  }
+]
 
 // ===== 每日育娃小贴士库（按日期取模轮换） =====
 const DAILY_TIPS = [
@@ -64,7 +110,14 @@ Page({
     dailyTipFull: '',
     weatherClass: 'sunny',
     weatherText: '',
-    // 云朵 AI 育娃伙伴
+    // 中部卡片模式：reviewMode=true 为审核模式（默认故事卡）；false 为完整 AI 模式
+    reviewMode: true,
+    storyIndex: 0,
+    storyTitle: '',
+    storyContent: '',
+    storyScrollTop: 0,       // 故事正文滚动位置（换篇时复位）
+    storySpeaking: false,
+    // 云朵 AI 育娃伙伴（完整模式用，审核模式不触发）
     quickQuestions: [
       '讲个睡前小故事',
       '唱首哄睡儿歌',
@@ -83,7 +136,7 @@ Page({
     aiExpanded: false,       // 字幕区是否展开完整回答（支持再次点击收起）
     aiInputValue: '',
     aiInputFocus: false,
-    showAiSheet: false,      // 文本输入弹层
+    showAiSheet: false,      // 文本输入弹层（完整模式）
     isOffline: false,
     cloudReady: true,
     todayText: '',
@@ -146,6 +199,8 @@ Page({
     this.updateTodayText()
     this.restoreSleepState()
     this.initDailyTip()
+    this.initStory()
+    this.loadFeatureFlags()
   },
 
   onShow() {
@@ -243,6 +298,93 @@ Page({
     const d = new Date()
     const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
     this.setData({ todayText: `${d.getMonth() + 1}/${d.getDate()} 周${week}` })
+  },
+
+  // ============================================
+  // 中部卡片：功能开关 + 每日早读故事（审核模式）
+  // ============================================
+
+  /**
+   * 读取云端功能开关（config 云函数）。
+   * 成功则按 aiEnabled 决定 reviewMode；失败/未开通按本地默认（审核模式）。
+   * 【重要】只在云环境就绪时调用；审核模式下不会触发任何 AI 请求。
+   */
+  async loadFeatureFlags() {
+    // 本地兜底默认：审核模式（故事卡）
+    let reviewMode = true
+    try {
+      if (app.globalData.cloudReady) {
+        const flags = await call('config', {})
+        if (flags && typeof flags.reviewMode === 'boolean') {
+          reviewMode = flags.reviewMode
+        }
+      }
+    } catch (err) {
+      // 云函数/config 未部署时不阻塞页面，保持默认审核模式
+      console.warn('读取功能开关失败，默认审核模式:', (err && err.message) || err)
+    }
+    this.setData({ reviewMode })
+    // 联动语音能力（2026-09-16 双通道）：
+    //  - 审核模式：仅官方插件朗读预置内容（故事卡听故事），禁止云端合成，无深度合成痕迹
+    //  - 完整模式：云端 edge-tts 女声优先 + 插件兜底
+    tts.enableTTS({ enabled: true, allowCloud: !reviewMode })
+    // 模式切换时需要停止可能在播放的语音
+    if (reviewMode) {
+      this.aiStopSpeaking()
+    }
+  },
+
+  /** 每日早读故事：按日期取模固定一篇，另支持手动换一篇 */
+  initStory() {
+    const now = new Date()
+    const dayIndex = now.getFullYear() * 1000 + now.getMonth() * 50 + now.getDate()
+    this.showStory(dayIndex % DAILY_STORIES.length)
+  },
+
+  showStory(index) {
+    const idx = ((index % DAILY_STORIES.length) + DAILY_STORIES.length) % DAILY_STORIES.length
+    const story = DAILY_STORIES[idx]
+    // 换篇后正文滚动复位到顶部
+    this.setData({
+      storyIndex: idx,
+      storyTitle: story.title,
+      storyContent: story.content,
+      storyScrollTop: 0
+    })
+    this.aiStopSpeaking()
+  },
+
+  /** 换一篇 */
+  nextStory() {
+    this.showStory(this.data.storyIndex + 1)
+  },
+
+  /**
+   * 听故事：朗读当前故事正文。
+   * 审核模式：仅走微信官方「同声传译」插件朗读预置文本（无云端 AI 合成）；
+   * 完整模式：云端女声优先（仍为预置文本）。
+   */
+  speakStory() {
+    if (this.data.storySpeaking) {
+      this.aiStopSpeaking()
+      return
+    }
+    const story = this.data.storyContent
+    if (!story) return
+    this.setData({ storySpeaking: true })
+    tts.speech(story, {
+      onStart: () => {},
+      onEnd: () => {
+        this.setData({ storySpeaking: false })
+      },
+      onError: () => {
+        this.setData({ storySpeaking: false })
+        wx.showToast({ title: '语音暂不可用，稍后再试', icon: 'none' })
+      },
+      onStopped: () => {
+        this.setData({ storySpeaking: false })
+      }
+    })
   },
 
   // ============================================
@@ -458,9 +600,12 @@ Page({
   // ============================================
   // 云朵 AI 育娃伙伴
   // ============================================
+  // 【审核模式短路】reviewMode=true（默认）时，以下 AI 交互方法一律不执行，
+  // 保证提审包无任何 AI 行为与网络请求。
 
   /** 快捷提问气泡点击 */
   onQuickQuestion(e) {
+    if (this.data.reviewMode) return
     const text = e.currentTarget.dataset.text
     if (!text) return
     this.aiSend(text)
@@ -468,6 +613,7 @@ Page({
 
   /** 云朵触摸开始：启动长按计时 */
   onCloudTouchStart() {
+    if (this.data.reviewMode) return
     if (this._aiBusy) return
     this.aiCancelRecording()
     this._aiPressStarted = false
@@ -507,6 +653,7 @@ Page({
 
   /** 长按已触发（bindlongpress 兜底，防移动时 touchend 丢失） */
   onCloudLongPress() {
+    if (this.data.reviewMode) return
     if (this._aiBusy) return
     if (this._aiPressTimer) {
       clearTimeout(this._aiPressTimer)
@@ -530,6 +677,7 @@ Page({
 
   /** 打开文本输入弹层 */
   openAiInputSheet() {
+    if (this.data.reviewMode) return
     this.aiStopSpeaking() // 切停播报（含待触发的自动播报定时器）
     this.setData({ showAiSheet: true, aiInputValue: '', aiInputFocus: true })
   },
@@ -545,6 +693,7 @@ Page({
 
   /** 文本输入弹层提交 */
   submitAiFromInput() {
+    if (this.data.reviewMode) return
     const text = (this.data.aiInputValue || '').trim()
     if (!text) {
       wx.showToast({ title: '先输入点内容吧', icon: 'none' })
@@ -556,6 +705,7 @@ Page({
 
   /** 开始录音识别（按住说话） */
   aiStartListening() {
+    if (this.data.reviewMode) return
     if (this._aiBusy) return
     this._aiPressLocked = true
     this.setData({
@@ -742,6 +892,7 @@ Page({
    *  - tts.speech 的 from 参数：从第几段开始（0=从头）
    */
   speakAnswer() {
+    if (this.data.reviewMode) return
     const full = this.data.aiFullAnswer
     if (!full) return
     if (this.data.aiSpeaking) {

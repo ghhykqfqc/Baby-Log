@@ -392,6 +392,113 @@
 }
 
 /* ============================================
+   每日早读故事卡（审核模式中部卡片，无 AI / 无合成语音）
+   布局：标题行 → 故事正文（始终全量展示，超高内部滚动）→ 操作行
+   ============================================ */
+.story-card {
+  flex: 1;               /* 吃掉剩余空间，覆盖原 AI 卡区域 */
+  min-height: 340rpx;     /* 小屏保底 */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12rpx);
+  border: 1rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 36rpx;
+  padding: 22rpx 26rpx 20rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 8rpx 32rpx rgba(180, 150, 110, 0.14);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.story-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  margin-bottom: 10rpx;
+}
+
+.story-title-row {
+  display: flex;
+  align-items: center;
+}
+
+.story-icon {
+  font-size: 40rpx;
+  line-height: 1;
+  margin-right: 12rpx;
+}
+
+.story-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--color-primary-dark, #7A5C3E);
+  letter-spacing: 1rpx;
+}
+
+.story-sub {
+  font-size: 22rpx;
+  color: var(--color-text-secondary, #8A7C6A);
+  flex-shrink: 0;
+}
+
+/* 正文区：全量展示、正常换行；超高时内部纵向滚动 */
+.story-scroll {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 12rpx;
+}
+
+.story-text {
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #5C4E3E;
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 2rpx 4rpx;
+}
+
+.story-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding-top: 6rpx;
+}
+
+.story-act {
+  display: flex;
+  align-items: center;
+  background: rgba(212, 184, 150, 0.26);
+  border-radius: 999rpx;
+  padding: 8rpx 20rpx;
+}
+
+.story-act + .story-act {
+  margin-left: 12rpx;
+}
+
+.story-act-icon {
+  font-size: 24rpx;
+  margin-right: 6rpx;
+}
+
+.story-act text:last-child {
+  font-size: 24rpx;
+  color: var(--color-text-secondary, #7A6A58);
+}
+
+/* 底部提示：正文超高时可滑动阅读（小字弱化，不抢占操作） */
+.story-tip {
+  margin-left: auto;
+  padding-left: 16rpx;
+  font-size: 20rpx;
+  color: var(--color-text-tertiary, #B5A795);
+}
+
+/* ============================================
    云朵 AI 育娃伙伴（2026-09-14 重构视觉）
    参考「云朵 AI 语音背景图」：磨砂玻璃质感渐变云朵 +
    居中麦克风/声波图标 + 云内动态提示文字

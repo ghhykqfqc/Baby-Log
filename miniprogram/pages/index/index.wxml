@@ -1,6 +1,6 @@
-<!-- pages/index/index.wxml - 首页（天气皮肤 + 云朵AI育娃伙伴 + 单行记录）
-     2026-09-12 改造：原「照片轮播相册」整块移除（规避 UGC 图片审核风险），
-     替换为「云朵 AI 育娃伙伴」：按住说话 / 点按文本提问 → 云函数调 DeepSeek → 打字机字幕 → TTS 播报 -->
+<!-- pages/index/index.wxml - 首页（天气皮肤 + 每日早读故事 + 单行记录）
+     2026-09-15 审核改造：首页中部改为「每日早读故事卡」（系统预置内容，无 AI）。
+     原「云朵 AI 育娃伙伴」仅当云端开关 aiEnabled=true 时启用（审核模式默认关闭）。 -->
 <view class="page-index safe-bottom">
 
   <!-- ===== 天气皮肤背景层（纯装饰，最底层） ===== -->
@@ -21,7 +21,7 @@
         type="2d"
         id="rainCanvas"
         class="rain-canvas"
-        wx:if="{{!showFeedSheet && !showDiaperSheet && !showSleepSheet && !showBabySheet && !showAiTextSheet && !showLoginPanel}}"
+        wx:if="{{!showFeedSheet && !showDiaperSheet && !showSleepSheet && !showBabySheet && !showAiSheet && !showLoginPanel}}"
       ></canvas>
     </block>
     <block wx:if="{{weatherClass === 'snow'}}">
@@ -89,99 +89,114 @@
       </view>
     </view>
 
-    <!-- ========== 云朵 AI 育娃伙伴（2026-09-14 重构：渐变玻璃云朵按钮 + 品牌头 + 光环 + 底部快捷提问） ========== -->
-    <view class="ai-buddy-card {{aiExpanded ? 'expanded' : ''}}">
-      <!-- 卡内装饰：漂浮小云 -->
-      <view class="ai-deco ai-deco-1"></view>
-      <view class="ai-deco ai-deco-2"></view>
-
-      <!-- 顶部：品牌名 + 动态状态徽标 -->
-      <view class="ai-header">
-        <view class="ai-brand">
-          <text class="ai-brand-icon">☁️</text>
-          <text class="ai-brand-name">小云朵</text>
-          <text class="ai-brand-sub">AI 育娃伙伴</text>
+    <!-- ===== 中部功能卡（双模式） =====
+         审核模式（aiEnabled=false，默认）：每日早读故事卡（系统预置，含语音播报，无 AI）
+         完整模式（aiEnabled=true，上线后云端开关开启）：云朵 AI 育娃伙伴问答+语音
+    -->
+    <block wx:if="{{!reviewMode}}">
+      <!-- ===== 完整模式：云朵 AI 育娃伙伴（仅云端开关开启时渲染） ===== -->
+      <view class="ai-buddy-card {{aiExpanded ? 'expanded' : ''}}">
+        <view class="ai-deco ai-deco-1"></view>
+        <view class="ai-deco ai-deco-2"></view>
+        <view class="ai-header">
+          <view class="ai-brand">
+            <text class="ai-brand-icon">☁️</text>
+            <text class="ai-brand-name">小云朵</text>
+            <text class="ai-brand-sub">AI 育娃伙伴</text>
+          </view>
+          <view class="ai-state {{aiListening ? 'st-listening' : ''}} {{aiThinking ? 'st-thinking' : ''}} {{aiSpeaking && !aiTalking ? 'st-speaking' : ''}}">
+            <text class="ai-state-dot"></text>
+            <text wx:if="{{aiListening}}">正在聆听</text>
+            <text wx:elif="{{aiThinking}}">思考中</text>
+            <text wx:elif="{{aiSpeaking && !aiTalking}}">正在播报</text>
+            <text wx:else>随时问我</text>
+          </view>
         </view>
-        <view class="ai-state {{aiListening ? 'st-listening' : ''}} {{aiThinking ? 'st-thinking' : ''}} {{aiSpeaking && !aiTalking ? 'st-speaking' : ''}}">
-          <text class="ai-state-dot"></text>
-          <text wx:if="{{aiListening}}">正在聆听</text>
-          <text wx:elif="{{aiThinking}}">思考中</text>
-          <text wx:elif="{{aiSpeaking && !aiTalking}}">正在播报</text>
-          <text wx:else>随时问我</text>
+        <view class="ai-voice-zone">
+          <view class="ai-halo halo-1 {{aiWaveActive ? 'on' : ''}}"></view>
+          <view class="ai-halo halo-2 {{aiWaveActive ? 'on' : ''}}"></view>
+          <view
+            class="ai-voice-btn {{aiTalking ? 'talking' : ''}} {{aiListening ? 'listening' : ''}}"
+            bindtouchstart="onCloudTouchStart"
+            bindtouchend="onCloudTouchEnd"
+            bindtouchcancel="onCloudTouchCancel"
+            bindlongpress="onCloudLongPress"
+            bindtap="onCloudTap"
+            hover-class="none"
+          >
+            <image class="ai-cloud-img" src="/images/cloud-voice-btn.png" mode="aspectFit"></image>
+          </view>
+          <view class="ai-voice-tip" wx:if="{{aiListening || aiThinking}}">{{aiTipText}}</view>
         </view>
-      </view>
-
-      <!-- 语音主区：渐变玻璃云朵大按钮（居中，占主要高度） -->
-      <view class="ai-voice-zone">
-        <!-- 聆听/播报扩散光环 -->
-        <view class="ai-halo halo-1 {{aiWaveActive ? 'on' : ''}}"></view>
-        <view class="ai-halo halo-2 {{aiWaveActive ? 'on' : ''}}"></view>
-
-        <!-- 大语音按钮：直接使用参考图裁切的云朵按钮图（含居中麦克风/声波/按住说话） -->
-        <view
-          class="ai-voice-btn {{aiTalking ? 'talking' : ''}} {{aiListening ? 'listening' : ''}}"
-          bindtouchstart="onCloudTouchStart"
-          bindtouchend="onCloudTouchEnd"
-          bindtouchcancel="onCloudTouchCancel"
-          bindlongpress="onCloudLongPress"
-          bindtap="onCloudTap"
-          hover-class="none"
-        >
-          <image class="ai-cloud-img" src="/images/cloud-voice-btn.png" mode="aspectFit"></image>
+        <view class="ai-subtitle-box {{aiExpanded ? 'expanded' : ''}}">
+          <view class="ai-subtitle-bar" bindtap="showFullAnswer">
+            <scroll-view class="ai-subtitle-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+              <view class="ai-subtitle-text">
+                <text wx:if="{{aiExpanded}}">{{aiFullAnswer}}</text>
+                <text wx:elif="{{aiSubtitle}}">{{aiSubtitle}}</text>
+                <text wx:elif="{{aiThinking}}" class="ai-thinking">小云朵思考中</text>
+                <text wx:else class="ai-subtitle-placeholder">问问小云朵，育儿难题轻松解</text>
+              </view>
+            </scroll-view>
+            <view class="ai-expand-btn" wx:if="{{aiShowArrow}}" catchtap="showFullAnswer">
+              <image class="ai-expand-icon {{aiExpanded ? 'rotated' : ''}}" src="/images/icons/chevron-down.svg" mode="aspectFit"></image>
+              <text class="ai-expand-text">{{aiExpanded ? '收起' : '全文'}}</text>
+            </view>
+          </view>
+          <view class="ai-answer-actions" wx:if="{{aiExpanded}}">
+            <view class="ai-act-btn" catchtap="speakAnswer" hover-class="ai-act-hover">
+              <text class="ai-act-icon">🔊</text>
+              <text>{{aiSpeaking ? '停止' : '播报'}}</text>
+            </view>
+            <view class="ai-act-btn" catchtap="copyAnswer" hover-class="ai-act-hover">
+              <text class="ai-act-icon">⧉</text>
+              <text>复制</text>
+            </view>
+            <text class="ai-answer-meta">内容由 AI 生成，仅供参考</text>
+          </view>
         </view>
-
-        <!-- 状态提示（云朵图内已含「按住说话」，仅聆听/思考时显示动态提示） -->
-        <view class="ai-voice-tip" wx:if="{{aiListening || aiThinking}}">{{aiTipText}}</view>
-      </view>
-
-      <!-- 流式字幕区 + 展开/收起（点胶囊按钮或字幕条切换，展开显示完整回答） -->
-      <view class="ai-subtitle-box {{aiExpanded ? 'expanded' : ''}}">
-        <view class="ai-subtitle-bar" bindtap="showFullAnswer">
-          <scroll-view class="ai-subtitle-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
-            <view class="ai-subtitle-text">
-              <text wx:if="{{aiExpanded}}">{{aiFullAnswer}}</text>
-              <text wx:elif="{{aiSubtitle}}">{{aiSubtitle}}</text>
-              <text wx:elif="{{aiThinking}}" class="ai-thinking">小云朵思考中</text>
-              <text wx:else class="ai-subtitle-placeholder">问问小云朵，育儿难题轻松解</text>
+        <view class="ai-quick-wrap" wx:if="{{!aiExpanded}}">
+          <scroll-view class="ai-quick-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
+            <view class="ai-quick-row">
+              <text class="ai-quick-lead">猜你想问</text>
+              <view
+                class="ai-quick-bubble"
+                wx:for="{{quickQuestions}}" wx:key="*this"
+                data-text="{{item}}"
+                bindtap="onQuickQuestion"
+                hover-class="ai-quick-hover"
+              >{{item}}</view>
             </view>
           </scroll-view>
-          <!-- 展开/收起胶囊按钮（带 chevron 图标，展开后图标翻转） -->
-          <view class="ai-expand-btn" wx:if="{{aiShowArrow}}" catchtap="showFullAnswer">
-            <image class="ai-expand-icon {{aiExpanded ? 'rotated' : ''}}" src="/images/icons/chevron-down.svg" mode="aspectFit"></image>
-            <text class="ai-expand-text">{{aiExpanded ? '收起' : '全文'}}</text>
-          </view>
-        </view>
-
-        <!-- 展开后的操作行：播报 / 复制 -->
-        <view class="ai-answer-actions" wx:if="{{aiExpanded}}">
-          <view class="ai-act-btn" catchtap="speakAnswer" hover-class="ai-act-hover">
-            <text class="ai-act-icon">🔊</text>
-            <text>{{aiSpeaking ? '停止' : '播报'}}</text>
-          </view>
-          <view class="ai-act-btn" catchtap="copyAnswer" hover-class="ai-act-hover">
-            <text class="ai-act-icon">⧉</text>
-            <text>复制</text>
-          </view>
-          <text class="ai-answer-meta">内容由 AI 生成，仅供参考</text>
         </view>
       </view>
-
-      <!-- 快捷提问气泡（横向滚动，置于底部；展开全文时让位隐藏） -->
-      <view class="ai-quick-wrap" wx:if="{{!aiExpanded}}">
-        <scroll-view class="ai-quick-scroll" scroll-x="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}">
-          <view class="ai-quick-row">
-            <text class="ai-quick-lead">猜你想问</text>
-            <view
-              class="ai-quick-bubble"
-              wx:for="{{quickQuestions}}" wx:key="*this"
-              data-text="{{item}}"
-              bindtap="onQuickQuestion"
-              hover-class="ai-quick-hover"
-            >{{item}}</view>
+    </block>
+    <block wx:else>
+      <!-- ===== 审核模式：每日早读故事卡（系统预置内容；语音朗读走微信官方同声传译插件，无云端 AI 合成） ===== -->
+      <view class="predict-card story-card">
+        <view class="story-top">
+          <view class="story-title-row">
+            <text class="story-icon">📖</text>
+            <text class="story-title">每日早读故事</text>
           </view>
+          <view class="story-sub">{{todayText}} · 第 {{storyIndex + 1}} 篇</view>
+        </view>
+        <scroll-view class="story-scroll" scroll-y="{{true}}" enhanced="{{true}}" show-scrollbar="{{false}}" scroll-top="{{storyScrollTop}}">
+          <view class="story-text">{{storyContent}}</view>
         </scroll-view>
+        <view class="story-actions">
+          <view class="story-act" catchtap="speakStory" hover-class="ai-act-hover">
+            <text class="story-act-icon">{{storySpeaking ? '⏹' : '🔊'}}</text>
+            <text>{{storySpeaking ? '停止' : '听故事'}}</text>
+          </view>
+          <view class="story-act" catchtap="nextStory" hover-class="ai-act-hover">
+            <text class="story-act-icon">📖</text>
+            <text>换一篇</text>
+          </view>
+          <view class="story-tip">上下滑动阅读全文</view>
+        </view>
       </view>
-    </view>
+    </block>
 
     <!-- ===== 记录控件：三卡一行 ===== -->
     <view class="record-row">
@@ -323,7 +338,7 @@
   </view>
 
   <!-- ========== 云朵 AI：文本输入弹层（点按云朵触发） ========== -->
-  <view class="sheet-mask ai-sheet-mask" wx:if="{{showAiSheet}}" bindtap="hideAiSheet" catchtouchmove="noop">
+  <view class="sheet-mask ai-sheet-mask" wx:if="{{showAiSheet && !reviewMode}}" bindtap="hideAiSheet" catchtouchmove="noop">
     <view class="ai-input-sheet" catchtap="noop">
       <view class="sheet-handle" data-close="hideAiSheet" bindtouchstart="_onSheetTouchStart" bindtouchmove="_onSheetTouchMove" bindtouchend="_onSheetTouchEnd"></view>
       <view class="ai-input-title">问问小云朵☁️</view>

@@ -1,24 +1,44 @@
-// utils/tts.js - 语音播报（云函数 edge-tts 温柔女声优先 + 微信同声传译插件兜底）+ 语音识别
+// utils/tts.js - 语音播报（云函数 edge-tts 温柔女声优先 + 微信同声传译插件兜底）+ 语音合成
 //
 // 播报方案（2026-09-15 v4 重构）：
-//  1. 优先调用云函数 aiTts：edge-tts 免费合成「温柔女声 晓晓（zh-CN-XiaoxiaoNeural）」，
-//     返回 mp3 base64，写入本地临时文件播放
-//  2. 失败 / 云函数未部署 → 自动回退「微信同声传译」插件（默认男声，仅保底）
+//  1. 完整模式：优先调用云函数 aiTts（edge-tts 免费合成「温柔女声 晓晓」）→ 插件兜底
+//  2. 审核模式：仅通过微信官方「同声传译」插件朗读预置文本，不调用任何云端合成
 //
-// 【2026-09-15 v4：顺序保真的双缓冲预取 + 分段续播】
-//   - 预取：并发合成多段（默认 2），但按【下标】落地到 slots 数组，
-//     播放永远从当前所需下标取，绝不出乱序（v3 的 ready.push 队列在
-//     各分片合成耗时随机时可能先播后面的段 —— 已修）
-//   - 续播：speech(text, { from: k }) 从第 k 段开始播；stop() 通过
-//     回调 options.onStopped({ segmentIndex }) 告知「停在第几段」，
-//     页面据此实现「同内容未收起 → 停止处续播」「新内容 → 从头播」
-//   - 停止令牌 _seq 机制：stop() 立即令合成/预取/播放全链作废
-//   - 句读感知分片（smartSplit）：句末标点优先，逗号次之，硬切兜底，单段≈120 字
+// 【模式开关 2026-09-16】
+//  - enableTTS({ enabled, allowCloud }) 动态配置语音能力与合成通道：
+//      enabled=false（默认，审核模式）：speech/startRecord 直接报错，不调用任何服务。
+//      enabled=true, allowCloud=false（审核模式·故事朗读）：仅官方插件朗读，不走云端合成。
+//      enabled=true, allowCloud=true（完整 AI 模式）：恢复云端 edge-tts 女声 + 插件兜底。
+//  - 审核模式用官方插件朗读预置故事，是 WechatSI 插件的正当用途，也是版本描述中的说明口径。
 //
 // 使用：
+//  - tts.enableTTS({ enabled: true, allowCloud: false })  // 审核模式：插件朗读故事
+//  - tts.enableTTS({ enabled: true, allowCloud: true })   // 完整模式：云端女声优先
 //  - tts.speech(text, { from, onStart, onEnd, onError, onStopped })
 //  - tts.stop()  // 立即、彻底；触发 onStopped 回调
 const PLUGIN_ID = 'WechatSI'
+
+// 语音能力总开关：默认关闭（审核模式）
+let _reviewEnabled = true
+// 是否允许云端合成（aiTts 云函数）：默认不允许（审核模式）
+let _allowCloudSynth = false
+
+/** 配置语音能力（页面在收到云端开关后调用） */
+function enableTTS(opts) {
+  if (typeof opts === 'boolean') {
+    _reviewEnabled = !opts
+    _allowCloudSynth = !!opts
+    return
+  }
+  const cfg = opts || {}
+  _reviewEnabled = cfg.enabled !== true
+  _allowCloudSynth = !!cfg.allowCloud
+}
+
+/** 当前是否允许调用云端合成（tts.js 内部控制 _synthOne 时用） */
+function isCloudSynthAllowed() {
+  return !_reviewEnabled && _allowCloudSynth
+}
 
 let _plugin = null
 function getPlugin() {
@@ -68,7 +88,7 @@ function stop() {
 // ============================================================
 // 智能分片（句读感知）
 // ============================================================
-const SEG_TARGET = 120 // 单段目标字数：够短（合成快、不撞 3s 陷阱），又保持语句相对完整
+const SEG_TARGET = 90 // 单段目标字数：低于官方插件 textToSpeech 100 字上限，两种通道均可安全朗读
 
 /** 按保留标点的正则把文本切成片段（保留标点） */
 function splitByPunct(text, re) {
@@ -198,17 +218,30 @@ function _synthPlugin(content, seq) {
   })
 }
 
-/** 单段全链路合成：云 → 插件兜底；都失败 resolve(null)（该段跳过，不中断整体） */
+/**
+ * 单段全链路合成：
+ *  - 完整模式（allowCloud）：云端女声优先 → 插件兜底
+ *  - 审核模式（仅插件允许）：只走插件，绝不调用云端合成
+ *  - 都失败 resolve(null)（该段跳过，不中断整体）
+ */
 function _synthOne(content, seq) {
   return new Promise((resolve) => {
+    const synth = () =>
+      _synthPlugin(content, seq)
+        .then((src) => resolve(src))
+        .catch(() => resolve(null))
+
+    if (!isCloudSynthAllowed()) {
+      // 审核/默认模式：不走云端，直接用官方插件朗读
+      synth()
+      return
+    }
     _synthCloud(content, seq).then(
       (src) => resolve(src),
       (err) => {
         if (!isAlive(seq)) { resolve(null); return }
         console.warn('edge-tts 女声合成失败，回退插件:', err)
-        _synthPlugin(content, seq)
-          .then((src) => resolve(src))
-          .catch(() => resolve(null))
+        synth()
       }
     )
   })
@@ -282,6 +315,11 @@ const PREFETCH_BATCH = 2 // 预取并发数（双缓冲：第 N 段播放时，N
  * @param {Function} [options.onStopped] 用户 stop() 时回调：({ segment }) 停在的分段下标
  */
 function speech(text, options = {}) {
+  // 完全禁用：不播放、不调用任何合成服务
+  if (_reviewEnabled) {
+    if (options && options.onError) options.onError(new Error('tts-disabled-in-review-mode'))
+    return
+  }
   const parts = smartSplit(text)
   if (!parts.length) return
   stop() // 先停旧播放链（令牌自增，并触发旧会话 onStopped）
@@ -391,6 +429,11 @@ let _onRecognizeFail = null
  * @param {object} callbacks { onText(text), onError(err), onStart() }
  */
 function startRecord(callbacks = {}) {
+  // 语音识别（按住说话提问）仅完整 AI 模式可用；审核模式关闭
+  if (!isCloudSynthAllowed()) {
+    if (callbacks && callbacks.onError) callbacks.onError({ errMsg: '语音暂不可用' })
+    return
+  }
   const pl = getPlugin()
   if (!pl || !pl.getRecordRecognitionManager) {
     if (callbacks.onError) callbacks.onError({ errMsg: '语音插件未就绪' })
@@ -434,6 +477,8 @@ function stopRecord() {
 }
 
 module.exports = {
+  enableTTS,
+  isCloudSynthAllowed,
   speech,
   stop,
   startRecord,
